@@ -223,7 +223,7 @@ cpdef process_cluster(dict id2cluster, str chrom, str te_idx):
         fout.write(id2cluster[c_id].cluster2bed())
     
     fout.close()
-    return id2cluster
+    return id2cluster, te_aln_path
 
 ##
 cdef align_mm2(str ref, str query, int thread_mm2, str preset="map-ont"):
@@ -232,12 +232,12 @@ cdef align_mm2(str ref, str query, int thread_mm2, str preset="map-ont"):
         str wk_dir = os.path.dirname(query)
         str q_p = os.path.basename(query).rsplit('.', 1)[0]
         str ref_p = os.path.basename(ref).rsplit('.', 1)[0]
-        str fout = os.path.join(wk_dir, ref_p + '_' + q_p + '.bam')
-        list cmd_mm2 = ['minimap2' + ' -t ' + str(thread_mm2) + ' -ax ' + preset + ' ' + ref + ' ' + query + ' | ' + 'samtools view -Shb - -o ' + fout]
+        str out_path = os.path.join(wk_dir, ref_p + '_' + q_p + '.bam')
+        list cmd_mm2 = ['minimap2' + ' -t ' + str(thread_mm2) + ' -ax ' + preset + ' ' + ref + ' ' + query + ' | ' + 'samtools view -Shb - -o ' + out_path]
     
     align_proc = Popen(cmd_mm2, stderr=DEVNULL, shell=True, executable='/bin/bash')
     exitcode = align_proc.wait()
     if exitcode != 0:
         raise Exception("Error: minimap2 alignment for {} to {} failed".format(q_p, ref_p))
     
-    return fout
+    return out_path
