@@ -2,7 +2,7 @@ from pysam import AlignmentFile
 from uuid import uuid4
 from collections import OrderedDict, defaultdict
 from bx.intervals.intersection import Intersecter, Interval
-import mappy as mp
+from mappy import revcomp
 from subprocess import Popen, PIPE, STDOUT, DEVNULL
 import os
 
@@ -86,7 +86,7 @@ cdef class Cluster:
 
 
 ##
-cdef trim(int qlen, str seq, int q_st, int q_en, int op_len, int flanksize):
+cdef trim(bint is_reverse, int qlen, str seq, int q_st, int q_en, int op_len, int flanksize):
     """ 将insert/clip片段从原本的query序列中剪切出来，两端各延伸flanksize长度。 """
     cdef:
         int st_t, en_t
@@ -104,6 +104,8 @@ cdef trim(int qlen, str seq, int q_st, int q_en, int op_len, int flanksize):
     q_st_t = q_st - st_t
     q_en_t = q_st_t + op_len
     seq_t = seq[st_t:en_t]
+    if is_reverse:
+        seq_t = revcomp(seq_t)
 
     return seq_t, q_st_t, q_en_t
 
@@ -161,7 +163,7 @@ cdef extract_seg(object read, object seg_fa, int flanksize=200, unsigned int min
 
             # trim the query sequence and define the trimmed query start & end of the segment
             if seq:
-                seq_t, q_st_t, q_en_t = trim(qlen, seq, q_st, q_en, op_len, flanksize)
+                seq_t, q_st_t, q_en_t = trim(read.is_reverse, qlen, seq, q_st, q_en, op_len, flanksize)
                 
                 # write out trimmed sequence
                 seg = Segment(read, segname, q_st, q_en, r_st, r_en, rpos, q_st_t, q_en_t, qlen)
