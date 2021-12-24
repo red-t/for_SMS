@@ -104,8 +104,8 @@ cdef trim(bint is_reverse, int qlen, str seq, int q_st, int q_en, int op_len, in
     q_st_t = q_st - st_t
     q_en_t = q_st_t + op_len
     seq_t = seq[st_t:en_t]
-    if is_reverse:
-        seq_t = revcomp(seq_t)
+    # if is_reverse:
+    #     seq_t = revcomp(seq_t)
 
     return seq_t, q_st_t, q_en_t
 
