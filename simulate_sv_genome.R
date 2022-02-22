@@ -24,7 +24,7 @@ tsd_idx = restrict(tsd_idx, start = 1)
 
 # 对于每种transposon，生成插入片段，与对应的tsd拼接起来，并且输出到文件当中
 k=0
-grad = 1/n_grad
+grad = 0.9/n_grad
 for (i in 1:length(te_idx)) {
   for (j in 1:n_grad) {
     l = k+j
@@ -32,7 +32,8 @@ for (i in 1:length(te_idx)) {
     end_idx = l*n_ins
     
     # 随机生成TE insert片段
-    tmp_te_idx = createRandomRegions(nregions = n_ins, length.mean = round(j*grad*width(te_idx[i])), length.sd = 20, genome = te_idx[i], non.overlapping = FALSE)
+    sd = 0.1*grad*width(te_idx[i])
+    tmp_te_idx = createRandomRegions(nregions = n_ins, length.mean = round(j*grad*width(te_idx[i])), length.sd = sd, genome = te_idx[i], non.overlapping = FALSE)
     tmp_te_idx = restrict(tmp_te_idx, start = 1)
     tmp_tsd_idx = tsd_idx[start_idx:end_idx]
     
