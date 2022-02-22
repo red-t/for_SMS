@@ -1,3 +1,35 @@
+# from pysam import AlignmentFile
+# from concurrent.futures import ThreadPoolExecutor, as_completed
+# from read_alignment import build_cluster, process_cluster
+
+# def main(bam='test.bam'):
+#     chrom2clusters = dict()
+#     with ThreadPoolExecutor(max_workers=5) as executor:
+#         bam_file = AlignmentFile(bam, 'rb')
+#         chroms = list(bam_file.references)
+
+#         future2chrom = {executor.submit(build_cluster, bam, chrom, "ALUL1SVA.mmi"):chrom for chrom in chroms}
+#         for future in as_completed(future2chrom):
+#             chrom = future2chrom[future]
+#             try:
+#                 chrom2clusters[chrom] = future.result()
+#             except Exception as exc:
+#                 print('building cluster for %r generated an exception: %s' % (chrom, exc))
+        
+#         future2chrom = {executor.submit(process_cluster, chrom2clusters[chrom], chrom):chrom for chrom in chroms}
+#         for future in as_completed(future2chrom):
+#             chrom = future2chrom[future]
+#             try:
+#                 chrom2clusters[chrom] = future.result()
+#             except Exception as exc:
+#                 print('processing cluster for %r generated an exception: %s' % (chrom, exc))
+    
+#     return chrom2clusters
+
+
+# chrom2c = main()
+
+
 from pysam import AlignmentFile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from read_alignment import build_cluster, process_cluster
@@ -8,29 +40,20 @@ def main(bam='test.bam'):
         bam_file = AlignmentFile(bam, 'rb')
         chroms = list(bam_file.references)
 
-        future2chrom = {executor.submit(build_cluster, bam, chrom):chrom for chrom in chroms}
+        future2chrom = {executor.submit(build_cluster, bam, chrom, "ALUL1SVA.mmi"):chrom for chrom in chroms}
         for future in as_completed(future2chrom):
             chrom = future2chrom[future]
-            try:
-                chrom2clusters[chrom] = future.result()
-            except Exception as exc:
-                print('building cluster for %r generated an exception: %s' % (chrom, exc))
+            chrom2clusters[chrom] = future.result()
         
-        future2chrom = {executor.submit(process_cluster, chrom2clusters[chrom], chrom, "ALUL1SVA.mmi"):chrom for chrom in chroms}
+        future2chrom = {executor.submit(process_cluster, chrom2clusters[chrom], chrom):chrom for chrom in chroms}
         for future in as_completed(future2chrom):
             chrom = future2chrom[future]
-            try:
-                chrom2clusters[chrom] = future.result()
-            except Exception as exc:
-                print('processing cluster for %r generated an exception: %s' % (chrom, exc))
+            chrom2clusters[chrom] = future.result()
     
     return chrom2clusters
 
 
 chrom2c = main()
-
-
-
 
 
 # def t_return(s):
@@ -192,50 +215,3 @@ chrom2c = main()
 
 #     def get_aligned_pairs(self, matches_only=False, with_seq=False): # return list of tuples; [(q_pos, r_pos), ...]
 #         pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Read name = 31e7dde4-0f61-46de-bc44-ec349ffc5639_chrTEST_90777_0_4628_r
-# Read length = 4,828bp
-# Flags = 16
-# ----------------------
-# Mapping = Primary @ MAPQ 60
-# Reference span = LINE1:4-3,422 (-) = 3,419bp
-# Cigar = 203S5M1D37M2I11M2I5M1D7M2I63M1I29M1I4M2I11M3I1M1I31M2D19M6I6M1I28M2I46M3D6M1I7M3I13M2I17M4I5M4D37M1I34M2D7M3I4M3I3M3D2M1I8M1I15M1D19M1I4M1D6M3D24M1I10M2I10M1I2M1I20M1I28M1I11M1I6M2D43M4D19M1I24M4I1M1D12M1I8M2D8M1D13M5I3M1I18M2I3M3D15M1D8M2I5M1D5M3I3M1I45M1I17M2I30M1I1M1I28M1I7M1D1M1D21M1D1M1D9M1I11M1D23M1D36M1I2M1I29M1D2M1D18M2I11M1D26M3D4M3D2M1D12M1I18M1I19M1I6M3I2M1I15M1I19M2I5M1I24M4D5M1I3M1D5M2D7M1D51M1I23M1I45M3I2M1D3M1D6M1I18M3D42M3I16M1I13M4D45M1D13M1D56M1I4M2D16M1D9M2D8M4D3M1I1M2I2M2I11M...7M3D5M1D7M1D14M1D9M1D7M1D15M1I12M1D8M7D10M1I26M1D1M1D2M1I6M5D5M1I6M4D1M1D38M1I5M1D11M1D4M1D3M2D4M1D41M1I6M1D23M4D8M1I20M4D2M1D5M2I5M1D8M1D4M1D10M1I5M2D4M1D6M1I10M1D4M1D12M1D5M2I5M1I19M1I15M1D6M1I1M2D4M3D10M2I6M2I8M2D5M1D9M3I6M1D14M3D6M1D4M1D5M2D16M3I18M2D9M5D3M3D22M1D18M1I8M1I23M2D10M1D3M1D10M4D2M9D8M1D3M1I7M1D3M4D1M10D12M3I8M5D13M1D7M2D8M2D2M1I1M2D11M1I7M2I1M1D12M2D8M10D8M1D13M2I7M5D7M1I10M1D6M2D15M1I6M1D19M1I2M1D1M1D7M1D3M1D3M1D1M3I12M1D1M1D23M1D2M1D3M1D29M1D11M3D4M1D13M1D4M2D4M3D6M2I18M1293S
-# Clipping = Left 203 soft; Right 1,293 soft
-# ----------------------
-# s1 = 556
-# s2 = 0
-# NM = 781
-# AS = 2412
-# de = 0.1694
-# rl = 0
-# cm = 63
-# nn = 0
-# tp = P
-# ms = 2629Location = LINE1:1,967
-# Base = C @ QV 126
-
-
-

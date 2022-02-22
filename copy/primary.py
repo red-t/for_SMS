@@ -2,7 +2,7 @@ from pysam import AlignmentFile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from read_alignment import build_cluster, process_cluster
 
-def main(bam='nanovar_ds.bam'):
+def main(bam='test.bam'):
     chrom2clusters = dict()
     with ThreadPoolExecutor(max_workers=5) as executor:
         bam_file = AlignmentFile(bam, 'rb')
@@ -16,7 +16,7 @@ def main(bam='nanovar_ds.bam'):
             except Exception as exc:
                 print('building cluster for %r generated an exception: %s' % (chrom, exc))
         
-        future2chrom = {executor.submit(process_cluster, chrom2clusters[chrom], chrom):chrom for chrom in chroms}
+        future2chrom = {executor.submit(process_cluster, chrom2clusters[chrom], chrom, "ALUL1SVA.mmi"):chrom for chrom in chroms}
         for future in as_completed(future2chrom):
             chrom = future2chrom[future]
             try:
@@ -107,19 +107,19 @@ chrom2c = main()
 
 # from uuid import uuid4
 # # from importlib import reload
-from pysam import AlignmentFile
-from read_alignment import build_cluster, process_cluster
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# from pysam import AlignmentFile
+# from read_alignment import build_cluster, process_cluster
+# from concurrent.futures import ThreadPoolExecutor, as_completed
 
-bam = "nanovar_ds.bam"
-clusters = {}
-with ThreadPoolExecutor(max_workers=5) as executor:
-    bam_file = AlignmentFile(bam, 'rb')
-    chroms = list(bam_file.references)
-    tasks = {executor.submit(build_cluster, bam, chrom):chrom for chrom in chroms}
-    for future in as_completed(tasks):
-        chrom = tasks[future]
-        clusters[chrom] = future.result()
+# bam = "nanovar_ds.bam"
+# clusters = {}
+# with ThreadPoolExecutor(max_workers=5) as executor:
+#     bam_file = AlignmentFile(bam, 'rb')
+#     chroms = list(bam_file.references)
+#     tasks = {executor.submit(build_cluster, bam, chrom):chrom for chrom in chroms}
+#     for future in as_completed(tasks):
+#         chrom = tasks[future]
+#         clusters[chrom] = future.result()
 
 
 
