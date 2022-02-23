@@ -11,8 +11,8 @@ out_path=$5
 
 # parameter initialization
 [ -z $n_group ] && n_group=1
-[ -z $g_size ] && g_size=1
-[ -z $n_ins ] && n_ins=500
+[ -z $g_size ] && g_size=5
+[ -z $n_ins ] && n_ins=1000
 [ -z $ref_path ] && ref_path="/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/simulated_sv.summary"
 [ -z $out_path ] && out_path="./"
 
@@ -30,8 +30,10 @@ do
 
     # calculating frequency
     cat $out_dir/group$i-sub*summary | sort -k1,1 -k2,2n | uniq -c > $out_dir/tmp.uniq
-    awk 'BEGIN{OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15}' $out_dir/tmp.uniq > $out_dir/group$i-ins-summary.bed
-    awk 'BEGIN{OFS="\t"} {print $8,$13,$16,$6}' $out_dir/tmp.uniq > $out_dir/group$i-ins-seq
+    echo -e "chrom\tstart\tend\tname\tadd_len\tstrand\tfrequency\tTE\tte_start\tte_len\ttsd_start\ttsd_len" > $out_dir/group$i-ins-summary.bed
+    awk 'BEGIN{OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15}' $out_dir/tmp.uniq >> $out_dir/group$i-ins-summary.bed
+    echo -e "name\tte_seq\ttsd_seq\tins_seq" > $out_dir/group$i-ins-seq
+    awk 'BEGIN{OFS="\t"} {print $8,$13,$16,$6}' $out_dir/tmp.uniq >> $out_dir/group$i-ins-seq
     rm $out_dir/tmp.uniq
 
 done
