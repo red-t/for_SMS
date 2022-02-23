@@ -3,23 +3,23 @@
 # usage: subset_ins.sh n_group g_size n_ins path_sv.summary out_path
 
 # geting parameters
-n_group = $1
-g_size = $2
-n_ins = $3
-ref_path = $4
-out_path = $5
+n_group=$1
+g_size=$2
+n_ins=$3
+ref_path=$4
+out_path=$5
 
 # parameter initialization
-[ -z $n_group ] && n_group = 1
-[ -z $g_size ] && g_size = 1
-[ -z $n_ins ] && n_ins = 500
-[ -z $ref_path ] && ref_path = "/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/simulated_sv.summary"
-[ -z $out_path ] && out_path = "./"
+[ -z $n_group ] && n_group=1
+[ -z $g_size ] && g_size=1
+[ -z $n_ins ] && n_ins=500
+[ -z $ref_path ] && ref_path="/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/simulated_sv.summary"
+[ -z $out_path ] && out_path="./"
 
 # generating group(s) of subset(s) AND calculating insertion frequency for each group
 for ((i=1; i<=$n_group; i++))
 do
-    out_dir = ${out_path%*/}/group$i
+    out_dir=${out_path%*/}/group$i && mkdir $out_dir
 
     # generating subset(s)
     for ((j=1; j<=$2; j++))
