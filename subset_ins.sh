@@ -30,8 +30,8 @@ do
 
     # calculating frequency
     cat $out_dir/group$i-sub*summary | sort -k1,1 -k2,2n | uniq -c > $out_dir/tmp.uniq
-    awk 'BEGIN{FS=OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15}' $out_dir/tmp.uniq > $out_dir/group$i-ins-summary.bed
-    awk 'BEGIN{FS=OFS="\t"} {print $8,$13,$16,$6}' $out_dir/tmp.uniq > $out_dir/group$i-ins-seq
+    awk 'BEGIN{OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15}' $out_dir/tmp.uniq > $out_dir/group$i-ins-summary.bed
+    awk 'BEGIN{OFS="\t"} {print $8,$13,$16,$6}' $out_dir/tmp.uniq > $out_dir/group$i-ins-seq
     rm $out_dir/tmp.uniq
 
 done
