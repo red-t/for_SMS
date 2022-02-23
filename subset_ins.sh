@@ -23,6 +23,7 @@ do
 
     # generating subset(s)
     for ((j=1; j<=$2; j++))
+    do
         shuf -n $n_ins $ref_path | sort -k1,1 -k2,2n > $out_dir/group$i-sub$j.summary
         cut -f 1-6 $out_dir/group$i-sub$j.summary > $out_dir/group$i-sub$j.bed
     done
