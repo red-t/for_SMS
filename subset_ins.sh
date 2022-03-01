@@ -1,6 +1,7 @@
 #! /bin/bash
 
 # usage: subset_ins.sh n_group g_size n_ins path_sv.summary out_path
+# subset_ins.sh 2 5 1000 ./simulated_sv.summary ./
 
 # geting parameters
 n_group=$1
