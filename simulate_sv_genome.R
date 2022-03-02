@@ -3,7 +3,6 @@
 # Rscript simulate_sv_genome.R te_ccs.fa origion_genome.fa 12 4
 library(Rsamtools)
 library(regioneR)
-library(RSVSim)
 
 
 seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
@@ -11,7 +10,11 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
   # 随机生成一些突变的位点以及类型
   n_var = sample(1:3, size = 1, prob = c(0.8, 0.1, 0.1))
   var_type = sample(1:4, size = n_var, prob = rep(0.25, 4))
-  var_idx = createRandomRegions(nregions=n_var, length.mean=0.1*width(idx), length.sd=1, genome=idx, non.overlapping=TRUE)
+  if (width(idx) <= 1000) {
+    var_idx = createRandomRegions(nregions=n_var, length.mean=0.1*width(idx), length.sd=1, genome=idx, non.overlapping=TRUE)
+  } else {
+    var_idx = createRandomRegions(nregions=n_var, length.mean=100, length.sd=10, genome=idx, non.overlapping=TRUE)
+  }
   var_idx = data.frame(var_idx)[order(data.frame(var_idx)$end, decreasing=TRUE),]
   
   # 将te_idx, genome_idx汇总为ref_idx并且对ref_idx进行一些限制
