@@ -210,9 +210,3 @@ tsd_idx = restrict(tsd_idx, start = 1)
 
 simulate_ins(te_fa, te_idx, genome_fa, genome_idx, tsd_idx[1:round(0.5*length(tsd_idx))], n, t)
 simulate_ins_full(te_fa, te_idx, genome_fa, genome_idx, tsd_idx[round(0.5*length(tsd_idx))+1:length(tsd_idx)], n)
-
-
-
-t <- function() {
-  return(c("adsadad",2))
-}
