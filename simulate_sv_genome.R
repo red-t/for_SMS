@@ -23,7 +23,8 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
   
   # 从var_idx中筛除一些可能导致bug的突变位点，若全部被筛除，则返回原本的te_seq
   var_idx = var_idx[var_idx$start>0 & var_idx$width>0 & var_idx$end<width(idx),]
-  if (nrow(var_idx) == 0) {return(c(te_seq, 0))}
+  n_var = nrow(var_idx)
+  if (nrow(var_idx) == 0) {return(c(te_seq, n_var))}
   
   for (i in 1:nrow(var_idx)) {
     if (var_type[i] == 1) {         # deletion
@@ -70,7 +71,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
     }
   }
   
-  return(c(te_seq, nrow(var_idx)))
+  return(c(te_seq, n_var))
 }
 
 
@@ -85,7 +86,7 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t) {
   for (i in 1:length(te_idx)) {
     for (j in 1:(t-1)) {
       l = k+j
-      n_mut = c()
+      n_mut = rep(0, n_ins)
       start_idx = (l-1)*n_ins + 1
       end_idx = l*n_ins
       
@@ -143,7 +144,7 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) 
   
   # 对于每种transposon，生成全长插入片段，与对应的tsd拼接起来，并且输出到文件当中
   for (i in 1:length(te_idx)) {
-    n_mut = c()
+    n_mut = rep(0, n_ins)
     start_idx = (i-1)*n_ins + 1
     end_idx = i*n_ins
     
