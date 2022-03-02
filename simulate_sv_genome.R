@@ -23,7 +23,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
   
   # 从var_idx中筛除一些可能导致bug的突变位点，若全部被筛除，则返回原本的te_seq
   var_idx = var_idx[var_idx$start>0 & var_idx$width>0 & var_idx$end<width(idx),]
-  if (nrow(var_idx) == 0) {return(te_seq)}
+  if (nrow(var_idx) == 0) {return(c(te_seq, 0))}
   
   for (i in 1:nrow(var_idx)) {
     if (var_type[i] == 1) {         # deletion
@@ -70,7 +70,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
     }
   }
   
-  return(te_seq)
+  return(c(te_seq, nrow(var_idx)))
 }
 
 
@@ -85,6 +85,7 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t) {
   for (i in 1:length(te_idx)) {
     for (j in 1:(t-1)) {
       l = k+j
+      n_mut = c()
       start_idx = (l-1)*n_ins + 1
       end_idx = l*n_ins
       
@@ -113,7 +114,9 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t) {
       origin_seq = as.character(origin_seq)
       for (x in 1:length(tmp_te_seq)) {
         if (sample(c(TRUE, FALSE), size = 1, prob = c(0.2, 0.8))) {
-          tmp_te_seq[x] = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
+          mut = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
+          tmp_te_seq[x] = mut[1]
+          n_mut[x] = mut[2]
         }
       }
       
@@ -123,9 +126,8 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t) {
                               add_len = sample(c(0,1), n_ins, prob=c(0.8, 0.2), replace=TRUE), name = tmp_names, strand = tmp_te_df$strand, TE = tmp_te_df$seqnames,
                               te_start = tmp_te_df$start-1, te_end = tmp_te_df$end, te_seq = tmp_te_seq,
                               tsd_start = tmp_tsd_df$start-1, tsd_len = tmp_tsd_df$end, tsd_seq = tmp_tsd_seq,
-                              origin_seq = origin_seq, FullLength = rep("False", n_ins))
+                              n_mutates = n_mut, origin_seq = origin_seq, FullLength = rep("False", n_ins))
       
-      # write.table(tmp_ins_df, file = "./simulated_sv.bed", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
       if (l==1) {write.table(tmp_ins_df, file = "./simulated_sv.summary", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE)}
       else {write.table(tmp_ins_df, file = "./simulated_sv.summary", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)}
     }
@@ -141,6 +143,7 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) 
   
   # 对于每种transposon，生成全长插入片段，与对应的tsd拼接起来，并且输出到文件当中
   for (i in 1:length(te_idx)) {
+    n_mut = c()
     start_idx = (i-1)*n_ins + 1
     end_idx = i*n_ins
     
@@ -167,7 +170,9 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) 
     origin_seq = as.character(origin_seq)
     for (x in 1:length(tmp_te_seq)) {
       if (sample(c(TRUE, FALSE), size = 1, prob = c(0.4, 0.6))) {
-        tmp_te_seq[x] = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
+        mut = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
+        tmp_te_seq[x] = mut[1]
+        n_mut[x] = mut[2]
       }
     }
     
@@ -177,7 +182,7 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) 
                             add_len = sample(c(0,1), n_ins, prob=c(0.8, 0.2), replace=TRUE), name = tmp_names, strand = tmp_te_df$strand, TE = tmp_te_df$seqnames,
                             te_start = tmp_te_df$start-1, te_end = tmp_te_df$end, te_seq = tmp_te_seq,
                             tsd_start = tmp_tsd_df$start-1, tsd_len = tmp_tsd_df$end, tsd_seq = tmp_tsd_seq,
-                            origin_seq = origin_seq, FullLength = rep("True", n_ins))
+                            n_mutates = n_mut, origin_seq = origin_seq, FullLength = rep("False", n_ins))
     
     write.table(tmp_ins_df, file = "./simulated_sv.summary", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
   }
@@ -205,3 +210,9 @@ tsd_idx = restrict(tsd_idx, start = 1)
 
 simulate_ins(te_fa, te_idx, genome_fa, genome_idx, tsd_idx[1:round(0.5*length(tsd_idx))], n, t)
 simulate_ins_full(te_fa, te_idx, genome_fa, genome_idx, tsd_idx[round(0.5*length(tsd_idx))+1:length(tsd_idx)], n)
+
+
+
+t <- function() {
+  return(c("adsadad",2))
+}
