@@ -57,7 +57,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
     if (var_type[i] == 4) {         # insertion
       ins_idx = createRandomRegions(nregions=1, length.mean=0.1*width(idx), length.sd=1, genome=ref_idx)
       ins_idx = ins_idx[start(ins_idx)>=1]
-      if (length(ins_idx)==0) {next}
+      if (length(ins_idx)==0) {n_var = n_var-1; next}
       if (as.character(seqnames(ins_idx)) %in% seqnames(te_idx)) {
         ins_seq = as.character(getSeq(te_fa, ins_idx))
       } else {
