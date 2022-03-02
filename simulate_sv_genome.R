@@ -24,7 +24,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
   # 从var_idx中筛除一些可能导致bug的突变位点，若全部被筛除，则返回原本的te_seq
   var_idx = var_idx[var_idx$start>0 & var_idx$width>0 & var_idx$end<width(idx),]
   n_var = nrow(var_idx)
-  if (nrow(var_idx) == 0) {return(c(te_seq, n_var))}
+  if (nrow(var_idx) == 0) {return(te_seq)}
   
   for (i in 1:nrow(var_idx)) {
     if (var_type[i] == 1) {         # deletion
@@ -57,7 +57,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
     if (var_type[i] == 4) {         # insertion
       ins_idx = createRandomRegions(nregions=1, length.mean=0.1*width(idx), length.sd=1, genome=ref_idx)
       ins_idx = ins_idx[start(ins_idx)>=1]
-      if (length(ins_idx)==0) {n_var = n_var-1; next}
+      if (length(ins_idx)==0) {next}
       if (as.character(seqnames(ins_idx)) %in% seqnames(te_idx)) {
         ins_seq = as.character(getSeq(te_fa, ins_idx))
       } else {
@@ -71,7 +71,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
     }
   }
   
-  return(c(te_seq, n_var))
+  return(te_seq)
 }
 
 
@@ -86,7 +86,6 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t) {
   for (i in 1:length(te_idx)) {
     for (j in 1:(t-1)) {
       l = k+j
-      n_mut = rep(0, n_ins)
       start_idx = (l-1)*n_ins + 1
       end_idx = l*n_ins
       
@@ -115,9 +114,7 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t) {
       origin_seq = as.character(origin_seq)
       for (x in 1:length(tmp_te_seq)) {
         if (sample(c(TRUE, FALSE), size = 1, prob = c(0.2, 0.8))) {
-          mut = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
-          tmp_te_seq[x] = mut[1]
-          n_mut[x] = mut[2]
+          tmp_te_seq[x] = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
         }
       }
       
@@ -144,7 +141,6 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) 
   
   # 对于每种transposon，生成全长插入片段，与对应的tsd拼接起来，并且输出到文件当中
   for (i in 1:length(te_idx)) {
-    n_mut = rep(0, n_ins)
     start_idx = (i-1)*n_ins + 1
     end_idx = i*n_ins
     
@@ -171,9 +167,7 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) 
     origin_seq = as.character(origin_seq)
     for (x in 1:length(tmp_te_seq)) {
       if (sample(c(TRUE, FALSE), size = 1, prob = c(0.4, 0.6))) {
-        mut = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
-        tmp_te_seq[x] = mut[1]
-        n_mut[x] = mut[2]
+        tmp_te_seq[x] = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
       }
     }
     
