@@ -49,7 +49,7 @@ if [ ! -f ${NAME}.tmp.F.snp.bcf ];then
         for CHROM in ${F_CHROMS[*]}
         do
             VCF=`readlink -f ${VCF_PATH%/}/*${CHROM}.*vcf.gz`
-            bcftools view -v snps -O b -o ${NAME}.tmp.F.snp.bcf -s ${NAME} -m2 -M2 -c1 -C1 ${VCF}
+            bcftools view --threads 10 -v snps -O b -o ${NAME}.tmp.F.snp.bcf -s ${NAME} -m2 -M2 -c1 -C1 ${VCF}
             bcftools index ${NAME}.tmp.F.snp.bcf
             bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%SAMPLE=%GT]\n' ${NAME}.tmp.F.snp.bcf | grep "1|0" | awk 'OFS=FS="\t"''{print $1, ($2 -1), $2, "SNP", $4, "0"}' >> ${NAME}.tmp.F.snp.h1.bed
             bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%SAMPLE=%GT]\n' ${NAME}.tmp.F.snp.bcf | grep "0|1" | awk 'OFS=FS="\t"''{print $1, ($2 -1), $2, "SNP", $4, "0"}' >> ${NAME}.tmp.F.snp.h2.bed
@@ -64,7 +64,7 @@ if [ ! -f ${NAME}.tmp.F.snp.bcf ];then
         for CHROM in ${F_CHROMS[*]}
         do
             VCF=`readlink -f ${VCF_PATH%/}/*${CHROM}.*vcf.gz`
-            bcftools view -v snps -O b -o ${NAME}.tmp.M.snp.bcf -s ${NAME} -m2 -M2 -c1 -C1 ${VCF}
+            bcftools view --threads 10 -v snps -O b -o ${NAME}.tmp.M.snp.bcf -s ${NAME} -m2 -M2 -c1 -C1 ${VCF}
             bcftools index ${NAME}.tmp.M.snp.bcf
             bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%SAMPLE=%GT]\n' ${NAME}.tmp.M.snp.bcf | grep "1|0" | awk 'OFS=FS="\t"''{print $1, ($2 -1), $2, "SNP", $4, "0"}' >> ${NAME}.tmp.M.snp.h1.bed
             if [ ${CHROM}!="chrX" ];then
