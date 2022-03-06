@@ -3,22 +3,18 @@
 ######## Help Information ########
 function help_info(){
     echo `basename $0`
-    echo -e "\t-n <name>\tsample name (id)."
-    echo -e "\t-s <F/M>\tsample sex, F/M."
-    echo -e "\t-f <fasta>\tindexed female reference genome FASTA."
-    echo -e "\t-m <fasta>\tindexed male reference genome FASTA."
-    echo -e "\t-v <path>\tdirectory to indexed phased SNVs VCFs (1000 genomes for human)."
+    echo -e "\t-n <name>\tinbred line name (id)."
+    echo -e "\t-r <fasta>\tindexed reference genome FASTA."
+    echo -e "\t-v <path>\tdirectory to indexed SNVs VCFs with genotype (DGRP for D.mel)."
     echo -e "\t-h \tShow this information"
 }
 
 
 ######## Getting parameters ########
-while getopts ":n:s:f:m:v:h" OPTION; do
+while getopts ":n:r:v:h" OPTION; do
     case $OPTION in
         n)  NAME=$OPTARG;;
-        s)  SEX=$OPTARG;;
-        f)  F_FASTA=$OPTARG;;
-        m)  M_FASTA=$OPTARG;;
+        r)  FASTA=$OPTARG;;
         v)  VCF_PATH=$OPTARG;;
         h)  help_info && exit 1;;
         *)  help_info && exit 1;;
@@ -26,8 +22,7 @@ while getopts ":n:s:f:m:v:h" OPTION; do
 done
 
 export PATH=$PATH:/data/tusers/zhongrenhu/Software/anaconda3/bin/
-[ ! -z ${F_FASTA} ] && F_CHROMS=($(cut -f 1 ${F_FASTA}.fai))
-[ ! -z ${M_FASTA} ] && M_CHROMS=($(cut -f 1 ${M_FASTA}.fai))
+[ ! -z ${FASTA} ] && CHROMS=($(cut -f 1 ${FASTA}.fai))
 
 
 ### checking ###
@@ -67,7 +62,7 @@ if [ ! -f ${NAME}.tmp.F.${CHROM}.snp.bcf ];then
             bcftools view --threads 10 -v snps -O b -o ${NAME}.tmp.M.${CHROM}.snp.bcf -s ${NAME} -m2 -M2 -c1 -C1 ${VCF}
             bcftools index ${NAME}.tmp.M.${CHROM}.snp.bcf
             bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%SAMPLE=%GT]\n' ${NAME}.tmp.M.${CHROM}.snp.bcf | grep '1|0\|1|1' | awk 'OFS=FS="\t"''{print "chr"$1, ($2 -1), $2, "SNP", $4, "0"}' >> ${NAME}.tmp.M.snp.h1.bed
-            if test ${CHROM} != "chrX";then
+            if test ${CHROM}!="chrX";then
                 bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%SAMPLE=%GT]\n' ${NAME}.tmp.M.${CHROM}.snp.bcf | grep '0|1\|1|1' | awk 'OFS=FS="\t"''{print "chr"$1, ($2 -1), $2, "SNP", $4, "0"}' >> ${NAME}.tmp.M.snp.h2.bed
             fi
         done
