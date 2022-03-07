@@ -34,24 +34,24 @@ echo -e "FASTA:\t${FASTA}"
 
 for NAME in ${NAMEs[*]}
 do
-    echo -e "[BUILD TEMPLATE GENOME FROM ${NAME} START.]"
+    echo -e "[ BUILD TEMPLATE GENOME FROM ${NAME} START. ]"
     if [ ! -f ${NAME}.tmp.snp.bed ];then
-        mkdir ${NAME}_templateswithsnp
+        [ ! -d ${NAME}_templateswithsnp ] && mkdir ${NAME}_templateswithsnp
         VCF=`readlink -f ${VCF_PATH%/}/*vcf.gz`
         bcftools view --threads 10 -v snps -O b -o ${NAME}.tmp.snp.bcf -s ${NAME} -m2 -M2 -c1 -C2 ${VCF}
         bcftools index ${NAME}.tmp.snp.bcf
         bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%SAMPLE=%GT]\n' ${NAME}.tmp.snp.bcf | grep '1/1' | awk 'OFS=FS="\t"''{print "chr"$1, ($2 -1), $2, "SNP", $4, "0"}' >> ${NAME}.tmp.snp.bed
 
         VISOR HACk -g ${FASTA} -b ${NAME}.tmp.snp.bed -o ${NAME}_templateswithsnp
-        mv ${NAME}.tmp.* ${NAME}_templateswithsnp
+        mv ${NAME}.tmp.* ${NAME}_templateswithsnp && mv ${NAME}_templateswithsnp/h1.fa ${NAME}_templateswithsnp/${NAME}_template.fa && mv ${NAME}_templateswithsnp/h1.fa.fai ${NAME}_templateswithsnp/${NAME}_template.fa.fai
     fi  
 
     if [ -f ${NAME}.tmp.snp.bed ];then
         VISOR HACk -g ${FASTA} -b ${NAME}.tmp.snp.bed -o ${NAME}_templateswithsnp
-        mv ${NAME}.tmp.* ${NAME}_templateswithsnp
+        mv ${NAME}.tmp.* ${NAME}_templateswithsnp && mv ${NAME}_templateswithsnp/h1.fa ${NAME}_templateswithsnp/${NAME}_template.fa && mv ${NAME}_templateswithsnp/h1.fa.fai ${NAME}_templateswithsnp/${NAME}_template.fa.fai
     fi
 
-    echo -e "[BUILD TEMPLATE GENOME FROM ${NAME} FINISH.]"
+    echo -e "[ BUILD TEMPLATE GENOME FROM ${NAME} FINISH. ]"
 done
 
 

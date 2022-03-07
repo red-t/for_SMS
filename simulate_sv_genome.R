@@ -1,11 +1,11 @@
 # USAGE:
-# Rscript simulate_sv_genome.R te_fa genome_fa n t
-# Rscript simulate_sv_genome.R te_ccs.fa origion_genome.fa 12 4
+# Rscript simulate_sv_genome.R te_fa genome_fa n t sample_name
+# Rscript simulate_sv_genome.R te_ccs.fa origion_genome.fa 12 4 sample_name
 library(Rsamtools)
 library(regioneR)
 
 
-seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
+seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa, sn) {
   
   # 随机生成一些突变的位点以及类型
   n_var = sample(1:3, size = 1, prob = c(0.8, 0.1, 0.1))
@@ -33,7 +33,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
       
       tmp_df <- data.frame(chr=var_idx[i,]$seqnames, start=var_idx[i,]$start-1, end=var_idx[i,]$end,
                            type="deletion", sequence=del_seq, strand=var_idx[i,]$strand)
-      write.table(tmp_df, file = "./interal_mutation", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+      write.table(tmp_df, file = paste("./", sn, ".interal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
     }
     
     if (var_type[i] == 2) {         # invertion
@@ -42,7 +42,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
       
       tmp_df <- data.frame(chr=var_idx[i,]$seqnames, start=var_idx[i,]$start-1, end=var_idx[i,]$end,
                            type="invertion", sequence=rc_seq, strand=var_idx[i,]$strand)
-      write.table(tmp_df, file = "./interal_mutation", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+      write.table(tmp_df, file = paste("./", sn, ".interal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
     }
     
     if (var_type[i] == 3) {         # duplication
@@ -51,7 +51,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
       
       tmp_df <- data.frame(chr=var_idx[i,]$seqnames, start=var_idx[i,]$start-1, end=var_idx[i,]$end,
                            type="duplication", sequence=dup_seq, strand=var_idx[i,]$strand)
-      write.table(tmp_df, file = "./interal_mutation", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+      write.table(tmp_df, file = paste("./", sn, ".interal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
     }
     
     if (var_type[i] == 4) {         # insertion
@@ -67,7 +67,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
       
       tmp_df <- data.frame(chr=var_idx[i,]$seqnames, start=var_idx[i,]$start-1, end=var_idx[i,]$start,
                            type="insertion", sequence=ins_seq, strand=var_idx[i,]$strand)
-      write.table(tmp_df, file = "./interal_mutation", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+      write.table(tmp_df, file = paste("./", sn, ".interal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
     }
   }
   
@@ -75,7 +75,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa) {
 }
 
 
-simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t) {
+simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t, sn) {
   
   # 初始化中间变量k，计算长度梯度grad，计算每种transposon在每个梯度应产生的insertion number -- n_ins
   k=0
@@ -108,14 +108,14 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t) {
       names(tmp_te_seq) <- tmp_names
       
       # 向TE片段中人为添加一些突变
-      if (l==1) {writeLines(paste("chr", "start", "end", "type", "sequence", "strand", sep="\t"), "./interal_mutation", sep="\n")}
+      if (l==1) {writeLines(paste("chr", "start", "end", "type", "sequence", "strand", sep="\t"), paste("./", sn, ".interal_mutation", sep = ""), sep="\n")}
       origin_seq = getSeq(te_fa, makeGRangesFromDataFrame(tmp_te_df))
       names(origin_seq) = tmp_names
       origin_idx = makeGRangesFromDataFrame(data.frame(chr=origin_seq@ranges@NAMES, start=rep(1,length(origin_seq)), end=width(origin_seq)))
       origin_seq = as.character(origin_seq)
       for (x in 1:length(tmp_te_seq)) {
         if (sample(c(TRUE, FALSE), size = 1, prob = c(0.2, 0.8))) {
-          mut = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
+          mut = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa, sn)
           tmp_te_seq[x] = mut[1]
           n_mutates[x] = mut[2]
         }
@@ -129,15 +129,15 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t) {
                               tsd_start = tmp_tsd_df$start-1, tsd_len = tmp_tsd_df$end, tsd_seq = tmp_tsd_seq,
                               n_mutates = n_mutates, origin_seq = origin_seq, FullLength = rep("False", n_ins))
       
-      if (l==1) {write.table(tmp_ins_df, file = "./simulated_sv.summary", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE)}
-      else {write.table(tmp_ins_df, file = "./simulated_sv.summary", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)}
+      if (l==1) {write.table(tmp_ins_df, file = paste("./", sn, ".simulated_sv.summary", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE)}
+      else {write.table(tmp_ins_df, file = paste("./", sn, ".simulated_sv.summary", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)}
     }
     k = k + (t-1)
   }
 }
 
 
-simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) {
+simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, sn) {
   
   # 设置每种transposon在此梯度应产生的insertion number -- n_ins
   n_ins = round(0.5*n)
@@ -171,7 +171,7 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) 
     origin_seq = as.character(origin_seq)
     for (x in 1:length(tmp_te_seq)) {
       if (sample(c(TRUE, FALSE), size = 1, prob = c(0.4, 0.6))) {
-        mut = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa)
+        mut = seq_mutate(idx=origin_idx[x], te_seq=tmp_te_seq[x], te_idx, te_fa, genome_idx, genome_fa, sn)
         tmp_te_seq[x] = mut[1]
         n_mutates[x] = mut[2]
       }
@@ -185,7 +185,7 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) 
                             tsd_start = tmp_tsd_df$start-1, tsd_len = tmp_tsd_df$end, tsd_seq = tmp_tsd_seq,
                             n_mutates = n_mutates, origin_seq = origin_seq, FullLength = rep("True", n_ins))
     
-    write.table(tmp_ins_df, file = "./simulated_sv.summary", append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+    write.table(tmp_ins_df, file = paste("./", sn, ".simulated_sv.summary", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
   }
 }
 
@@ -196,6 +196,7 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n) 
 args <- commandArgs(trailingOnly = TRUE)
 n = as.integer(args[3]) # 每种transposon生成的insertion总数
 t = as.integer(args[4]) # 长度梯度划分数目
+sample_name = args[5]
 
 # 读取transposon consensus序列，以及genome
 te_fa <- open(FaFile(args[1]))
@@ -209,5 +210,5 @@ genome_idx <- narrow(genome_idx, end = -2)
 tsd_idx <- createRandomRegions(nregions = n*length(te_idx)+50 , length.mean = 8, length.sd = 1, genome = genome_idx)
 tsd_idx = restrict(tsd_idx, start = 1)
 
-simulate_ins(te_fa, te_idx, genome_fa, genome_idx, tsd_idx[1:round(0.5*length(tsd_idx))], n, t)
-simulate_ins_full(te_fa, te_idx, genome_fa, genome_idx, tsd_idx[(round(0.5*length(tsd_idx))+1):length(tsd_idx)], n)
+simulate_ins(te_fa, te_idx, genome_fa, genome_idx, tsd_idx[1:round(0.5*length(tsd_idx))], n, t, sample_name)
+simulate_ins_full(te_fa, te_idx, genome_fa, genome_idx, tsd_idx[(round(0.5*length(tsd_idx))+1):length(tsd_idx)], n, sample_name)
