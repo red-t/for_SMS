@@ -42,7 +42,7 @@ echo -e "M_CHROMS:\t${M_CHROMS[*]}"
 ### checking ###
 
 
-if [ ! -f ${NAME}.tmp.F.${CHROM}.snp.bcf ];then
+if [ ! -f ${NAME}.tmp.F.snp.h1.bed ];then
     mkdir ${NAME}_templateswithsnp
 
     if test ${SEX} = "F";then
@@ -77,11 +77,27 @@ if [ ! -f ${NAME}.tmp.F.${CHROM}.snp.bcf ];then
         mv haplo2/h1.fa haplo2/h2.fa && mv haplo2/h1.fa.fai haplo2/h2.fa.fai && mv haplo2/h2.fa* ${NAME}_templateswithsnp && rm -r haplo2
         mv ${NAME}.tmp.M* ${NAME}_templateswithsnp
     fi
-fi  
+fi
+
+
+if [ -f ${NAME}.tmp.F.snp.h1.bed ];then
+    if test ${SEX} = "F";then
+        VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.F.snp.h1.bed ${NAME}.tmp.F.snp.h2.bed -o ${NAME}_templateswithsnp
+        mv ${NAME}.tmp.F* ${NAME}_templateswithsnp
+    fi
+
+    if test ${SEX} = "M";then
+        VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.M.snp.h1.bed -o ${NAME}_templateswithsnp
+        VISOR HACk -g ${M_FASTA} -b ${NAME}.tmp.M.snp.h2.bed -o haplo2
+        mv haplo2/h1.fa haplo2/h2.fa && mv haplo2/h1.fa.fai haplo2/h2.fa.fai && mv haplo2/h2.fa* ${NAME}_templateswithsnp && rm -r haplo2
+        mv ${NAME}.tmp.M* ${NAME}_templateswithsnp
+    fi
+fi
 
 
 # HG02716 Female
 # HG02610 Male
+# HG02646 Female
 # /data/tusers.ds/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_X.fa
 # /data/tusers.ds/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_Y.fa
 # /data/tusers.ds/zhongrenhu/for_SMS/reference/GRCh38.p13/GGVP/ALL_GGVP.chrX.shapeit2_integrated_snvindels_v1b_20200120.GRCh38.phased.vcf.gz
