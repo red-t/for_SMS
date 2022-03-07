@@ -37,7 +37,7 @@ echo -e "M_CHROMS:\t${M_CHROMS[*]}"
 ### checking ###
 
 
-if [ ! -f ${NAME}.tmp.F.snp.h1.bed ];then
+if [ ! -f ${NAME}.tmp.${SEX}.snp.h1.bed ];then
     mkdir ${NAME}_templateswithsnp
 
     if test ${SEX} = "F";then
