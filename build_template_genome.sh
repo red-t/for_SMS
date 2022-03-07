@@ -46,6 +46,7 @@ if [ ! -f ${NAME}.tmp.${SEX}.snp.h1.bed ];then
     mkdir ${NAME}_templateswithsnp
 
     if test ${SEX} = "F";then
+        mkdir ${NAME}_haplo2
         for CHROM in ${F_CHROMS[*]}
         do
             VCF=`readlink -f ${VCF_PATH%/}/*${CHROM}.*vcf.gz`
@@ -55,12 +56,14 @@ if [ ! -f ${NAME}.tmp.${SEX}.snp.h1.bed ];then
             bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%SAMPLE=%GT]\n' ${NAME}.tmp.F.${CHROM}.snp.bcf | grep '0|1\|1|1' | awk 'OFS=FS="\t"''{print "chr"$1, ($2 -1), $2, "SNP", $4, "0"}' >> ${NAME}.tmp.F.snp.h2.bed
         done
 
-        VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.F.snp.h1.bed ${NAME}.tmp.F.snp.h2.bed -o ${NAME}_templateswithsnp
+        VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.F.snp.h1.bed -o ${NAME}_templateswithsnp
+        VISOR HACk -g ${M_FASTA} -b ${NAME}.tmp.F.snp.h2.bed -o ${NAME}_haplo2
+        mv ${NAME}_haplo2/h1.fa ${NAME}_haplo2/h2.fa && mv ${NAME}_haplo2/h1.fa.fai ${NAME}_haplo2/h2.fa.fai && mv ${NAME}_haplo2/h2.fa* ${NAME}_templateswithsnp && rm -r ${NAME}_haplo2
         mv ${NAME}.tmp.F* ${NAME}_templateswithsnp
     fi
 
     if test ${SEX} = "M";then
-        mkdir haplo2
+        mkdir ${NAME}_haplo2
         for CHROM in ${F_CHROMS[*]}
         do
             VCF=`readlink -f ${VCF_PATH%/}/*${CHROM}.*vcf.gz`
@@ -73,8 +76,8 @@ if [ ! -f ${NAME}.tmp.${SEX}.snp.h1.bed ];then
         done
 
         VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.M.snp.h1.bed -o ${NAME}_templateswithsnp
-        VISOR HACk -g ${M_FASTA} -b ${NAME}.tmp.M.snp.h2.bed -o haplo2
-        mv haplo2/h1.fa haplo2/h2.fa && mv haplo2/h1.fa.fai haplo2/h2.fa.fai && mv haplo2/h2.fa* ${NAME}_templateswithsnp && rm -r haplo2
+        VISOR HACk -g ${M_FASTA} -b ${NAME}.tmp.M.snp.h2.bed -o ${NAME}_haplo2
+        mv ${NAME}_haplo2/h1.fa ${NAME}_haplo2/h2.fa && mv ${NAME}_haplo2/h1.fa.fai ${NAME}_haplo2/h2.fa.fai && mv ${NAME}_haplo2/h2.fa* ${NAME}_templateswithsnp && rm -r ${NAME}_haplo2
         mv ${NAME}.tmp.M* ${NAME}_templateswithsnp
     fi
 fi
@@ -82,14 +85,16 @@ fi
 
 if [ -f ${NAME}.tmp.${SEX}.snp.h1.bed ];then
     if test ${SEX} = "F";then
-        VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.F.snp.h1.bed ${NAME}.tmp.F.snp.h2.bed -o ${NAME}_templateswithsnp
-        mv ${NAME}.tmp.F* ${NAME}_templateswithsnp
+        VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.F.snp.h1.bed -o ${NAME}_templateswithsnp
+        VISOR HACk -g ${M_FASTA} -b ${NAME}.tmp.F.snp.h2.bed -o ${NAME}_haplo2
+        mv ${NAME}_haplo2/h1.fa ${NAME}_haplo2/h2.fa && mv ${NAME}_haplo2/h1.fa.fai ${NAME}_haplo2/h2.fa.fai && mv ${NAME}_haplo2/h2.fa* ${NAME}_templateswithsnp && rm -r ${NAME}_haplo2
+        mv ${NAME}.tmp.M* ${NAME}_templateswithsnp
     fi
 
     if test ${SEX} = "M";then
         VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.M.snp.h1.bed -o ${NAME}_templateswithsnp
-        VISOR HACk -g ${M_FASTA} -b ${NAME}.tmp.M.snp.h2.bed -o haplo2
-        mv haplo2/h1.fa haplo2/h2.fa && mv haplo2/h1.fa.fai haplo2/h2.fa.fai && mv haplo2/h2.fa* ${NAME}_templateswithsnp && rm -r haplo2
+        VISOR HACk -g ${M_FASTA} -b ${NAME}.tmp.M.snp.h2.bed -o ${NAME}_haplo2
+        mv ${NAME}_haplo2/h1.fa ${NAME}_haplo2/h2.fa && mv ${NAME}_haplo2/h1.fa.fai ${NAME}_haplo2/h2.fa.fai && mv ${NAME}_haplo2/h2.fa* ${NAME}_templateswithsnp && rm -r ${NAME}_haplo2
         mv ${NAME}.tmp.M* ${NAME}_templateswithsnp
     fi
 fi
