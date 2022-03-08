@@ -36,10 +36,10 @@ for opt, arg in opts:
         HOMOZYGOUS = True
 
 ### Checking ###
-print("PREFIX:\t", PREFIX, sep='')
-print("N_INS:\t", str(N_INS), sep='')
-print("REF_SUMMARY:\t", REF_SUMMARY, sep='')
-print("HOMOZYGOUS:\t", HOMOZYGOUS, sep='')
+# print("PREFIX:\t", PREFIX, sep='')
+# print("N_INS:\t", str(N_INS), sep='')
+# print("REF_SUMMARY:\t", REF_SUMMARY, sep='')
+# print("HOMOZYGOUS:\t", HOMOZYGOUS, sep='')
 ### Checking ###
 
 

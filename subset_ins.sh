@@ -38,17 +38,19 @@ echo -e "G_SIZE:\t${G_SIZE}"
 
 
 ### GENERATE A GROUP OF SUBSET(S) AND CALCULATE INSERTION FREQUENCY FOR EACH GROUP ###
-if [ ! -z ${SEX} ];then
+if [ -z ${SEX} ];then
     echo -e "[ GENERATE SUBSET(S) FOR ${NAME} START. ]"
     # GENERATE SUBSET(S)
     for ((j=1; j<=${G_SIZE}; j++))
     do
         if [ ! -f ${NAME}.homozygous.groundtruth.summary ];then
+            echo -e "[ CMD:\tpython /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} -H ]"
             python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} -H
             sort -k1,1 -k2,2n ${NAME}.homozygous.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.homozygous.groundtruth.summary
             sort -k1,1 -k2,2n ${NAME}.${j}.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
             cut -f 1-6 ${NAME}.homozygous.groundtruth.summary > ${NAME}.homozygous.groundtruth.bed
         else
+            echo -e "[ CMD:\tpython /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} ]"
             python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY}
             sort -k1,1 -k2,2n ${NAME}.${j}.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
         fi
