@@ -55,12 +55,13 @@ if [ -z ${SEX} ];then
             python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY}
             sort -k1,1 -k2,2n ${NAME}.${j}.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
         fi
+        
         cut -f 1-6 ${NAME}.${j}.groundtruth.summary > ${NAME}.${j}.groundtruth.bed
+        cat ${NAME}.homozygous.groundtruth.summary >> tmp.all
         cat ${NAME}.${j}.groundtruth.summary >> tmp.all
     done
 
     # CALCULATING FREQUENCY
-    cat ${NAME}.homozygous.groundtruth.summary >> tmp.all
     sort -k1,1 -k2,2n ./tmp.all | uniq -c > ./tmp.uniq
     echo -e "chrom\tstart\tend\tname\tadd_len\tstrand\tfrequency\tTE\tte_start\tte_end\ttsd_start\ttsd_end\tn_mutates\tFullLength" > ./${NAME}.groundtruth.summary.bed
     awk 'BEGIN{OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15,$17,$19}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.bed
