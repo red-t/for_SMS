@@ -56,15 +56,17 @@ if [ -z ${SEX} ];then
             sort -k1,1 -k2,2n ${NAME}.${j}.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
         fi
         cut -f 1-6 ${NAME}.${j}.groundtruth.summary > ${NAME}.${j}.groundtruth.bed
+        cat ${NAME}.${j}.groundtruth.summary >> tmp.all
     done
 
     # CALCULATING FREQUENCY
-    cat ./${NAME}.*.groundtruth.summary | sort -k1,1 -k2,2n | uniq -c > ./tmp.uniq
+    cat ${NAME}.homozygous.groundtruth.summary >> tmp.all
+    sort -k1,1 -k2,2n ./tmp.all | uniq -c > ./tmp.uniq
     echo -e "chrom\tstart\tend\tname\tadd_len\tstrand\tfrequency\tTE\tte_start\tte_end\ttsd_start\ttsd_end\tn_mutates\tFullLength" > ./${NAME}.groundtruth.summary.bed
     awk 'BEGIN{OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15,$17,$19}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.bed
     echo -e "name\tte_seq\ttsd_seq\tins_seq\torigin_seq" > ./${NAME}.groundtruth.summary.seq
     awk 'BEGIN{OFS="\t"} {print $8,$13,$16,$6,$18}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.seq
-    rm ./tmp.uniq
+    rm tmp.uniq && rm tmp.all
 
     echo -e "[ GENERATE SUBSET(S) FOR ${NAME} FINISH. ]"
 fi
