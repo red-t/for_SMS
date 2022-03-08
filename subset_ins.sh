@@ -43,25 +43,23 @@ if [ ! -z ${SEX} ];then
     # GENERATE SUBSET(S)
     for ((j=1; j<=${G_SIZE}; j++))
     do
-        echo -e "[ CMD:\tshuf -n ${N_INS} ${REF_SUMMARY} | sort -k1,1 -k2,2n > ./${NAME}.${j}.groundtruth.summary ]"
-        shuf -n ${N_INS} ${REF_SUMMARY} | sort -k1,1 -k2,2n > ./${NAME}.${j}.groundtruth.summary
-        echo -e "[ CMD:\tcut -f 1-6 ./${NAME}.${j}.groundtruth.summary > ./${NAME}.${j}.groundtruth.bed ]"
-        cut -f 1-6 ./${NAME}.${j}.groundtruth.summary > ./${NAME}.${j}.groundtruth.bed
+        if [ ! -f ${NAME}.homozygous.groundtruth.summary ];then
+            python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} -H
+            sort -k1,1 -k2,2n ${NAME}.homozygous.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.homozygous.groundtruth.summary
+            sort -k1,1 -k2,2n ${NAME}.${j}.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
+            cut -f 1-6 ${NAME}.homozygous.groundtruth.summary > ${NAME}.homozygous.groundtruth.bed
+        else
+            python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY}
+            sort -k1,1 -k2,2n ${NAME}.${j}.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
+        fi
+        cut -f 1-6 ${NAME}.${j}.groundtruth.summary > ${NAME}.${j}.groundtruth.bed
     done
 
     # CALCULATING FREQUENCY
     cat ./${NAME}.*.groundtruth.summary | sort -k1,1 -k2,2n | uniq -c > ./tmp.uniq
-    echo -e "chrom\tstart\tend\tname\tadd_len\tstrand\tfrequency\tTE\tte_start\tte_end\ttsd_start\ttsd_end" > ./${NAME}.groundtruth.summary.bed
-    awk 'BEGIN{OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.bed
-    echo -e "name\tte_seq\ttsd_seq\tins_seq" > ./${NAME}.groundtruth.summary.seq
-    awk 'BEGIN{OFS="\t"} {print $8,$13,$16,$6}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.seq
+    echo -e "chrom\tstart\tend\tname\tadd_len\tstrand\tfrequency\tTE\tte_start\tte_end\ttsd_start\ttsd_end\tn_mutates\tFullLength" > ./${NAME}.groundtruth.summary.bed
+    awk 'BEGIN{OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15,$17,$19}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.bed
+    echo -e "name\tte_seq\ttsd_seq\tins_seq\torigin_seq" > ./${NAME}.groundtruth.summary.seq
+    awk 'BEGIN{OFS="\t"} {print $8,$13,$16,$6,$18}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.seq
     rm ./tmp.uniq
 fi
-
-# calculating frequency
-cat ./${NAME}.*.groundtruth.summary | sort -k1,1 -k2,2n | uniq -c > ./tmp.uniq
-echo -e "chrom\tstart\tend\tname\tadd_len\tstrand\tfrequency\tTE\tte_start\tte_len\ttsd_start\ttsd_len" > ./${NAME}.groundtruth.summary.bed
-awk 'BEGIN{OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.bed
-echo -e "name\tte_seq\ttsd_seq\tins_seq" > ./${NAME}.groundtruth.summary.seq
-awk 'BEGIN{OFS="\t"} {print $8,$13,$16,$6}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.seq
-rm ./tmp.uniq
