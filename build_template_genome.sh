@@ -103,7 +103,7 @@ if [ -f ${NAME}.tmp.${SEX}.snp.h1.bed ];then
     fi
 fi
 
-
+rm *bcf*
 # HG02716 Female
 # HG02610 Male
 # HG02646 Female

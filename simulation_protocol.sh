@@ -87,17 +87,23 @@ if [ -z ${SEX} ];then
 
         ## GENERATE SUBSETS OF INSERTIONS AND CALAULATE FREQUENCY ##
         echo -e "[ GENERATE SUBSETS OF INSERTIONS FROM ${NAME}_templateswithsnp/${NAME}.simulated_sv.summary ]"
-        if [ -f  ];then
+        if [ -f ${NAME}_templateswithsnp/${NAME}.groundtruth.summary.seq ];then
+            echo -e "[ SUBSETS OF ${NAME} ALREADY EXIST, SKIP. ]"
         else
+            cd ${NAME}_templateswithsnp
+            NROW=`wc -l ${NAME}.simulated_sv.summary`
+            NUM=`awk -vN=${NROW} 'BEGIN{printf "%.0f", 0.5*N}'`
+            /data/tusers/zhongrenhu/for_SMS/test/subset_ins.sh -n ${NAME} -M ${NUM} -R ${NAME}.simulated_sv.summary -S 4
+            cd ..
         fi
     done
 fi
 
 
 ### SIMULATION WITH PHASED SNV ###
-if [ ! -z ${SEX} ];then
-    echo -e "SIMULATION WITH PHASED SNV"
-fi
+# if [ ! -z ${SEX} ];then
+#     echo -e "SIMULATION WITH PHASED SNV"
+# fi
 
 
 # if [ ! -f  ];then
