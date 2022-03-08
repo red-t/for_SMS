@@ -1,4 +1,5 @@
-import sys, getopt
+from sys import argv
+import getopt
 import random, linecache
 import pickle
 
