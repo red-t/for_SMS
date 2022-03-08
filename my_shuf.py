@@ -15,7 +15,8 @@ def help_info():
 
 ######## Getting parameters ########
 try:
-    opts, args = getopt.getopt(sys.argv,"p:M:R:H:h")
+    argv = sys.argv[1:]
+    opts, args = getopt.getopt(argv,"p:M:R:Hh")
 except getopt.GetoptError:
     help_info()
     sys.exit(2)
