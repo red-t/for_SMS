@@ -1,4 +1,4 @@
-from sys import argv
+import sys
 import getopt
 import random, linecache
 import pickle
@@ -15,7 +15,7 @@ def help_info():
 
 ######## Getting parameters ########
 try:
-    opts, args = getopt.getopt(argv,"p:M:R:H:h")
+    opts, args = getopt.getopt(sys.argv,"p:M:R:H:h")
 except getopt.GetoptError:
     help_info()
     sys.exit(2)
