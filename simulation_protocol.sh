@@ -46,6 +46,8 @@ echo -e "F_FASTA:\t${F_FASTA}"
 echo -e "M_FASTA:\t${M_FASTA}"
 echo -e "VCF_PATH:\t${VCF_PATH}"
 echo -e "TE_FASTA:\t${TE_FASTA}"
+echo -e "INS_NUM:\t${INS_NUM}"
+echo -e "GRADIENT:\t${GRADIENT}"
 ### checking ###
 
 
@@ -60,7 +62,6 @@ if [ -z ${SEX} ];then
 
     for NAME in ${NAMEs[*]}
     do
-        # cd ${NAME}_templateswithsnp && echo -e "[ NOW WORKING DIR:\t`pwd` ]"
         ## BUILD TEMPLATE GENOME ##
         echo -e "[ BUILD TEMPLATE GENOME FOR ${NAME} ]"
         if [ -f ${NAME}_templateswithsnp/${NAME}_template.fa.fai ];then
@@ -86,6 +87,9 @@ if [ -z ${SEX} ];then
 
         ## GENERATE SUBSETS OF INSERTIONS AND CALAULATE FREQUENCY ##
         echo -e "[ GENERATE SUBSETS OF INSERTIONS FROM ${NAME}_templateswithsnp/${NAME}.simulated_sv.summary ]"
+        if [ -f  ];then
+        else
+        fi
     done
 fi
 

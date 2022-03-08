@@ -60,7 +60,7 @@ if [ ! -f ${NAME}.tmp.${SEX}.snp.h1.bed ];then
         VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.F.snp.h2.bed -o ${NAME}_haplo2
         mv ${NAME}_haplo2/h1.fa ${NAME}_haplo2/${NAME}_template_h2.fa && mv ${NAME}_haplo2/h1.fa.fai ${NAME}_haplo2/${NAME}_template_h2.fa.fai && mv ${NAME}_haplo2/${NAME}_template_h2.fa* ${NAME}_templateswithsnp && rm -r ${NAME}_haplo2
         mv ${NAME}_templateswithsnp/h1.fa ${NAME}_templateswithsnp/${NAME}_template_h1.fa && mv ${NAME}_templateswithsnp/h1.fa.fai ${NAME}_templateswithsnp/${NAME}_template_h1.fa.fai
-        mv ${NAME}.tmp.M* ${NAME}_templateswithsnp
+        mv ${NAME}.tmp.F* ${NAME}_templateswithsnp
     fi
 
     if test ${SEX} = "M";then
@@ -91,7 +91,7 @@ if [ -f ${NAME}.tmp.${SEX}.snp.h1.bed ];then
         VISOR HACk -g ${F_FASTA} -b ${NAME}.tmp.F.snp.h2.bed -o ${NAME}_haplo2
         mv ${NAME}_haplo2/h1.fa ${NAME}_haplo2/${NAME}_template_h2.fa && mv ${NAME}_haplo2/h1.fa.fai ${NAME}_haplo2/${NAME}_template_h2.fa.fai && mv ${NAME}_haplo2/${NAME}_template_h2.fa* ${NAME}_templateswithsnp && rm -r ${NAME}_haplo2
         mv ${NAME}_templateswithsnp/h1.fa ${NAME}_templateswithsnp/${NAME}_template_h1.fa && mv ${NAME}_templateswithsnp/h1.fa.fai ${NAME}_templateswithsnp/${NAME}_template_h1.fa.fai
-        mv ${NAME}.tmp.M* ${NAME}_templateswithsnp
+        mv ${NAME}.tmp.F* ${NAME}_templateswithsnp && mv 
     fi
 
     if test ${SEX} = "M";then
