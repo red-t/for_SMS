@@ -40,6 +40,7 @@ echo -e "G_SIZE:\t${G_SIZE}"
 ### GENERATE A GROUP OF SUBSET(S) AND CALCULATE INSERTION FREQUENCY FOR EACH GROUP ###
 if [ -z ${SEX} ];then
     echo -e "[ GENERATE SUBSET(S) FOR ${NAME} START. ]"
+
     # GENERATE SUBSET(S)
     for ((j=1; j<=${G_SIZE}; j++))
     do
@@ -64,4 +65,6 @@ if [ -z ${SEX} ];then
     echo -e "name\tte_seq\ttsd_seq\tins_seq\torigin_seq" > ./${NAME}.groundtruth.summary.seq
     awk 'BEGIN{OFS="\t"} {print $8,$13,$16,$6,$18}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.seq
     rm ./tmp.uniq
+
+    echo -e "[ GENERATE SUBSET(S) FOR ${NAME} FINISH. ]"
 fi
