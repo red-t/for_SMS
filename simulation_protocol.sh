@@ -46,6 +46,7 @@ echo -e "WORKING DIR:\t${WORKING_DIR}"
 echo -e "NAME:\t${NAMEs[*]}"
 echo -e "FASTA:\t${FASTA}"
 echo -e "SEX:\t${SEX}"
+echo -e "G_SIZE:\t${G_SIZE}"
 echo -e "F_FASTA:\t${F_FASTA}"
 echo -e "M_FASTA:\t${M_FASTA}"
 echo -e "IN_NUM:\t${IN_NUM}"
@@ -92,7 +93,7 @@ if [ -z ${SEX} ];then
 
         ## GENERATE SUBSETS OF INSERTIONS AND CALAULATE FREQUENCY ##
         echo -e "[ GENERATE SUBSETS OF INSERTIONS FROM ${NAME}_templateswithsnp/${NAME}.simulated_sv.summary ]"
-        if [ -f ${NAME}_templateswithsnp/${NAME}.groundtruth.summary.seq ];then
+        if [ -f ${NAME}_templateswithsnp/${NAME}.${G_SIZE}.fa.fai ];then
             echo -e "[ SUBSETS OF ${NAME} ALREADY EXIST, SKIP. ]"
         else
             cd ${NAME}_templateswithsnp
