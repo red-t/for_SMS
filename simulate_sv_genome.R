@@ -33,7 +33,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa, sn) {
       
       tmp_df <- data.frame(chr=var_idx[i,]$seqnames, start=var_idx[i,]$start-1, end=var_idx[i,]$end,
                            type="deletion", sequence=del_seq, strand=var_idx[i,]$strand)
-      write.table(tmp_df, file = paste("./", sn, ".interal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+      write.table(tmp_df, file = paste("./", sn, ".internal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
     }
     
     if (var_type[i] == 2) {         # invertion
@@ -42,7 +42,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa, sn) {
       
       tmp_df <- data.frame(chr=var_idx[i,]$seqnames, start=var_idx[i,]$start-1, end=var_idx[i,]$end,
                            type="invertion", sequence=rc_seq, strand=var_idx[i,]$strand)
-      write.table(tmp_df, file = paste("./", sn, ".interal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+      write.table(tmp_df, file = paste("./", sn, ".internal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
     }
     
     if (var_type[i] == 3) {         # duplication
@@ -51,7 +51,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa, sn) {
       
       tmp_df <- data.frame(chr=var_idx[i,]$seqnames, start=var_idx[i,]$start-1, end=var_idx[i,]$end,
                            type="duplication", sequence=dup_seq, strand=var_idx[i,]$strand)
-      write.table(tmp_df, file = paste("./", sn, ".interal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+      write.table(tmp_df, file = paste("./", sn, ".internal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
     }
     
     if (var_type[i] == 4) {         # insertion
@@ -67,7 +67,7 @@ seq_mutate <- function(idx, te_seq, te_idx, te_fa, genome_idx, genome_fa, sn) {
       
       tmp_df <- data.frame(chr=var_idx[i,]$seqnames, start=var_idx[i,]$start-1, end=var_idx[i,]$start,
                            type="insertion", sequence=ins_seq, strand=var_idx[i,]$strand)
-      write.table(tmp_df, file = paste("./", sn, ".interal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+      write.table(tmp_df, file = paste("./", sn, ".internal_mutation", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
     }
   }
   
@@ -108,7 +108,7 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t, sn
       names(tmp_te_seq) <- tmp_names
       
       # 向TE片段中人为添加一些突变
-      if (l==1) {writeLines(paste("chr", "start", "end", "type", "sequence", "strand", sep="\t"), paste("./", sn, ".interal_mutation", sep = ""), sep="\n")}
+      if (l==1) {writeLines(paste("chr", "start", "end", "type", "sequence", "strand", sep="\t"), paste("./", sn, ".internal_mutation", sep = ""), sep="\n")}
       origin_seq = getSeq(te_fa, makeGRangesFromDataFrame(tmp_te_df))
       names(origin_seq) = tmp_names
       origin_idx = makeGRangesFromDataFrame(data.frame(chr=origin_seq@ranges@NAMES, start=rep(1,length(origin_seq)), end=width(origin_seq)))

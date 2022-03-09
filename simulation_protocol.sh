@@ -1,5 +1,5 @@
 #! /bin/bash
-# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/test -n "line_21" -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/ -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon.fa -N 2000 -M 2000 -G 4 -S 10 &
+# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/test -n "line_21" -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/ -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon.fa -N 800 -M 2000 -G 4 -S 100 &
 
 ######## Help Information ########
 function help_info(){
