@@ -1,5 +1,5 @@
 #! /bin/bash
-# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/test -n "line_21" -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/ -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon.fa -N 2000 -M 2000 -G 10 &
+# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/test -n "line_21" -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/ -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon.fa -N 2000 -M 2000 -G 4 -S 10 &
 
 ######## Help Information ########
 function help_info(){
@@ -8,6 +8,7 @@ function help_info(){
     echo -e "\t-n <name(s)>\tinbred line name(s) (id) OR sample name."
     echo -e "\t-r <fasta>\tindexed reference genome FASTA. (use this without -s)"
     echo -e "\t-s <F/M>\tsample sex, F/M."
+    echo -e "\t-S <int>\tgroup size."
     echo -e "\t-f <fasta>\tindexed female reference genome FASTA. (use this with -s)"
     echo -e "\t-m <fasta>\tindexed male reference genome FASTA. (use this with -s)"
     echo -e "\t-M <int>\tnumber of insertions to integrate into template genome."
@@ -26,6 +27,7 @@ while getopts ":d:n:r:s:f:m:M:v:t:N:G:h" OPTION; do
         n)  NAMEs=($OPTARG);;
         r)  FASTA=$OPTARG;;
         s)  SEX=$OPTARG;;
+        S)  G_SIZE=$OPTARG;;
         f)  F_FASTA=$OPTARG;;
         m)  M_FASTA=$OPTARG;;
         M)  IN_NUM=$OPTARG;;
@@ -94,7 +96,7 @@ if [ -z ${SEX} ];then
             echo -e "[ SUBSETS OF ${NAME} ALREADY EXIST, SKIP. ]"
         else
             cd ${NAME}_templateswithsnp
-            /data/tusers/zhongrenhu/for_SMS/test/subset_ins.sh -n ${NAME} -M ${IN_NUM} -R ${NAME}.simulated_sv.summary -S 4
+            /data/tusers/zhongrenhu/for_SMS/test/subset_ins.sh -n ${NAME} -M ${IN_NUM} -R ${NAME}.simulated_sv.summary -S ${G_SIZE}
             cd ..
         fi
     done
