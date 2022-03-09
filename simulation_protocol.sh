@@ -1,5 +1,5 @@
 #! /bin/bash
-# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/test -n "line_21" -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/ -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon.fa -N 2000 -G 4 &
+# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/test -n "line_21" -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/ -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon.fa -N 2000 -M 2000 -G 10 &
 
 ######## Help Information ########
 function help_info(){
@@ -10,6 +10,7 @@ function help_info(){
     echo -e "\t-s <F/M>\tsample sex, F/M."
     echo -e "\t-f <fasta>\tindexed female reference genome FASTA. (use this with -s)"
     echo -e "\t-m <fasta>\tindexed male reference genome FASTA. (use this with -s)"
+    echo -e "\t-M <int>\tnumber of insertions to integrate into template genome."
     echo -e "\t-v <path>\tdirectory to indexed SNVs VCFs with genotype (GGVP for GRCh38; DGRP for dm3)."
     echo -e "\t-t <fasta>\tindexed TE CCS FASTA."
     echo -e "\t-N <int>\tnumber of insertions to generate for each TE."
@@ -19,7 +20,7 @@ function help_info(){
 
 
 ######## Getting parameters ########
-while getopts ":d:n:r:s:f:m:v:t:N:G:h" OPTION; do
+while getopts ":d:n:r:s:f:m:M:v:t:N:G:h" OPTION; do
     case $OPTION in
         d)  WORKING_DIR=$OPTARG;;
         n)  NAMEs=($OPTARG);;
@@ -27,6 +28,7 @@ while getopts ":d:n:r:s:f:m:v:t:N:G:h" OPTION; do
         s)  SEX=$OPTARG;;
         f)  F_FASTA=$OPTARG;;
         m)  M_FASTA=$OPTARG;;
+        M)  IN_NUM=$OPTARG;;
         v)  VCF_PATH=$OPTARG;;
         t)  TE_FASTA=$OPTARG;;
         N)  INS_NUM=$OPTARG;;
@@ -44,6 +46,7 @@ echo -e "FASTA:\t${FASTA}"
 echo -e "SEX:\t${SEX}"
 echo -e "F_FASTA:\t${F_FASTA}"
 echo -e "M_FASTA:\t${M_FASTA}"
+echo -e "IN_NUM:\t${IN_NUM}"
 echo -e "VCF_PATH:\t${VCF_PATH}"
 echo -e "TE_FASTA:\t${TE_FASTA}"
 echo -e "INS_NUM:\t${INS_NUM}"
@@ -91,9 +94,7 @@ if [ -z ${SEX} ];then
             echo -e "[ SUBSETS OF ${NAME} ALREADY EXIST, SKIP. ]"
         else
             cd ${NAME}_templateswithsnp
-            NTE=`cat ${TE_FASTA%.fa}.size | wc -l`
-            NUM=`awk -vT=${NTE} -vI=${INS_NUM} 'BEGIN{printf "%.0f", 0.1*T*I}'`
-            /data/tusers/zhongrenhu/for_SMS/test/subset_ins.sh -n ${NAME} -M ${NUM} -R ${NAME}.simulated_sv.summary -S 4
+            /data/tusers/zhongrenhu/for_SMS/test/subset_ins.sh -n ${NAME} -M ${IN_NUM} -R ${NAME}.simulated_sv.summary -S 4
             cd ..
         fi
     done
