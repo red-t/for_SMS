@@ -21,7 +21,7 @@ function help_info(){
 
 
 ######## Getting parameters ########
-while getopts ":d:n:r:s:f:m:M:v:t:N:G:h" OPTION; do
+while getopts ":d:n:r:s:S:f:m:M:v:t:N:G:h" OPTION; do
     case $OPTION in
         d)  WORKING_DIR=$OPTARG;;
         n)  NAMEs=($OPTARG);;
