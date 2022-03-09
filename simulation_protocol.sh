@@ -91,8 +91,8 @@ if [ -z ${SEX} ];then
             echo -e "[ SUBSETS OF ${NAME} ALREADY EXIST, SKIP. ]"
         else
             cd ${NAME}_templateswithsnp
-            NROW=`cat ${NAME}.simulated_sv.summary | wc -l`
-            NUM=`awk -vN=${NROW} 'BEGIN{printf "%.0f", 0.5*N}'`
+            NTE=`cat ${TE_FASTA%.fa}.size | wc -l`
+            NUM=`awk -vT=${NTE} -vI=${INS_NUM} 'BEGIN{printf "%.0f", 0.1*T*I}'`
             /data/tusers/zhongrenhu/for_SMS/test/subset_ins.sh -n ${NAME} -M ${NUM} -R ${NAME}.simulated_sv.summary -S 4
             cd ..
         fi

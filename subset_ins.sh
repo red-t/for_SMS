@@ -46,19 +46,20 @@ if [ -z ${SEX} ];then
     for ((j=1; j<=${G_SIZE}; j++))
     do
         # GENERATE SUBSET(S)
-        if [ ! -f ${NAME}.homozygous.groundtruth.summary ];then
+        if [ ! -f ${NAME}.homozygous.groundtruth.bed ];then
             echo -e "[ CMD:\tpython /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} -H ]"
             python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} -H
             awk '$5 ~ /^[ATCG]*$/{print $0}' ${NAME}.homozygous.groundtruth.summary | sort -k1,1 -k2,2n > tmp.gt && mv tmp.gt ${NAME}.homozygous.groundtruth.summary
             awk '$5 ~ /^[ATCG]*$/{print $0}' ${NAME}.${j}.groundtruth.summary | sort -k1,1 -k2,2n > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
             cut -f 1-6 ${NAME}.homozygous.groundtruth.summary > ${NAME}.homozygous.groundtruth.bed
-        else
+            cut -f 1-6 ${NAME}.${j}.groundtruth.summary > ${NAME}.${j}.groundtruth.bed
+        elif [ ! -f ${NAME}.${j}.groundtruth.bed ];then
             echo -e "[ CMD:\tpython /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} ]"
             python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY}
             awk '$5 ~ /^[ATCG]*$/{print $0}' ${NAME}.${j}.groundtruth.summary | sort -k1,1 -k2,2n > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
+            cut -f 1-6 ${NAME}.${j}.groundtruth.summary > ${NAME}.${j}.groundtruth.bed
         fi
 
-        cut -f 1-6 ${NAME}.${j}.groundtruth.summary > ${NAME}.${j}.groundtruth.bed
         cat ${NAME}.homozygous.groundtruth.summary >> tmp.all
         cat ${NAME}.${j}.groundtruth.summary >> tmp.all
 
