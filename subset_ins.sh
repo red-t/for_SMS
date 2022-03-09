@@ -67,7 +67,8 @@ if [ -z ${SEX} ];then
             echo -e "[ INTEGRATE ${NAME}.homozygous.groundtruth.bed AND ${NAME}.${j}.groundtruth.bed INTO ${NAME}_template.fa START. ]"
             mkdir tmp && cat ${NAME}.homozygous.groundtruth.bed ${NAME}.${j}.groundtruth.bed > tmp.bed
             VISOR HACk -g ${NAME}_template.fa -b tmp.bed -o tmp
-            mv tmp/h1.fa ./${NAME}.${j}.fa && mv tmp/h1.fa.fai ./${NAME}.${j}.fa.fai && rm -r tmp && rm tmp.bed
+            mv tmp/h1.fa ./${NAME}.${j}.fa && mv tmp/h1.fa.fai ./${NAME}.${j}.fa.fai
+            rm -r tmp && rm tmp.bed
             echo -e "[ INTEGRATION FOR ${NAME}.${j} FINISH. ]"
         fi
     done
