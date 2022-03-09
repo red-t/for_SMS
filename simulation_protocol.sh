@@ -1,5 +1,5 @@
 #! /bin/bash
-
+# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/test -n "line_21" -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/ -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon.fa -N 2000 -G 4 &
 
 ######## Help Information ########
 function help_info(){
@@ -91,7 +91,7 @@ if [ -z ${SEX} ];then
             echo -e "[ SUBSETS OF ${NAME} ALREADY EXIST, SKIP. ]"
         else
             cd ${NAME}_templateswithsnp
-            NROW=`wc -l ${NAME}.simulated_sv.summary`
+            NROW=`cat ${NAME}.simulated_sv.summary | wc -l`
             NUM=`awk -vN=${NROW} 'BEGIN{printf "%.0f", 0.5*N}'`
             /data/tusers/zhongrenhu/for_SMS/test/subset_ins.sh -n ${NAME} -M ${NUM} -R ${NAME}.simulated_sv.summary -S 4
             cd ..
@@ -101,9 +101,9 @@ fi
 
 
 ### SIMULATION WITH PHASED SNV ###
-# if [ ! -z ${SEX} ];then
-#     echo -e "SIMULATION WITH PHASED SNV"
-# fi
+if [ ! -z ${SEX} ];then
+    echo -e "SIMULATION WITH PHASED SNV"
+fi
 
 
 # if [ ! -f  ];then
