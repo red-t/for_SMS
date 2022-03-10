@@ -83,3 +83,63 @@ if [ -z ${SEX} ];then
     rm tmp.uniq && rm tmp.all
     echo -e "[ GENERATE SUBSET(S) FOR ${NAME} FINISH. ]"
 fi
+
+
+if [ ! -z ${SEX} ];then
+    echo -e "[ GENERATE SUBSET(S) FOR ${NAME} START. ]"
+
+    for ((j=1; j<=${G_SIZE}; j++))
+    do
+        # GENERATE SUBSET(S)
+        if [ ! -f ${NAME}.homozygous.groundtruth.h2.bed ];then
+            echo -e "[ CMD:\tpython /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} -H ]"
+            python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} -H
+            awk '$5~/^[ATCG]*$/ && $19~/^[ATCG]*$/{print $0}' ${NAME}.homozygous.groundtruth.summary | sort -k1,1 -k2,2n > tmp.gt && mv tmp.gt ${NAME}.homozygous.groundtruth.summary
+            awk '$5~/^[ATCG]*$/ && $19~/^[ATCG]*$/{print $0}' ${NAME}.${j}.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
+            awk '{print $1,$2,$3,$4,$5,$6}' ${NAME}.homozygous.groundtruth.summary > ${NAME}.homozygous.groundtruth.h1.bed
+            awk '{print $1,$2,$3,$4,$12$9,$6}' ${NAME}.homozygous.groundtruth.summary > ${NAME}.homozygous.groundtruth.h2.bed
+
+            NR=`cat ${NAME}.${j}.groundtruth.summary | wc -l`; NR1=`awk -vN=${NR} 'BEGIN{printf "%.0f",0.5*N}'`; NR2=$((NR-NR1))
+            head -n ${NR1} ${NAME}.${j}.groundtruth.summary | awk '{print $1,$2,$3,$4,$5,$6}' > ${NAME}.${j}.groundtruth.h1.bed
+            tail -n ${NR2} ${NAME}.${j}.groundtruth.summary | awk '{print $1,$2,$3,$4,$12$9,$6}' > ${NAME}.${j}.groundtruth.h2.bed
+        elif [ ! -f ${NAME}.${j}.groundtruth.bed ];then
+            echo -e "[ CMD:\tpython /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} ]"
+            python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY}
+            awk '$5~/^[ATCG]*$/ && $19~/^[ATCG]*$/{print $0}' ${NAME}.${j}.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
+            
+            NR=`cat ${NAME}.${j}.groundtruth.summary | wc -l`; NR1=`awk -vN=${NR} 'BEGIN{printf "%.0f",0.5*N}'`; NR2=$((NR-NR1))
+            head -n ${NR1} ${NAME}.${j}.groundtruth.summary | awk '{print $1,$2,$3,$4,$5,$6}' > ${NAME}.${j}.groundtruth.h1.bed
+            tail -n ${NR2} ${NAME}.${j}.groundtruth.summary | awk '{print $1,$2,$3,$4,$12$9,$6}' > ${NAME}.${j}.groundtruth.h2.bed
+        fi
+
+        cat ${NAME}.homozygous.groundtruth.summary >> tmp.all && cat ${NAME}.homozygous.groundtruth.summary >> tmp.all
+        cat ${NAME}.${j}.groundtruth.summary >> tmp.all
+
+        # INTEGRATE INSERTIONS INTO TEMPLATE GENOME
+        if [ ! -f ${NAME}.${j}.h2.fa.fai ];then
+            echo -e "[ INTEGRATION FOR ${NAME}.${j} START. ]"
+            # INTEGRATION FOR H1
+            mkdir tmp
+            cat ${NAME}.homozygous.groundtruth.h1.bed ${NAME}.${j}.groundtruth.h1.bed > tmp.bed
+            VISOR HACk -g ${NAME}_template_h1.fa -b tmp.bed -o tmp
+            mv tmp/h1.fa ./${NAME}.${j}.h1.fa && mv tmp/h1.fa.fai ./${NAME}.${j}.h1.fa.fai
+
+            # INTEGRATION FOR H2
+            rm tmp.bed
+            cat ${NAME}.homozygous.groundtruth.h2.bed ${NAME}.${j}.groundtruth.h2.bed > tmp.bed
+            VISOR HACk -g ${NAME}_template_h2.fa -b tmp.bed -o tmp
+            mv tmp/h1.fa ./${NAME}.${j}.h2.fa && mv tmp/h1.fa.fai ./${NAME}.${j}.h2.fa.fai
+            rm -r tmp && rm tmp.bed
+            echo -e "[ INTEGRATION FOR ${NAME}.${j} FINISH. ]"
+        fi
+    done
+
+    # CALCULATING FREQUENCY
+    sort -k1,1 -k2,2n ./tmp.all | uniq -c > ./tmp.uniq
+    echo -e "chrom\tstart\tend\tname\tadd_len\tstrand\tfrequency\tTE\tte_start\tte_end\ttsd_start\ttsd_end\tn_mutates\tFullLength" > ./${NAME}.groundtruth.summary.bed
+    awk 'BEGIN{OFS="\t"} {print $2,$3,$4,$8,$7,$9,$1,$10,$11,$12,$14,$15,$17,$19}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.bed
+    echo -e "name\tte_seq\ttsd_seq\th2_tsd_seq\tins_seq\torigin_seq" > ./${NAME}.groundtruth.summary.seq
+    awk 'BEGIN{OFS="\t"} {print $8,$13,$16,$20,$6,$18}' ./tmp.uniq >> ./${NAME}.groundtruth.summary.seq
+    rm tmp.uniq && rm tmp.all
+    echo -e "[ GENERATE SUBSET(S) FOR ${NAME} FINISH. ]"
+fi

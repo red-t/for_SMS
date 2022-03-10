@@ -126,7 +126,7 @@ simulate_ins <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, t, sn
                               type = rep("insertion", n_ins), ins_seq = paste(tmp_te_seq, tmp_tsd_seq, sep = ""),
                               add_len = sample(c(0,1), n_ins, prob=c(0.8, 0.2), replace=TRUE), name = tmp_names, strand = tmp_te_df$strand, TE = tmp_te_df$seqnames,
                               te_start = tmp_te_df$start-1, te_end = tmp_te_df$end, te_seq = tmp_te_seq,
-                              tsd_start = tmp_tsd_df$start-1, tsd_len = tmp_tsd_df$end, tsd_seq = tmp_tsd_seq,
+                              tsd_start = tmp_tsd_df$start-1, tsd_end = tmp_tsd_df$end, tsd_seq = tmp_tsd_seq,
                               n_mutates = n_mutates, origin_seq = origin_seq, FullLength = rep("False", n_ins))
       
       if (l==1) {write.table(tmp_ins_df, file = paste("./", sn, ".simulated_sv.summary", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE)}
@@ -182,7 +182,7 @@ simulate_ins_full <- function(te_fa, te_idx, genome_fa, genome_idx, tsd_idx, n, 
                             type = rep("insertion", n_ins), ins_seq = paste(tmp_te_seq, tmp_tsd_seq, sep = ""),
                             add_len = sample(c(0,1), n_ins, prob=c(0.8, 0.2), replace=TRUE), name = tmp_names, strand = tmp_te_df$strand, TE = tmp_te_df$seqnames,
                             te_start = tmp_te_df$start-1, te_end = tmp_te_df$end, te_seq = tmp_te_seq,
-                            tsd_start = tmp_tsd_df$start-1, tsd_len = tmp_tsd_df$end, tsd_seq = tmp_tsd_seq,
+                            tsd_start = tmp_tsd_df$start-1, tsd_end = tmp_tsd_df$end, tsd_seq = tmp_tsd_seq,
                             n_mutates = n_mutates, origin_seq = origin_seq, FullLength = rep("True", n_ins))
     
     write.table(tmp_ins_df, file = paste("./", sn, ".simulated_sv.summary", sep = ""), append = TRUE, quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
