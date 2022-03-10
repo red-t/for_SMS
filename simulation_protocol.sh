@@ -1,6 +1,6 @@
 #! /bin/bash
 # nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/test -n "line_21" -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/ -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon.fa -N 800 -M 2000 -G 4 -S 100 &
-# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/GRCh38/test -n "HG02716" -s F -f /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_X.fa -m /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_Y.fa -v /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GGVP/ -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/ALUL1SVA.fa -N 2000 -M 2000 -G 4 -S 1 &
+# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/GRCh38/test -n "HG02716" -s F -f /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_X.fa -m /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_Y.fa -v /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GGVP/ -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/ALUL1SVA.fa -N 2000 -M 2000 -G 4 -S 2 &
 
 ######## Help Information ########
 function help_info(){
