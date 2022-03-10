@@ -1,5 +1,6 @@
 #! /bin/bash
 # nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/test -n "line_21" -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/ -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon.fa -N 800 -M 2000 -G 4 -S 100 &
+# nohup /data/tusers/zhongrenhu/for_SMS/test/simulation_protocol.sh -d /data/tusers/zhongrenhu/for_SMS/dna/simulation/GRCh38/test -n "HG02716" -s F -f /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_X.fa -m /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_Y.fa -v /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GGVP/ -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/ALUL1SVA.fa -N 2000 -M 2000 -G 4 -S 1 &
 
 ######## Help Information ########
 function help_info(){
@@ -130,7 +131,7 @@ if [ ! -z ${SEX} ];then
             cd ${NAME}_templateswithsnp && echo -e "[ CMD:\tRscript /data/tusers/zhongrenhu/for_SMS/test/simulate_sv_genome.R ${TE_FASTA} ${NAME}_template_h1.fa ${INS_NUM} ${GRADIENT} ${NAME} ]"
             conda activate R_env
             Rscript /data/tusers/zhongrenhu/for_SMS/test/simulate_sv_genome.R ${TE_FASTA} ${NAME}_template_h1.fa ${INS_NUM} ${GRADIENT} ${NAME}
-            awk '{print $1":"($13+1)"-"$14}' ${NAME}.simulated_sv.summary > tmp.region
+            awk 'FNR != 1 {print $1":"($13+1)"-"$14}' ${NAME}.simulated_sv.summary > tmp.region
             echo -e "tsd_h2" > tmp.tsd & samtools faidx -r tmp.region ${NAME}_template_h2.fa | grep -v "^>" >> tmp.tsd
             paste ${NAME}.simulated_sv.summary tmp.tsd > ${NAME}.simulated_phased_sv.summary
             rm tmp.region && rm tmp.tsd && rm ${NAME}.simulated_sv.summary
