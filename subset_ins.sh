@@ -97,11 +97,11 @@ if [ ! -z ${SEX} ];then
             awk '$5~/^[ATCG]*$/ && $19~/^[ATCG]*$/{print $0}' ${NAME}.homozygous.groundtruth.summary | sort -k1,1 -k2,2n > tmp.gt && mv tmp.gt ${NAME}.homozygous.groundtruth.summary
             awk '$5~/^[ATCG]*$/ && $19~/^[ATCG]*$/{print $0}' ${NAME}.${j}.groundtruth.summary > tmp.gt && mv tmp.gt ${NAME}.${j}.groundtruth.summary
             awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6}' ${NAME}.homozygous.groundtruth.summary > ${NAME}.homozygous.groundtruth.h1.bed
-            awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$12$9,$6}' ${NAME}.homozygous.groundtruth.summary > ${NAME}.homozygous.groundtruth.h2.bed
+            awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$12$19,$6}' ${NAME}.homozygous.groundtruth.summary > ${NAME}.homozygous.groundtruth.h2.bed
 
             NR=`cat ${NAME}.${j}.groundtruth.summary | wc -l`; NR1=`awk -vN=${NR} 'BEGIN{printf "%.0f",0.5*N}'`; NR2=$((NR-NR1))
             head -n ${NR1} ${NAME}.${j}.groundtruth.summary | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6}' > ${NAME}.${j}.groundtruth.h1.bed
-            tail -n ${NR2} ${NAME}.${j}.groundtruth.summary | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$12$9,$6}' > ${NAME}.${j}.groundtruth.h2.bed
+            tail -n ${NR2} ${NAME}.${j}.groundtruth.summary | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$12$19,$6}' > ${NAME}.${j}.groundtruth.h2.bed
         elif [ ! -f ${NAME}.${j}.groundtruth.bed ];then
             echo -e "[ CMD:\tpython /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY} ]"
             python /data/tusers/zhongrenhu/for_SMS/test/my_shuf.py -p ${NAME}.${j} -M ${N_INS} -R ${REF_SUMMARY}
@@ -109,7 +109,7 @@ if [ ! -z ${SEX} ];then
             
             NR=`cat ${NAME}.${j}.groundtruth.summary | wc -l`; NR1=`awk -vN=${NR} 'BEGIN{printf "%.0f",0.5*N}'`; NR2=$((NR-NR1))
             head -n ${NR1} ${NAME}.${j}.groundtruth.summary | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6}' > ${NAME}.${j}.groundtruth.h1.bed
-            tail -n ${NR2} ${NAME}.${j}.groundtruth.summary | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$12$9,$6}' > ${NAME}.${j}.groundtruth.h2.bed
+            tail -n ${NR2} ${NAME}.${j}.groundtruth.summary | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$12$19,$6}' > ${NAME}.${j}.groundtruth.h2.bed
         fi
 
         cat ${NAME}.homozygous.groundtruth.summary >> tmp.all && cat ${NAME}.homozygous.groundtruth.summary >> tmp.all
