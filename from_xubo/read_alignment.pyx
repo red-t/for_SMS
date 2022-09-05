@@ -156,7 +156,7 @@ cdef class Cluster:
     cpdef static(self):
         """ 筛选supporting reads和unsuporting reads，计算frequency """
         # supporting reads
-        cdef：
+        cdef:
             dict black_region = {'start':1000000000,'end':0}
             int black_read_num = 0
             list support_span_reads_list = []
