@@ -5,6 +5,7 @@ DATA_PATH="/data/tusers/boxu/lrft/rawdata/simulation"
 OUT_PATH_dir="/data/tusers/boxu/lrft/result/simulation"
 lrft_BIN_PATH="/data/tusers/boxu/lrft/scripts"
 ANNO_PATH="/data/tusers/boxu/annotation"
+REPEATMASKER_FILE="/data/tusers/boxu/annotation/dm3/dm3.rmsk.bed"
 GENOME="dm6_clean"
 SAMPLE="line_28"
 CPU="10"
@@ -39,7 +40,7 @@ do
     # python lrft2.py ${OUT_PATH}/${SAMPLE}_pacbio.${dep}X.q0.region.sorted.bam ${OUT_PATH}/SMS ${ANNO_PATH}/${GENOME}/dm6_clean.transposon.2.mmi ${ANNO_PATH}/${GENOME}/dm6_clean.transposon.size 300
 
 
-    python lrft2.py ${OUT_PATH}/${SAMPLE}_pacbio.${dep}X.q0.sorted.bam ${OUT_PATH}/SMS ${ANNO_PATH}/${GENOME}/dm6_clean.transposon.2.mmi ${ANNO_PATH}/${GENOME}/dm6_clean.transposon.size 300
+    python SMS.py ${OUT_PATH}/${SAMPLE}_pacbio.${dep}X.q0.region.sorted.bam ${OUT_PATH}/SMS ${ANNO_PATH}/dm3/dm3.transposon_for_simulaTE.mmi ${ANNO_PATH}/dm3/dm3.transposon_for_simulaTE.size 300 sms.test ${ANNO_PATH}/${GENOME}/line_28_template.fa ${ANNO_PATH}/${GENOME}/line_28_template.mmi ${REPEATMASKER_FILE}
     # bedtools intersect -wa -wb -a ${OUT_PATH}/SMS/SMS.insertion.bed -b ${ANNO_PATH}/dm3/dm3.rmsk.bed | awk '{split($4,a,"|");for(i=1;i<=length(a);i++){split(a[i],b,":");if(b[1]==$13){print $0}}}' > ${OUT_PATH}/SMS/SMS.ex_rmsk.bed
     # bedtools intersect -v -a ${OUT_PATH}/SMS/SMS.insertion.bed -b ${OUT_PATH}/SMS/SMS.ex_rmsk.bed > ${OUT_PATH}/SMS/SMS.final.bed
 
