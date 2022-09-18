@@ -167,7 +167,7 @@ fi
 
 # python lrft2.py ${OUT_PATH}/${SAMPLE}_pacbio.${dep}X.q0.region.sorted.bam ${OUT_PATH}/SMS ${ANNO_PATH}/dm3/dm3.transposon_for_simulaTE.mmi ${ANNO_PATH}/dm3/dm3.transposon_for_simulaTE.size 300
 
-python lrft2.py ${BAM_FILE} ${OUT_PATH} ${TRANSPOSON_INDEX} ${TRANSPOSON_SIZE} ${FLANKSIZE} ${PREFIX} ${GENOME_FA} ${GENOME_INDEX} ${REPEATMASKER_FILE}
+python SMS.py ${BAM_FILE} ${OUT_PATH} ${TRANSPOSON_INDEX} ${TRANSPOSON_SIZE} ${FLANKSIZE} ${PREFIX} ${GENOME_FA} ${GENOME_INDEX} ${REPEATMASKER_FILE}
 
 
 
