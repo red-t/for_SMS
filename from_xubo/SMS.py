@@ -1,4 +1,5 @@
 
+
 from pysam import AlignmentFile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from read_alignment import build_cluster, process_cluster
@@ -11,8 +12,11 @@ out_path=sys.argv[2]
 te_index=sys.argv[3]
 te_size=sys.argv[4]
 flanksize=sys.argv[5]
-# te_size="/data/tusers/boxu/annotation/dm6_clean/dm6_clean.transposon.size"
-# te_size="/data/tusers/boxu/annotation/hs37d5/hs37d5.transposon.size"
+prefix=sys.argv[6]
+genome_fa=sys.argv[7]
+genome_idx=sys.argv[8]
+repeatmasker_file=sys.argv[9]
+
 temp_out_path=out_path+"/temp/"
 
 read_seq_dic = {}
@@ -30,7 +34,7 @@ def main(bam=bamFile, te_index=te_index):
         chroms = list(bam_file.references)
         # chroms = ['chr2L', 'chr3R']
 
-        for read in AlignmentFile("/data/tusers/boxu/lrft/result/simulation/10/line_28_pacbio.10X.q0.sorted.bam", 'rb'):
+        for read in AlignmentFile("/data/tusers/boxu/lrft/result/simulation/30/line_28_pacbio.30X.q0.sorted.bam", 'rb'):
         # for read in AlignmentFile(bamFile, 'rb'):
             if not read.is_supplementary and not read.is_secondary and read.query_sequence:
                 # 以genome正向为标准
@@ -45,11 +49,11 @@ def main(bam=bamFile, te_index=te_index):
             chrom = future2chrom[future]
             chrom2clusters[chrom] = future.result()
         
-        future2chrom = {executor.submit(process_cluster, chrom2clusters[chrom], chrom, out_path):chrom for chrom in chroms}
+        future2chrom = {executor.submit(process_cluster, chrom2clusters[chrom], chrom, out_path, genome_fa, genome_idx, repeatmasker_file ):chrom for chrom in chroms}
         for future in as_completed(future2chrom):
             chrom = future2chrom[future]
             chrom2clusters[chrom] = future.result()
-    merge_script = "cat " + out_path + "/*tmp.bed" + " > " + out_path + "/SMS.insertion.bed"
+    merge_script = "cat " + out_path + "/*tmp.bed" + " > " + out_path + "/" + prefix + ".insertion.bed"
     subprocess.Popen(merge_script, shell=True)
     
     return chrom2clusters
