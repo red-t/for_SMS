@@ -5,8 +5,9 @@ from bx.intervals.intersection import Intersecter, Interval
 from mappy import revcomp
 from subprocess import Popen, PIPE, STDOUT, DEVNULL
 import os
-# from consensus.py import get_consensus_seq
-
+from consensus import get_consensus_seq
+from operator import itemgetter
+import re
 
 # 目前的筛选条件：
 # 1. primary alignment & supplementary alignment
@@ -17,14 +18,14 @@ import os
 # 4. hard clip也可能是
 # 5. 有些比对到genome上的质量比较差，添加mapq
 # 6. te list里并不全是一类转座子
-# 7.把insert序列信息记录下来
+# 7. 把insert序列信息记录下来
 
-# 8.给TE 比对的情况打分
-# 9.筛选supporting reads和unspporting reads 计算frequency
+# 8. 给TE 比对的情况打分
+# 9. 筛选supporting reads和unspporting reads 计算frequency
 
-# 7.区分出nested insertion
-# 8.把insert序列做consensus
-# 9.consensus两端跟genome比取TSD
+# 7. 区分出nested insertion
+# 8. 把insert序列做consensus
+# 9. consensus两端跟genome比取TSD
 
 # 10.方向问题，最终输出以genone reference 正链为参考，
 #            bam文件中sequence序列是与正链一致的，所以insert seq比对到TE的方向就是insertion的方向
@@ -57,19 +58,15 @@ cdef class Segment:
         self.r_st = r_st # reference segment start. reference position of insert/clip segment start.
         self.r_en = r_en # reference segment end. reference position of insert/clip segment end.
         self.rpos = rpos
-        # self.mapq = read.mapping_quality
         self.type_list = []
         self.cord_list = []
         self.orients = []
         self.read = read
     
     cpdef add_te(self, str te_n, int q_st, int q_en, int r_st, int r_en, int te_strand):
-        # self.type_list.append(te_n)
+        
         self.cord_list.append( (q_st, q_en, r_st, r_en, te_strand) )
-        # self.orients.append( abs(self.strand - strand) )
         self.orients.append( te_strand )
-        # self.type_list.append( te_n+":"+self.segname + "_|_" + str(abs(self.strand - strand)))
-        # self.type_list.append( te_n + "_|_" + str(abs(self.strand - strand)))
 
         # segment里每条supporting reads对应的TE 类型和 方向要保持对应，方便判断nested insertion
         self.type_list.append( te_n + "_|_" + str(te_strand))
@@ -86,7 +83,7 @@ cdef class Cluster:
     cdef public:
         int orient, state, supp_reads_num
         float frequency
-        str c_id, consensus, consensus_seq, tsd, ref_name, te_type
+        str c_id, consensus, consensus_seq, tsd, ref_name, te_type, insert_seq_info
         str out_path, supp_reads, unsupp_reads, span_reads
         list type_list, seg_list, orients, bp, supp_reads_list, unsupp_reads_list, span_reads_list, segname_list
         object ref_aln
@@ -105,6 +102,7 @@ cdef class Cluster:
         self.span_reads_list = []
         self.consensus = ''
         self.tsd = ''
+        self.insert_seq_info = ''
         self.state = 1 # insertion 的是否保留的标签，有两个值，0和1，0表示这个insertion是假的，会丢掉，1就会被留下
         self.ref_aln = ref_aln
         self.frequency = 0
@@ -131,24 +129,52 @@ cdef class Cluster:
 
         
 
-    cpdef te_stat(self):
+    cpdef te_stat(self, repeatmasker_file):
         
         cdef:
             str te_temp
             list te_temp_list=[]
-        # self.orient = Counter(self.orients).most_common()[0][0] +  "_|_" +"_|_".join(self.orient)
-        # self.te_type = Counter(self.type_list).most_common()[0][0] + "_|_" +"_|_".join(self.type_list)
-
-        # te_temp = Counter(self.type_list).most_common()[0][0]
-        
         # 暂时输出一个insertion位置上所有可能的TE type
         # 但nested insertion的方向还没处理
+
+        # 写入文件跟rmk对比去掉repeatmasker附近的insertion
+
+        g = open( self.out_path + self.ref_name + "/" + self.c_id + "te_type.bed", 'w')
+
         for te_temp in list(set(self.type_list)):
-            # print(te_temp)
             te_temp_list.append(te_temp.split('_|_')[0])
-            # self.orient = self.orient + "|" + int(te_temp.split('_|_')[1])
             self.orient = int(te_temp.split('_|_')[1])
+
+            if self.orient == 1:
+                te_temp_strand = '-'
+            else:
+                te_temp_strand = '+'
+            g.write("\t".join([self.ref_name, str(self.bp[0]), str(self.bp[1]), te_temp.split('_|_')[0], str(0), te_temp_strand ]) + '\n')
+
+        
         self.te_type = "|".join(te_temp_list)
+
+        
+        g.close()
+
+        rm_rmk_cmd = ['bedtools', 'intersect', '-a', repeatmasker_file, '-b', self.out_path + self.ref_name + "/" + self.c_id + "te_type.bed" ,'-wa','-wb', '|','awk', '\'{if($4==$10 && $6==$12){print $4}}\'' ]
+        rmk_te_list = os.popen(" ".join(rm_rmk_cmd)).readlines()
+        if len(rmk_te_list) > 0:
+            rmk_te = rmk_te_list[0].strip()
+            if rmk_te in te_temp_list:
+                te_temp_list.remove(rmk_te)
+        
+        self.type_list = te_temp_list
+        self.te_type = "|".join(self.type_list)
+        if len(self.type_list) == 0:
+            self.state = 0
+        
+        # print(self.te_type)
+
+
+        # print(">"+str(rmk_te.readlines()[0].strip()))
+        # rm_rmk_proc = Popen([" ".join(rm_rmk_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
+        
         # self.te_type = te_temp.split('_|_')[0]
         # self.orient = int(te_temp.split('_|_')[1])
 
@@ -257,41 +283,48 @@ cdef class Cluster:
             insertion_type = 'germ|' + nested
 
         #if self.state:
-        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, 0, strand, self.supp_reads, self.frequency, insertion_type, self.tsd , self.consensus )
+        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, 0, strand, self.supp_reads, self.frequency, insertion_type, self.tsd, self.insert_seq_info, self.consensus )
         #else:
         #    continue
 
-    cpdef get_consensus(self):
+    cpdef get_consensus(self, genome_fa,  genome_idx):
         """ define consensus sequence """
         cdef:
-            str consensus_prefix  = self.out_path + self.ref_name 
+            str consensus_prefix  = self.out_path + self.ref_name + "/" + self.c_id
             list insert_size_list=[] # 找到一个合适的组装的seq size
             int i
-            list canu_cmd 
-            # canu -p chr2L.consensus.te -d ./test_canu genomeSize=1k -pacbio chr2L.consensus.temp.fa
-            # align_proc = Popen([" ".join(cmd_mm2)], stderr=DEVNULL, shell=True, executable='/bin/bash')
-            # exitcode = align_proc.wait()
-        # consensus_proc = Popen([" ".join(canu_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash')
-        # exitcode = consensus_proc.wait()
-        # consensus_seq = open( self.out_path + '/' + self.ref_name + '/' + self.ref_name + '.insert.consensus', 'r' ).readlines()[0]
-        
-        # self.consensus = get_consensus(self.seg_list, self.out_path, self.ref_name, self.te_idx, consensus_seq_temp_file)
-        
-        # print(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type)
+            
         try:
-            consensus_with_tsd = get_consensus(self.seg_list, self.out_path, self.ref_name, self.te_idx, consensus_prefix )
+            consensus_with_tsd = get_consensus(self.seg_list, self.out_path, self.ref_name, self.te_idx, self.c_id, self.type_list, genome_fa,  genome_idx )
         except(IndexError):
-            consensus_with_tsd = ["IndexError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)])]
+            consensus_with_tsd = ["IndexError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
+            rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
+ 
         except(KeyError):
-            consensus_with_tsd = ["KeyError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)])]
+            consensus_with_tsd = ["KeyError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
+            rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
         except(ValueError):
-            consensus_with_tsd = ["ValueError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)])]
+            consensus_with_tsd = ["ValueError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
+            rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
         except(UnboundLocalError):
-            consensus_with_tsd = ["UnboundLocalError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)])]
+            consensus_with_tsd = ["UnboundLocalError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
+            rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
         except(FileNotFoundError):
-            consensus_with_tsd = ["FileNotFoundError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)])]
+            consensus_with_tsd = ["FileNotFoundError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
+            rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
+        except(TypeError):
+            consensus_with_tsd = ["TypeError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
+            rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
         self.consensus = consensus_with_tsd[0]
         self.tsd = consensus_with_tsd[1]
+        self.insert_seq_info = consensus_with_tsd[2]
+        
 
     def find_tsd(self):
         """ find TSD sequence """
@@ -301,120 +334,87 @@ cdef class Cluster:
 
 
 ## consensus
-cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, str consensus_prefix  ):
+cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, str c_id, list te_type_list, genome_fa,  genome_idx  ):
     cdef:
         int i = 0, l =  100
         list insert_size_list = []
-        str consensus_seq_temp_file = consensus_prefix + ".consensus.temp.fa"
-        # object consensus_seq_temp_file_ob = open(consensus_seq_temp_file, 'w')
-    # canu_cmd = ['canu', '-p', self.ref_name + '.insert.consensus', '-d', self.out_path + '/' + self.ref_name, '-pacbio', consensus_seq_temp_file]
-    # consensus_seq = ''
-    # return consensus_seq
-    if len(seg_list) <= 1 :
-        consensus_seq_print = 'None'
-        tsd_print = 'None'
-        return consensus_seq_print, tsd_print 
+        str consensus_seq_temp_file =  out_path + ref_name + "/" + c_id  + ".consensus.temp.fa"
+
 
     consensus_seq_temp_file_ob = open(consensus_seq_temp_file, 'w')
 
-    insert_type_list = [ insert_seq.segname[-1] for insert_seq in seg_list ] # 为了判断是否包含span reads
+    insert_type_list = list(set([ insert_seq.segname[-1] for insert_seq in seg_list ])) # 为了判断是否包含span reads
     # 在用wtdbg2组装的时候，发现如果组装长度（大致等于插入TE序列长度，这里暂时用insert seq的平均值代替）大于3000的时候，flanksize取200比较好
     # 如果小于3000，flanksize取300比较好
     # 但现在看到的也是个别例子，可能还得细化
     insert_size_list = [ len(insert_seq.seq_t) for insert_seq in seg_list ]
     insert_size = int(sum(insert_size_list) / len(insert_size_list))
+    # print(sorted(insert_size_list))
+
 
     # 只有clip supporting reads的insertion先跳过，因为效果不好，还在尝试参数
     # 实在不行就跳过
-    if 'm' not in insert_type_list:
+    if len(insert_type_list) == 1 and 'm' not in insert_type_list:
         consensus_seq_print = 'None'
         tsd_print = 'None'
-        return consensus_seq_print, tsd_print 
+        te_break_info_print = 'None'
+        return consensus_seq_print, tsd_print ,te_break_info_print 
 
     for insert_seq in seg_list :
         insert_type_list = []
         if insert_seq.segname[-1] != 'c':
             i = i + 1
-            # print(insert_seq.segname)
-            # print(insert_seq.genome_strand)
-            # print(insert_seq.orients)
             #consensus_seq_temp_file_ob.write( ">" + str(i) + "\n" + insert_seq.seq_t + "\n" )
 
             # 因为trim suporting reads是在找 candinate insertion的时候，不好根据整体情况判断falksize该取多少
             # 所有trim的时候flanksize先取300，在这里进行判断是否要再裁减一下
-            if insert_size > 3500:
-                if insert_seq.segname[-1] == 'm':
-                    consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t[l:-l] + "\n" )
-                if insert_seq.segname[-1] == 'l':
-                    consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t[l: ] + "\n" )
-                if insert_seq.segname[-1] == 'r':
-                    consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t[:-l ] + "\n" )
-            else:
-                consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t + "\n" )
-            # insert_size_list.append( len(insert_seq.seq_t) )
+            #if insert_size > 3500:
+            # if insert_size <= 0 :
+            #    if insert_seq.segname[-1] == 'm':
+            #        consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t[l:-l] + "\n" )
+            #    if insert_seq.segname[-1] == 'l':
+            #        consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t[l: ] + "\n" )
+            #    if insert_seq.segname[-1] == 'r':
+            #        consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t[:-l ] + "\n" )
+            #else:
+                
+            consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t + "\n" )
 
     consensus_seq_temp_file_ob.close()
-    # insert_size = str(int(sum(insert_size_list) / len(insert_size_list)))
-    # print(insert_size_list)
-    # print(insert_size)
 
-
-    # wtdbg2 - left
-    # wtdbg2_contig_cmd = [  'wtdbg2', '-x', 'preset2', '-q', '-p', '1','-k','6','-S','2', '-L', '0', '-g', '0.5k', '-t', '10', '-i', consensus_seq_temp_file, '-fo', out_path + ref_name + ".consensus.temp2" ]        
-    # wtdbg2_contig_cmd = [  'wtdbg2 -x preset2 -L 0 -q -p 0 -k 15 -g 3m -S 2 -e 2 -l 256 --ctg-min-length 1000 --node-len 512 --ctg-min-nodes 2', '-t', '10', '-i', consensus_seq_temp_file, '-fo', out_path + ref_name + ".consensus.temp2" ]        
-    
-    # -L 对参与组装reads长度的限制，第一步筛选
-    # -q quiet
-    # -p 和 -k 这两个值指kmer，但不是很理解，这里是用推荐的值，测试后感觉效果还行
-    # -e 做有向图时要求contig的最低coverage
-    # -l alignment长度
-    # --ctg-min-length 1000 组装出来contig的长度
-    # --node-len 512  有向图每个node的长度，这里至少两个bin
-    # --ctg-min-nodes 2    最终contig只有是由几个node组成的
-    wtdbg2_contig_cmd = [  'wtdbg2 -x preset2 -L 0 -q -p 0 -k 15 -g 3m -S 2 -e 1 -l 256 --ctg-min-length 1000 --node-len 512 --ctg-min-nodes 2', '-t', '10', '-i', consensus_seq_temp_file, '-fo', out_path + ref_name + ".consensus.temp2" ]        
-    wtdbg2_contig_proc = Popen([" ".join(wtdbg2_contig_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash')
-    exitcode = wtdbg2_contig_proc.wait()
-    
-    wtdbg2_consensus_cmd = [ 'wtpoa-cns', '-q', '-t', '10', '-i', out_path + ref_name + ".consensus.temp2.ctg.lay.gz", '-fo', out_path + ref_name + ".consensus.temp.wtdbg2_consensus.fa" ]
-    wtdbg2_consensus_proc = Popen([" ".join(wtdbg2_consensus_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
-    
-    exitcode = wtdbg2_consensus_proc.wait()
-
-
-    #exitcode = wtdbg2_consensus_proc_right.wait()
-
-
-    
-    # fa_index
-    
-
-    # print(len(open(out_path + ref_name + ".consensus.temp.wtdbg2_consensus.fa", 'r').readlines()))
-    if len(open(out_path + ref_name + ".consensus.temp.wtdbg2_consensus.fa", 'r').readlines()) == 0:
-        consensus_seq = ''
+    if max(insert_size_list) >=10000:
+        consensus_seq = get_consensus_seq('wtdbg2',consensus_seq_temp_file, out_path, ref_name, c_id )
     else:
-        # fa_index
-        # fa_index_cmd = ['samtools', 'faidx', out_path + ref_name + ".consensus.temp.wtdbg2_consensus.fa" ]
-        # fa_index_proc = Popen([" ".join(fa_index_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
-
-        consensus_seq_fa = FastaFile(out_path + ref_name + ".consensus.temp.wtdbg2_consensus.fa")
-        consensus_seq = consensus_seq_fa.fetch('ctg1')
-
-
+        consensus_seq = get_consensus_seq('mafft',consensus_seq_temp_file, out_path, ref_name, c_id ) # ./consensus.py/mafft
 
     
     # 将consensus seq比对到TE consensus上
     # splice mode可以比对有结构变异的insertion，cigar中表示为N
-    consensus_insert_bam = align_mm2(te_idx, out_path + ref_name + ".consensus.temp.wtdbg2_consensus.fa", out_path, thread_mm2=10, preset="splice")
+    # test_inser_bam = align_mm2("/home/boxu/temp/wtdbg2/insert_seq/maff.insert.mmi", out_path + ref_name + "/insert.consensus.fa",  out_path + ref_name, thread_mm2=10, preset="splice")
+    #test_inser_bam = align_mm2(te_idx, out_path + ref_name + "/insert.consensus.fa",  out_path + ref_name, thread_mm2=10, preset="splice")
+
+    #test_inser_bam_read = AlignmentFile(test_inser_bam, "rb")
+    # g = open("/home/boxu/temp/wtdbg2/for_qc/wtdbg2_divergency.txt", 'a')
+    # for read in test_inser_bam_read:
+    #    cigar_count = AlignedSegment.get_cigar_stats(read)[0];n_M = cigar_count[0];NM = cigar_count[-1];PM = n_M - NM;
+    #    divergence = (n_M - PM ) / n_M
+        #g.write(str(divergence)+"\n")
+    # g.close()
+
+    consensus_insert_bam = align_mm2(te_idx, out_path + ref_name + "/" + c_id + ".consensus.fa", out_path + ref_name, thread_mm2=10, preset="splice")
+    # consensus_insert_bam = align_mm2("/data/tusers/boxu/annotation/dm3/dm3.transposon_for_simulaTE.mmi", out_path + ref_name + "/" + c_id + ".consensus.fa", out_path + ref_name, thread_mm2=10, preset="splice")
 
     consensus_insert_bam_read = AlignmentFile(consensus_insert_bam, "rb")
-    seq_break_list = {}
+    seq_break_list_all = []
     for insert_seq_read in consensus_insert_bam_read:
+        cigar_count = AlignedSegment.get_cigar_stats(insert_seq_read)[0];n_M = cigar_count[0];NM = cigar_count[-1];PM = n_M - NM;divergence = (n_M - PM + 0.01 ) / (n_M + 0.01);print(divergence)
+        if insert_seq_read.reference_name not in te_type_list:
+            continue
+
         insert_te = insert_seq_read.reference_name
 
         # print(insert_seq_read.query_name, insert_seq_read.reference_start, insert_seq_read.reference_end, insert_seq_read.reference_length)
 
-        if insert_te not in seq_break_list.keys():
-            seq_break_list[insert_te] = [10000,10000]
 
         # 通过比对结果两边clip情况判断consensus seq哪一段是TE
         cigar_list = insert_seq_read.cigartuples
@@ -422,6 +422,16 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
         clip_genome_r = cigar_list[-1]
         break_l = 0
         break_r = 0
+        if clip_genome_l[0] not in (4,5):
+            continue
+        elif clip_genome_l[1] < 50:
+            continue
+
+        if clip_genome_r[0] not in (4,5):
+            continue
+        elif clip_genome_r[1] < 50:
+            continue
+
         if clip_genome_l[0] in (4, 5):
             if insert_seq_read.is_reverse:
                 break_l = len(consensus_seq) - clip_genome_l[1]
@@ -432,43 +442,64 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
                 break_r = clip_genome_r[1]
             else:
                 break_r = len(consensus_seq) - clip_genome_r[1]
+        
+        break_1 = min([break_l,break_r])
+        break_2 = max([break_l,break_r])
+        
+        if insert_seq_read.is_reverse:
+            break_seq_strand = '-'
+        else:
+            break_seq_strand = '+'
+        
+        # internal deletion
 
-        if break_l + break_r < sum(seq_break_list[insert_te]):
-            seq_break_list[insert_te] = [break_l, break_r]
+        indel_cigar = insert_seq_read.cigarstring
+        if 'N' in indel_cigar : 
+            del_pos_list = [int(n_cigar) for n_cigar in re.findall('[0-9]{1,}',indel_cigar.split('N')[0].split('S')[-1])]
+
+            del_len = del_pos_list[-1]
+            del_pos = sum(del_pos_list[:-1])
+            seq_break_list_all.append((break_1, break_2,":".join([insert_te , str(insert_seq_read.reference_start),str(insert_seq_read.reference_end) ,break_seq_strand,"with_"+str(del_len)+"_del",str(insert_seq_read.reference_start + del_pos), str(insert_seq_read.reference_start + del_pos + del_len)])))
+
+        else:
+            seq_break_list_all.append((break_1, break_2,":".join([insert_te , str(insert_seq_read.reference_start),str(insert_seq_read.reference_end) ,break_seq_strand ])))
+    seq_break_list_all_sorted = sorted(seq_break_list_all, key = itemgetter(1))
+
+    # print(seq_break_list_all_sorted)
 
 
-    seq_break_list_all = []
-    for insert_te in seq_break_list:
-        seq_break_list_all.extend([seq_break_list[insert_te][0], seq_break_list[insert_te][1]])
+    consensus_seq_print_list = []
+    te_break_info_print_list = []
+    for i in range(len(seq_break_list_all_sorted)):
+        break_p = seq_break_list_all_sorted[i]
+        if i == 0:
+            consensus_seq_print_list.append(consensus_seq[0:break_p[0]])
+            te_break_info_print_list.append("0-"+str(break_p[0])+":genome")
+        consensus_seq_print_list.append(consensus_seq[break_p[0]:break_p[1]])
+        te_break_info_print_list.append(str(break_p[0])+"-"+str(break_p[1]) + ":" + break_p[2])
 
-    seq_break_list_sort = sorted(seq_break_list_all)
-    if len(seq_break_list_sort) == 1:
-        consensus_seq_print = '__'.join([consensus_seq[0:seq_break_list_sort[0]], consensus_seq[seq_break_list_sort[0]::]])
-    if len(seq_break_list_sort) == 2:
-        consensus_seq_print = '__'.join([consensus_seq[0:seq_break_list_sort[0]], consensus_seq[seq_break_list_sort[0]:seq_break_list_sort[1]], consensus_seq[seq_break_list_sort[1]:]])
+        if i == len(seq_break_list_all_sorted) - 1 :
+            consensus_seq_print_list.append(consensus_seq[break_p[1]:])
+            te_break_info_print_list.append( str(break_p[1]) + "-" + str(len(consensus_seq)) + ":genome" )
+
+    consensus_seq_print = '__'.join(consensus_seq_print_list)
+    te_break_info_print = '__'.join(te_break_info_print_list)
+    seq_break_list_tsd = [seq_break_list_all_sorted[0][0], seq_break_list_all_sorted[-1][1]]
+
     
+    tsd_print = get_tsd( consensus_seq, seq_break_list_tsd, out_path, ref_name, c_id, genome_fa,  genome_idx )
+    #tsd_print = 'None'
     
     # 去掉中间文件，如果保留的话，pysam在读consensus.fa的时候会出问题，感觉是因为内存释放的问题，
-    rm_wtdbg2_cmd = ['rm', out_path + ref_name + ".consensus.temp*" ]
-    rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
-        
-            
-
-    # print(len(consensus_seq),  seq_break_list_sort)
-    
-    # consensus_proc = Popen([" ".join(canu_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash')
-    # exitcode = consensus_proc.wait()
-    # consensus_seq = open( self.out_path + '/' + self.ref_name + '/' + self.ref_name + '.insert.consensus', 'r' ).readlines()[0]
+    rm_wtdbg2_cmd = ['rm', out_path + ref_name +  "/*" + c_id + "*" ]
+    # rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
     
     
-    
-    tsd_print = get_tsd( consensus_seq, seq_break_list_sort, out_path, ref_name )
-    #tsd_print = 'None'
-    return  consensus_seq_print , tsd_print 
+    return  consensus_seq_print , tsd_print , te_break_info_print
 
 
-cdef str get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref_name ):
-    tsd_temp_file = out_path + ref_name + ".tsd.temp.fa"
+cdef str get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref_name, str c_id, str genome_fa,  str genome_idx ):
+    tsd_temp_file = out_path + ref_name + "/"+ c_id + ".tsd.temp.fa"
     tsd = ''
 
     # 取consensus seq两端非TE的序列写入文件与genome进行比对
@@ -477,8 +508,7 @@ cdef str get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref_n
     tsd_temp_file_ob = open(tsd_temp_file, 'w')
     tsd_temp_file_ob.write('>left_tsd\n' + tsd_l + '\n>right_tsd\n' + tsd_r)
     tsd_temp_file_ob.close()
-    genome_idx = '/data/tusers/boxu/annotation/dm6_clean/line_28_template.mmi'
-    tsd_bam = align_mm2(genome_idx, tsd_temp_file, out_path, thread_mm2=10, preset="map-ont")
+    tsd_bam = align_mm2(genome_idx, tsd_temp_file, out_path + ref_name, thread_mm2=10, preset="map-ont")
 
     tsd_bam_ob = AlignmentFile(tsd_bam, 'rb')
     tsd_temp_dic = {}
@@ -493,6 +523,7 @@ cdef str get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref_n
                 left_tsd_clip = 0
             else:
                 left_tsd_clip = cigar_list[-1][1]
+                # print(left_tsd_clip)
         if read.query_name == 'right_tsd':
             if cigar_list[0][0] not in (4,5):
                 right_tsd_clip = 0
@@ -505,16 +536,19 @@ cdef str get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref_n
     # print(tsd_position)
     
     # print(-tsd_len-left_tsd_clip,-left_tsd_clip)
+    if tsd_len > 50:
+        tsd = "too_long"
+        return tsd
     if left_tsd_clip == 0:
         tsd_left = tsd_l[ -tsd_len: ]
     else:
         tsd_left = tsd_l[ -tsd_len-left_tsd_clip: -left_tsd_clip]
     tsd_right = tsd_r[right_tsd_clip : right_tsd_clip + tsd_len]
 
-    tsd_genome = FastaFile('/data/tusers/boxu/annotation/dm6_clean/line_28_template.fa').fetch(ref_name, tsd_position[0], tsd_position[1])
+    tsd_genome = FastaFile(genome_fa).fetch(ref_name, tsd_position[0], tsd_position[1])
 
 
-    tsd = tsd_left + '__' + tsd_right + '__' + tsd_genome
+    tsd = tsd_left + '__' + tsd_right + '__' + tsd_genome + '__pass'
     # print(tsd)
     return tsd
 
@@ -550,9 +584,6 @@ cdef tuple trim(bint is_reverse, int qlen, str seq, int q_st, int q_en, int op, 
     seq_t = seq[st_t:en_t]
 
 
-    # if is_reverse:
-    #     seq_t = revcomp(seq_t)
-
     return seq_t, q_st_t, q_en_t
 
 ## extract_seg ##
@@ -572,9 +603,6 @@ cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksi
         str segname # name of the I/S segment
         str seq_t, seq = read.query_sequence
         object t
-
-    # seg_fa.write('>{}\n{}\n'.format(read.query_name, seq))
-    # print(read_seq_dic['65;chr2L_hg8806:7585021'])
 
 
     # MrBleem
@@ -600,16 +628,6 @@ cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksi
     # 找到所有可能存在的insertion位置
     # 然后记录下来insert片段和比对到reference的位置
     
-    # if read.cigartuples[0][0] == 5 and read.cigartuples[-1][0] == 5:
-    #    if read.cigartuples[0][1] > 60 and read.cigartuples[0][1] > 60:
-    #        return segs
-    #if read.cigartuples[0][0] == 4 and read.cigartuples[-1][0] == 4:
-    #    if read.cigartuples[0][1] > 60 and read.cigartuples[0][1] > 60:
-    #        return segs 
-
-    #t = open('t.txt','a')
-    #t.write(">"+read.query_name+"\n"+seq+"\n")
-    #t.close()
     for op, op_len in read.cigartuples:
         if op in (1, 4, 5) and op_len >= min_len: # I or S or H
             if op_len > max_len:
@@ -720,8 +738,6 @@ cdef score_te_alignment(object read, dict te_size_dict):
     # mismatch / （ mismatch + perfect match ）
     cigar_count = AlignedSegment.get_cigar_stats(read)[0]
     n_M = cigar_count[0]
-    # n_I = cigar_count[1]
-    # n_D = cigar_count[2]
     NM = cigar_count[-1]
     PM = n_M - NM
     divergence = (n_M - PM ) / n_M
@@ -879,17 +895,23 @@ cpdef dict build_cluster(str ref_bam, str chrom, str te_idx, str outpath, dict r
 
 
 ## process_cluster ##
-cpdef process_cluster(dict cluster_dict, str chrom, str out_path):
+cpdef process_cluster(dict cluster_dict, str chrom, str out_path, str genome_fa, str genome_idx, str repeatmasker_file):
     cdef:
         str c_id
         Cluster cluster
         object fout = open("{}/{}.tmp.bed".format(out_path,chrom), "w")
+
+    
+    mkdir_cmd = ['mkdir', out_path + "/temp/" + chrom ]
+    mkdir_cmd_proc = Popen([" ".join(mkdir_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash')
+    exitcode = mkdir_cmd_proc.wait()
+
     
     for c_id in cluster_dict:
         cluster_dict[c_id].find_bp()
-        cluster_dict[c_id].te_stat()
+        cluster_dict[c_id].te_stat(repeatmasker_file)
         cluster_dict[c_id].static()
-        cluster_dict[c_id].get_consensus()
+        cluster_dict[c_id].get_consensus(genome_fa, genome_idx)
         # print(cluster_dict[c_id].state)
         if cluster_dict[c_id].state:
             fout.write(cluster_dict[c_id].cluster2bed())
