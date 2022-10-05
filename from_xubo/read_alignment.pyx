@@ -82,12 +82,12 @@ cdef class Segment:
 cdef class Cluster:
     cdef public:
         int orient, state, supp_reads_num
-        float frequency
+        float frequency, 
         str c_id, consensus, consensus_seq, tsd, ref_name, te_type, insert_seq_info
         str out_path, supp_reads, unsupp_reads, span_reads
         list type_list, seg_list, orients, bp, supp_reads_list, unsupp_reads_list, span_reads_list, segname_list
         object ref_aln
-        str te_idx 
+        str te_idx, divergency, consensus_meth, su_type
 
 
     def __init__(self, str c_id, str ref_name, str out_path, object ref_aln, str te_idx):
@@ -109,6 +109,9 @@ cdef class Cluster:
         self.supp_reads_num = 0
         self.segname_list = []
         self.te_idx = te_idx
+        self.divergency = '0'
+        self.consensus_meth = 'none'
+        self.su_type = 'none'
 
     cpdef add_seg(self, Segment seg):
         """ 向Cluster对象的segs当中添加周围的Segment """
@@ -130,7 +133,19 @@ cdef class Cluster:
         
 
     cpdef te_stat(self, repeatmasker_file):
-        
+        """
+        用于判断该 insertion cluster 该保留还是丢弃，根据 cluster 区间与 Repeat masker 注释区间是否有 overlap
+        来进行判断，有则丢弃，无则保留
+
+        Parameters:
+            repeatmasker_file: string
+            Repeatmasker 注释结果（BED文件）.
+
+        Returns：
+            self.state  
+                0代表丢弃，1代表保留
+      
+        """
         cdef:
             str te_temp
             list te_temp_list=[]
@@ -181,6 +196,20 @@ cdef class Cluster:
     # MrBleem
     cpdef static(self):
         """ 筛选supporting reads和unsuporting reads，计算frequency """
+        """
+        Function:
+            用于判断该 insertion cluster 该保留还是丢弃，根据 cluster 区间与 Repeat masker 注释区间是否有 overlap
+            来进行判断，有则丢弃，无则保留
+
+        Parameters:
+            repeatmasker_file: string
+            Repeatmasker 注释结果（BED文件）.
+
+        Returns：
+            self.state  
+                0代表丢弃，1代表保留
+      
+        """
         # supporting reads
         cdef:
             dict black_region = {'start':1000000000,'end':0}
@@ -226,7 +255,10 @@ cdef class Cluster:
         n_m = supp_reads_type.count('m')
         n_l = supp_reads_type.count('l')
         n_r = supp_reads_type.count('r')
-        # print(n_m, n_l, n_r)
+        print(">>>>")
+        # print(self.te_type)
+        print(n_m, n_l, n_r)
+        self.su_type = "_".join([str(n_m),str(n_l),str(n_r)])
 
         if n_m == 0 :
             if n_l == 0 :
@@ -283,12 +315,20 @@ cdef class Cluster:
             insertion_type = 'germ|' + nested
 
         #if self.state:
-        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, 0, strand, self.supp_reads, self.frequency, insertion_type, self.tsd, self.insert_seq_info, self.consensus )
+        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, self.frequency, strand, self.supp_reads, self.divergency, self.consensus_meth,insertion_type, self.tsd, self.insert_seq_info, self.consensus, self.su_type )
         #else:
         #    continue
 
     cpdef get_consensus(self, genome_fa,  genome_idx):
         """ define consensus sequence """
+        """
+        Function:
+            
+        Parameters:
+
+        Returns:
+
+        """
         cdef:
             str consensus_prefix  = self.out_path + self.ref_name + "/" + self.c_id
             list insert_size_list=[] # 找到一个合适的组装的seq size
@@ -297,33 +337,35 @@ cdef class Cluster:
         try:
             consensus_with_tsd = get_consensus(self.seg_list, self.out_path, self.ref_name, self.te_idx, self.c_id, self.type_list, genome_fa,  genome_idx )
         except(IndexError):
-            consensus_with_tsd = ["IndexError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            consensus_with_tsd = ["IndexError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
             rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
             rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
  
         except(KeyError):
-            consensus_with_tsd = ["KeyError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            consensus_with_tsd = ["KeyError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
             rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
             rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
         except(ValueError):
-            consensus_with_tsd = ["ValueError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            consensus_with_tsd = ["ValueError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
             rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
             rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
         except(UnboundLocalError):
-            consensus_with_tsd = ["UnboundLocalError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            consensus_with_tsd = ["UnboundLocalError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
             rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
             rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
         except(FileNotFoundError):
-            consensus_with_tsd = ["FileNotFoundError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            consensus_with_tsd = ["FileNotFoundError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None','0', 'None']
             rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
             rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
         except(TypeError):
-            consensus_with_tsd = ["TypeError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None']
+            consensus_with_tsd = ["TypeError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
             rm_wtdbg2_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
             rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
         self.consensus = consensus_with_tsd[0]
         self.tsd = consensus_with_tsd[1]
         self.insert_seq_info = consensus_with_tsd[2]
+        self.divergency = consensus_with_tsd[3]
+        self.consensus_meth = consensus_with_tsd[4]
         
 
     def find_tsd(self):
@@ -334,13 +376,35 @@ cdef class Cluster:
 
 
 ## consensus
-cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, str c_id, list te_type_list, genome_fa,  genome_idx  ):
+cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, str c_id, list te_type_list, str genome_fa,  str genome_idx  ):
+    """
+        Function:
+            用supporting reads组装一条consensus sequence，
+            并比对到genome和transposon consensus sequence上，
+            通过比对结果判断 insert sequence 的结构信息
+        Parameters:
+            seg_list - 一个insertion的cluster信息
+            out_path - temp文件路径
+            ref_name - insertion 所在染色体名字
+            te_idx - transposon consensus sequence 的minimap2 index
+            c_id - 每个insertion的特有id，为了记录中间文件用的，这样在并行的时候不会出错
+            te_type_list - insert sequence可能包含的TE类型，已经去除过repeatmasker
+            genome_fa - genome reference fasta信息，为了获取tsd区域的序列信息
+            genome_idx - genome的minimap2 index
+
+        Returns:
+            consensus_seq_print - 最终打印在结果里的序列信息，包含genome序列信息，insert seq的序列信息
+            tsd_print - tsd在insert consensus sequence 左右两端的序列信息以及genome上的TSD序列信息
+            te_break_info_print - 最终consensus sequence 各段分割点信息
+            divergency - consensus sequence 跟transposon reference比得到的divergency
+            consensus_meth - 做consensus 的软件类型
+    """
     cdef:
         int i = 0, l =  100
         list insert_size_list = []
         str consensus_seq_temp_file =  out_path + ref_name + "/" + c_id  + ".consensus.temp.fa"
 
-
+    # return 'none', 'none', 'none'
     consensus_seq_temp_file_ob = open(consensus_seq_temp_file, 'w')
 
     insert_type_list = list(set([ insert_seq.segname[-1] for insert_seq in seg_list ])) # 为了判断是否包含span reads
@@ -352,16 +416,26 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
     # print(sorted(insert_size_list))
 
 
+    
+    # print(insert_type_list)
     # 只有clip supporting reads的insertion先跳过，因为效果不好，还在尝试参数
     # 实在不行就跳过
     if len(insert_type_list) == 1 and 'm' not in insert_type_list:
         consensus_seq_print = 'None'
         tsd_print = 'None'
         te_break_info_print = 'None'
-        return consensus_seq_print, tsd_print ,te_break_info_print 
+        divergency = '0'
+        consensus_meth = 'None'
+        return consensus_seq_print, tsd_print ,te_break_info_print, divergency, consensus_meth
 
+    seq_raw_id_uniq_list = []
     for insert_seq in seg_list :
         insert_type_list = []
+        seq_raw_id = "_".join(insert_seq.segname.split('_')[3:5])
+        if seq_raw_id not in seq_raw_id_uniq_list:
+            seq_raw_id_uniq_list.append(seq_raw_id)
+        else:
+            continue
         if insert_seq.segname[-1] != 'c':
             i = i + 1
             #consensus_seq_temp_file_ob.write( ">" + str(i) + "\n" + insert_seq.seq_t + "\n" )
@@ -382,12 +456,46 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
 
     consensus_seq_temp_file_ob.close()
 
-    if max(insert_size_list) >=10000:
-        consensus_seq = get_consensus_seq('wtdbg2',consensus_seq_temp_file, out_path, ref_name, c_id )
+    if max(insert_size_list) <= 3000:
+        consensus_seq = get_consensus_seq('mafft',consensus_seq_temp_file, out_path, ref_name, c_id, 'local' )
+        consensus_meth = 'mafft'
     else:
-        consensus_seq = get_consensus_seq('mafft',consensus_seq_temp_file, out_path, ref_name, c_id ) # ./consensus.py/mafft
+        consensus_seq = get_consensus_seq('wtdbg2', consensus_seq_temp_file, out_path, ref_name, c_id, '1' )
+        consensus_meth = 'wtdbg2'
+         # ./consensus.py/mafft
 
-    
+    # test for divergency
+    # 这个是测试用的
+    # for meth in ['wtdbg2', 'mafft']:
+    for meth in []:
+        if meth == 'wtdbg2':
+            models = ['0','1']
+        else:
+            models = ['retree', 'local', 'gene', 'global']
+        # print(meth, models)
+        for model in models:
+            try:
+                consensus_seq = get_consensus_seq(meth,consensus_seq_temp_file, out_path, ref_name, c_id + "_" + model, model )
+                
+                consensus_insert_bam = align_mm2(te_idx, out_path + ref_name + "/" + c_id + "_" + model + ".consensus.fa", out_path + ref_name, thread_mm2=10, mismatch_model="", preset="splice")
+                consensus_insert_bam_read = AlignmentFile(consensus_insert_bam, "rb")
+                for insert_seq_read in consensus_insert_bam_read:
+                    if insert_seq_read.reference_name not in te_type_list:
+                        continue
+                    cigar_count = AlignedSegment.get_cigar_stats(insert_seq_read)[0];n_M = cigar_count[0];NM = cigar_count[-1];PM = n_M - NM;divergence = (n_M - PM + 0.01 ) / (n_M + 0.01);
+                    print(meth + "_" + model + "_consensus :" + str(divergence))
+                
+                consensus_insert_bam = align_mm2("/home/boxu/temp/wtdbg2/for_mafft/regions.mmi", out_path + ref_name + "/" + c_id + "_" + model + ".consensus.fa", out_path + ref_name, thread_mm2=10, mismatch_model="", preset="splice")
+                consensus_insert_bam_read = AlignmentFile(consensus_insert_bam, "rb")
+                for insert_seq_read in consensus_insert_bam_read:
+                    cigar_count = AlignedSegment.get_cigar_stats(insert_seq_read)[0];n_M = cigar_count[0];NM = cigar_count[-1];PM = n_M - NM;divergence = (n_M - PM + 0.01 ) / (n_M + 0.01);
+                    print(meth + "_" + model + "_reads :" + str(divergence))
+            except:
+                print(meth + "_" + model + ":" + 'none')
+
+        
+
+
     # 将consensus seq比对到TE consensus上
     # splice mode可以比对有结构变异的insertion，cigar中表示为N
     # test_inser_bam = align_mm2("/home/boxu/temp/wtdbg2/insert_seq/maff.insert.mmi", out_path + ref_name + "/insert.consensus.fa",  out_path + ref_name, thread_mm2=10, preset="splice")
@@ -395,21 +503,47 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
 
     #test_inser_bam_read = AlignmentFile(test_inser_bam, "rb")
     # g = open("/home/boxu/temp/wtdbg2/for_qc/wtdbg2_divergency.txt", 'a')
-    # for read in test_inser_bam_read:
+    # for read in test_inser_bam_read: 
     #    cigar_count = AlignedSegment.get_cigar_stats(read)[0];n_M = cigar_count[0];NM = cigar_count[-1];PM = n_M - NM;
     #    divergence = (n_M - PM ) / n_M
         #g.write(str(divergence)+"\n")
     # g.close()
 
-    consensus_insert_bam = align_mm2(te_idx, out_path + ref_name + "/" + c_id + ".consensus.fa", out_path + ref_name, thread_mm2=10, preset="splice")
+    # 这部分是做polishing的，还没全部测试完成，只做了一半
+    insert_sequence_bam = align_mm2(te_idx, consensus_seq_temp_file, out_path + ref_name, thread_mm2=10,  mismatch_model="--eqx", preset="splice")
+    insert_sequence_bam_obj = AlignmentFile(insert_sequence_bam, 'rb')
+    
+    insert_con_sequence_dict = {}
+    for te_reference in te_type_list:
+        insert_con_sequence_dict[te_reference] = ''
+        insert_con_sequence = ''
+        for pileup_col in insert_sequence_bam_obj.pileup(te_reference):
+            map_base_list_dict = Counter(pileup_col.get_query_sequences(mark_matches=False, mark_ends=False, add_indels=False))
+            map_base_list = [(x,map_base_list_dict[x]) for x in map_base_list_dict ]
+
+            map_base_list_sorted = sorted(map_base_list, key = itemgetter(1), reverse=True)
+            insert_con_sequence = insert_con_sequence + map_base_list_sorted[0][0].split('-')[0]
+        insert_con_sequence_dict[te_reference] = insert_con_sequence
+
+
+    # consensus序列比对到 te 确定结构信息
+    consensus_insert_bam = align_mm2(te_idx, out_path + ref_name + "/" + c_id + ".consensus.fa", out_path + ref_name, thread_mm2=10, mismatch_model="", preset="splice")
     # consensus_insert_bam = align_mm2("/data/tusers/boxu/annotation/dm3/dm3.transposon_for_simulaTE.mmi", out_path + ref_name + "/" + c_id + ".consensus.fa", out_path + ref_name, thread_mm2=10, preset="splice")
 
     consensus_insert_bam_read = AlignmentFile(consensus_insert_bam, "rb")
     seq_break_list_all = []
     for insert_seq_read in consensus_insert_bam_read:
-        cigar_count = AlignedSegment.get_cigar_stats(insert_seq_read)[0];n_M = cigar_count[0];NM = cigar_count[-1];PM = n_M - NM;divergence = (n_M - PM + 0.01 ) / (n_M + 0.01);print(divergence)
+        
         if insert_seq_read.reference_name not in te_type_list:
             continue
+        
+        cigar_count = AlignedSegment.get_cigar_stats(insert_seq_read)[0];n_M = cigar_count[0];NM = cigar_count[-1];PM = n_M - NM;
+        if n_M != 0:
+            divergency = "{:.5f}".format( NM / n_M )
+        else:
+            divergency = 'none'
+        print(divergency)
+
 
         insert_te = insert_seq_read.reference_name
 
@@ -463,26 +597,41 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
 
         else:
             seq_break_list_all.append((break_1, break_2,":".join([insert_te , str(insert_seq_read.reference_start),str(insert_seq_read.reference_end) ,break_seq_strand ])))
+    
     seq_break_list_all_sorted = sorted(seq_break_list_all, key = itemgetter(1))
+    print(seq_break_list_all_sorted)
 
-    # print(seq_break_list_all_sorted)
+
+    polished_sequence = insert_con_sequence 
 
 
     consensus_seq_print_list = []
     te_break_info_print_list = []
     for i in range(len(seq_break_list_all_sorted)):
         break_p = seq_break_list_all_sorted[i]
+        break_te_info = break_p[2].split(':')
+        break_te_ref = break_te_info[0]
+        break_te_start = break_te_info[1]
+        break_te_end = break_te_info[2]
+
+        # left genome
         if i == 0:
             consensus_seq_print_list.append(consensus_seq[0:break_p[0]])
             te_break_info_print_list.append("0-"+str(break_p[0])+":genome")
+            polished_sequence = consensus_seq[0:break_p[0]] + "___" + polished_sequence
+
+        # insert sequence
         consensus_seq_print_list.append(consensus_seq[break_p[0]:break_p[1]])
         te_break_info_print_list.append(str(break_p[0])+"-"+str(break_p[1]) + ":" + break_p[2])
+        polished_sequence = polished_sequence + insert_con_sequence_dict[break_te_ref][break_te_start:break_te_end]
 
+        # right genome
         if i == len(seq_break_list_all_sorted) - 1 :
             consensus_seq_print_list.append(consensus_seq[break_p[1]:])
             te_break_info_print_list.append( str(break_p[1]) + "-" + str(len(consensus_seq)) + ":genome" )
+            polished_sequence = polished_sequence + "___" + consensus_seq[break_p[1]:]
 
-    consensus_seq_print = '__'.join(consensus_seq_print_list)
+    consensus_seq_print = '__'.join(consensus_seq_print_list) + "......" + polished_sequence
     te_break_info_print = '__'.join(te_break_info_print_list)
     seq_break_list_tsd = [seq_break_list_all_sorted[0][0], seq_break_list_all_sorted[-1][1]]
 
@@ -495,10 +644,23 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
     # rm_wtdbg2_proc = Popen([" ".join(rm_wtdbg2_cmd)], stderr=DEVNULL, shell=True, executable='/bin/bash' )
     
     
-    return  consensus_seq_print , tsd_print , te_break_info_print
+    return  consensus_seq_print , tsd_print , te_break_info_print, divergency, consensus_meth
 
 
 cdef str get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref_name, str c_id, str genome_fa,  str genome_idx ):
+    """
+        Function:
+            由consensus序列获取两端非TE的序列，比对到genome上，确定TSD信息
+            用在get_consensus()这个函数里
+        Parameters:
+            consensus_seq - 由软件（wtdbg2或mafft）获得的consensus 序列
+            seq_break_list - 最终consensus sequence 各段分割点信息，用于获取两端flanking region
+            剩下同上
+        Returns:
+            tsd - 左右两端以及genome上的tsd序列信息
+                tsd_left + '__' + tsd_right + '__' + tsd_genome + '__pass'
+
+    """
     tsd_temp_file = out_path + ref_name + "/"+ c_id + ".tsd.temp.fa"
     tsd = ''
 
@@ -508,7 +670,7 @@ cdef str get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref_n
     tsd_temp_file_ob = open(tsd_temp_file, 'w')
     tsd_temp_file_ob.write('>left_tsd\n' + tsd_l + '\n>right_tsd\n' + tsd_r)
     tsd_temp_file_ob.close()
-    tsd_bam = align_mm2(genome_idx, tsd_temp_file, out_path + ref_name, thread_mm2=10, preset="map-ont")
+    tsd_bam = align_mm2(genome_idx, tsd_temp_file, out_path + ref_name, thread_mm2=10, mismatch_model="", preset="map-ont")
 
     tsd_bam_ob = AlignmentFile(tsd_bam, 'rb')
     tsd_temp_dic = {}
@@ -587,7 +749,7 @@ cdef tuple trim(bint is_reverse, int qlen, str seq, int q_st, int q_en, int op, 
     return seq_t, q_st_t, q_en_t
 
 ## extract_seg ##
-cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksize=300, unsigned int min_len=200, unsigned int max_len=11000):
+cdef tuple extract_seg(object read, object seg_fa, dict read_seq_dic, list raw_read_id_list, int flanksize=300,  unsigned int min_len=200, unsigned int max_len=11000 ):
     """ 根据输入的alignment，解析其CIGAR字段并提取alignment当中的clip或
         insert segment。最后返回list of tuple, (segname, seg) """
     cdef:
@@ -660,7 +822,6 @@ cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksi
             elif r_en:
                 rpos = r_en
             else:
-                
                 continue
             
 
@@ -683,8 +844,12 @@ cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksi
                 seq_t, q_st_t, q_en_t = trim(read.is_reverse, qlen, seq, q_st, q_en, op, op_len, flanksize)
                 
                 # write out trimmed sequence
-                seg = Segment(read, segname, read.is_reverse, q_st, q_en, r_st, r_en, rpos, q_st_t, q_en_t, seq_t)
-                seg_fa.write('>{}\t{}\n{}\n'.format(segname, len(seq_t), seq_t))
+                if read.query_name in raw_read_id_list:
+                    continue
+                else:
+                    raw_read_id_list.append(read.query_name)
+                    seg = Segment(read, segname, read.is_reverse, q_st, q_en, r_st, r_en, rpos, q_st_t, q_en_t, seq_t)
+                    seg_fa.write('>{}\t{}\n{}\n'.format(segname, len(seq_t), seq_t))
             else:
                 seg = Segment(read, segname, read.is_reverse, q_st, q_en, r_st, r_en, rpos, 0, 0)
 
@@ -694,11 +859,11 @@ cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksi
         if op in (0, 1, 4, 7, 8):
             start_idx += op_len
 
-    return segs # list of tuples, (segname, seg)
+    return segs, raw_read_id_list # list of tuples, (segname, seg)
 
 
 ## align_mm2 ##
-cdef str align_mm2(str ref, str query, str outpath, int thread_mm2, str preset="map-ont"):
+cdef str align_mm2(str ref, str query, str outpath, int thread_mm2, str mismatch_model="", str preset="map-ont"):
     cdef:
         int exitcode
         ## str wk_dir = os.path.dirname(query)
@@ -707,7 +872,7 @@ cdef str align_mm2(str ref, str query, str outpath, int thread_mm2, str preset="
         str ref_p = os.path.basename(ref).rsplit('.', 1)[0]
         str out_path = os.path.join(wk_dir, ref_p + '_' + q_p + '.bam')
         # list cmd_mm2 = ['minimap2', '-t', str(thread_mm2), '-aYx', preset, '--secondary=no', ref, query, '|', 'samtools', 'view', '-bhSG 4', '-', '|', 'samtools', 'sort', '-o', out_path, '-']
-        list cmd_mm2 = ['minimap2', '-t', str(thread_mm2), '-aYx', preset, '--secondary=no',ref, query, '|', 'samtools', 'view', '-bhS', '-', '|', 'samtools', 'sort', '-o', out_path, '-']
+        list cmd_mm2 = ['minimap2', '-t', str(thread_mm2), '-aYx', preset, mismatch_model, '--secondary=no',ref, query, '|', 'samtools', 'view', '-bhS', '-', '|', 'samtools', 'sort', '-o', out_path, '-']
         list cmd_idx = ['samtools index ' + out_path]
     
     # pysam.sort("-o", "output.bam", "ex1.bam")
@@ -725,22 +890,36 @@ cdef str align_mm2(str ref, str query, str outpath, int thread_mm2, str preset="
 
 
 cdef score_te_alignment(object read, dict te_size_dict):
+    """
+        Function:
+            判断一条supporitng reads跟transposon 比对情况，根据几个参数进行打分0/1
+        Parameters:
+            read - 从 candidate supporting reads中取出来的 insert sequence 比对的TE上的情况
+            te_size_dict - 根据 transposon.size 文件建立的记录各 transposon 大小的字典
+        Returns:
+            score_te_align - 该比对结果的打分判断结果 0/1
+                0丢弃 1保留
+
+    """
     cdef:
         int score_te_align = 0, map_te_len, insert_te_len
         str map_te_name
     
     
-    map_te_name = read.reference_name.split(':')[0]
-    map_te_len = int(te_size_dict[map_te_name])
-    insert_te_len = read.reference_length
+    map_te_name = read.reference_name.split(':')[0] # 比对的TE的类型
+    map_te_len = int(te_size_dict[map_te_name]) # consensus TE的长度
+    insert_te_len = read.reference_length # 比对到transposon的长度
     
     # 计算divergency
     # mismatch / （ mismatch + perfect match ）
     cigar_count = AlignedSegment.get_cigar_stats(read)[0]
-    n_M = cigar_count[0]
-    NM = cigar_count[-1]
-    PM = n_M - NM
-    divergence = (n_M - PM ) / n_M
+    # n_M = cigar_count[0]
+    n_PM = cigar_count[7]
+    n_MM = cigar_count[8]
+    # NM = cigar_count[-1]
+    # PM = n_M - NM
+    # divergence = (n_M - PM ) / n_M
+    divergence = n_MM / ( n_PM + n_MM )
 
 
     # 这里考虑read上比对到TE的长度，如果太短就不太可靠，以及如果比对到TE的部分只占read的一小部分，也不太可靠
@@ -749,7 +928,7 @@ cdef score_te_alignment(object read, dict te_size_dict):
 
     if read.query_name[-1] == 'm':
         
-        if mappbility_for_te >= 0.25:
+        if mappbility_for_te >= 0.25:  # 如果supporitng reads里有跨过这个insertion的reads，而且reads中transposon的序列与consensus序列比例大于0.25，就保留这条alignment
             score_te_align = 1
         #print('ck3\n'+map_te_name,read.query_name)
         #print(read.query_alignment_length,read.query_length,read.reference_start,read.reference_end,read.pos)
@@ -765,10 +944,10 @@ cdef score_te_alignment(object read, dict te_size_dict):
         #print(read.query_alignment_start)
         #print(mappbility_for_read, mappbility_for_te)
 
-        if mappbility_for_read > 0.6 and read.mapq >= 40:
+        if mappbility_for_read > 0.6 and read.mapq >= 40:    # 如果reads大部分序列都是属于consensus TE的，这条比对可能是真的
             score_te_align = 1
         elif read.pos <= 20:
-            if mappbility_for_te >= 0.1 and read.mapq >= 30:
+            if mappbility_for_te >= 0.1 and read.mapq >= 30: # 如果与TE比对是从头开始比对，对reads中TE的占比要求可以低一点，如果不是就要求高一点
                 score_te_align = 1
         else:
             if mappbility_for_te >= 0.25 and read.mapq >= 60:
@@ -845,16 +1024,24 @@ cdef dict collect_seg(object ref_aln, str chrom, str te_idx, str outpath, dict r
 
 
     # extract segment from reference genome alignment
+    raw_read_id_list = []
     for read in ref_aln.fetch(chrom):
         if not read.is_secondary:
             if read.mapping_quality > 0:
-                segs.extend(extract_seg(read, seg_fa, read_seq_dic, flanksize))
+                temp_segs = extract_seg(read, seg_fa, read_seq_dic,  raw_read_id_list, flanksize)
+                segs.extend(temp_segs[0])
+                raw_read_id_list=temp_segs[1]
 
     seg_fa.close()
     seg_dict = dict(segs) # should we remove segs after this?
+    # print('>>>')
+     #print(len(segs),segs)
+     #print(len(seg_dict.keys()), seg_dict.keys())
+    # print(len(raw_read_id_list), raw_read_id_list)
+    # print(len(set(raw_read_id_list)), set(raw_read_id_list))
 
     # align segment sequence to transposon consensus sequence
-    te_bam = align_mm2(te_idx, outpath + "/" + chrom + ".tmp.fa", outpath, thread_mm2=10)
+    te_bam = align_mm2(te_idx, outpath + "/" + chrom + ".tmp.fa", outpath, thread_mm2=10, mismatch_model="--eqx")
     # 这里比对到TE之后，还需要考虑一个insert片段可能会比对到两个以上的的TE consensus上
 
     # parse TE alignment of segment sequence
@@ -913,6 +1100,7 @@ cpdef process_cluster(dict cluster_dict, str chrom, str out_path, str genome_fa,
         cluster_dict[c_id].static()
         cluster_dict[c_id].get_consensus(genome_fa, genome_idx)
         # print(cluster_dict[c_id].state)
+        # print("\n")
         if cluster_dict[c_id].state:
             fout.write(cluster_dict[c_id].cluster2bed())
 
