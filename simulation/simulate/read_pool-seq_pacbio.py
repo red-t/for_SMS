@@ -47,6 +47,8 @@ parser.add_argument("--error-rate", type=float, required=False, dest="error_rate
 parser.add_argument("--deletion-fraction", type=float, required=False, dest="delfrac", default=0.5, help="the fraction of deletions, the complementary fraction will be insertions")
 parser.add_argument("--reads", type=int, required=True, dest="reads", default=None, help="the total number of reads")
 parser.add_argument("--fasta", type=str, required=True, dest="fasta", default=None, help="output - a fasta file")
+parser.add_argument("--tgs-maxl", type=int, required=True, dest="tgs_maxl", default=None, help="Max length of TGS reads")
+parser.add_argument("--tgs-minl", type=int, required=True, dest="tgs_minl", default=None, help="Min length of TGS reads.")
 
 
 
@@ -77,6 +79,11 @@ for header,seq in fastaIO.FastaReader(args.pop_gen):
     sl=len(seq)
     for i in range(0,targetreads):
         readlen=rldfactory.next()
+        if readlen < args.tgs_minl:
+            readlen = random.randint(args.tgs_minl, args.tgs_maxl)
+        if readlen > args.tgs_maxl:
+            readlen = random.randint(args.tgs_minl, args.tgs_maxl)
+            
         firstposition=random.randint(0,sl-readlen)
         read1=seq[firstposition:firstposition+readlen]
         if random.random()<0.5:
