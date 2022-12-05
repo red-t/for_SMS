@@ -6,7 +6,7 @@ class PacBioMutator:
 
 	def __init__(self,errorrate,delfrac):
 		self.__er=errorrate
-		self.__tr={'A':['T','C','G'], 'T':['A','C','G'],'C':['A','T','G'],'G':['A','T','C']}
+                self.__tr={'A':['T','C','G'], 'T':['A','C','G'],'C':['A','T','G'],'G':['A','T','C'],'N':['N']}
 		self.__ins=['A','T','C','G']
 		self.__delfrac=delfrac;
 	
@@ -41,7 +41,7 @@ class PoisonSeqMutator:
 
 	def __init__(self,errorrate):
 		self.__er=errorrate
-		self.__tr={'A':['T','C','G'], 'T':['A','C','G'],'C':['A','T','G'],'G':['A','T','C']}
+                self.__tr={'A':['T','C','G'], 'T':['A','C','G'],'C':['A','T','G'],'G':['A','T','C'],'N':['N']}
 	
 	def __getPoisson(self,lam):
 		L= math.exp(-lam)
@@ -94,7 +94,7 @@ class ExhaustiveSeqMutator:
 	
 	def __init__(self,errorrate):
 		self.__er=errorrate
-		self.__tr={'A':['T','C','G'], 'T':['A','C','G'],'C':['A','T','G'],'G':['A','T','C']}
+                self.__tr={'A':['T','C','G'], 'T':['A','C','G'],'C':['A','T','G'],'G':['A','T','C'],'N':['N']}
 	
 
 	def mutateseq(self,seq):
