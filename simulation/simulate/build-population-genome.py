@@ -18,7 +18,7 @@ if cmd_subfolder not in sys.path:
      sys.path.insert(0, cmd_subfolder)
 
 
-parser = argparse.ArgumentParser(description="""           
+parser = argparse.ArgumentParser(description="""
 Description
 -----------
 This script generates an empty TE landscape for manual editing
@@ -42,7 +42,9 @@ parser.add_argument("--chassis", type=str, required=False, dest="ref_fasta", def
 parser.add_argument("--te-seqs", type=str, required=False, dest="te_fasta", default=None, help="TE sequences in a fasta file")
 parser.add_argument("--pgd", type=str, required=True, dest="pgd_definition", default=None, help="the definition of the population genome")
 parser.add_argument("--output", type=str, required=True, dest="output", default=None, help="the output file; will be multi-fasta file")
-
+parser.add_argument("--ins-seq", type=str, required=False, dest="ins_seq", default=None, help="the output file of insertion sequence; will be multi-fasta file")
+parser.add_argument("--sub_idx", type=int, required=True, dest="sub_idx", default=None, help="the index of the sub-population genome")
+parser.add_argument("--sub_size", type=int, required=True, dest="sub_size", default=None, help="the size of the sub-population genome")
 args = parser.parse_args()
 
 # read TE sequences from file; if provided
@@ -69,6 +71,7 @@ if args.ref_fasta is not None:
      crap,chasis=SequenceUtility.load_chasis(args.ref_fasta)
 else:
      print "No chasis file found; Will use chasis from the population definition file"
+     crap="TOY"
      chasis=pgdr.get_chasis()
 if chasis=="":
      raise Exception("No chasis was provided, neither in a fastq file nor in the population genome definition file")
@@ -79,24 +82,26 @@ print "Will proceed with chasis having a size of {0} nt".format(len(chasis))
 
 
 
-
-counter=1
+counter=1 + args.sub_idx*args.sub_size
 fw=FastaWriter(args.output,60)
 print "Start writing population genome"
 for tmp in tedeftuples:
      # translate into sequences
+     seqidtup = [(t[0],str(crap)+"_hg"+str(counter)+";"+t[1]) for t in tmp]
      seqtup=[(t[0],sc.getTESequence(t[1])) for t in tmp]
-     seq_with_te=SeqInserter.insertSequences(chasis,seqtup)
+     seq_with_te=SeqInserter.insertSequences(chasis,seqtup, args.ins_seq, seqidtup)
      # TODO seqinserter must check if position is smaller than sequence length
 
-     fw.write("hg"+str(counter),seq_with_te)
+     fw.write(str(crap)+"_hg"+str(counter),seq_with_te)
      counter+=1
-print "Done; Wrote {0} genomes to file {1}".format(counter-1,args.output)
+print "Done; Wrote {0} genomes to file {1}".format(args.sub_size,args.output)
 fw.close()
 
-    
-    
-    
 
+# if args.ins_seq:
+#      seqid=list(set(seqid))
+#      fout=open(args.ins_seq, "a")
+#      for id in seqid:
+#           fout.write("{0}\t{1}\n".format(str(id), sc.getTESequence(id).sequence))
 
-
+#      fout.close()
