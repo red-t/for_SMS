@@ -91,7 +91,6 @@ cdef class Cluster:
     cdef public:
         int orient, state, supp_reads_num
         float frequency
-        str frequency_test, 
         str c_id, consensus, consensus_seq, tsd, ref_name, te_type, insert_seq_info
         str out_path, supp_reads, unsupp_reads, span_reads
         list type_list, seg_list, orients, bp, supp_reads_list, unsupp_reads_list, span_reads_list, segname_list
@@ -114,11 +113,10 @@ cdef class Cluster:
         self.consensus = ''
         self.tsd = ''
         self.insert_seq_info = ''
-        self.state = 1 # insertion 的是否保留的标签，有两个值，0和1，0表示这个insertion是假的，会丢掉，1就会被留下
+        self.state = 1 # insertion 的是否保留的标签，现在为了分清每个insertion的具体情况，有多种state，会保留下来的stat有 1、16、10、12、14、24 
         self.ref_aln = ref_aln
         self.genome_fa = genome_fa
         self.frequency = 0
-        self.frequency_test = ''
         self.supp_reads_num = 0
         self.segname_list = []
         self.te_idx = te_idx
@@ -206,6 +204,7 @@ cdef class Cluster:
         self.te_size = "|".join([str(te_size_dict[te]) for te in self.type_list]) # check
         # type_list 是这个cluster包含的TE insertion类型数量
         # 如果是0，可能是因为这个地方是一个repeat masker，就丢掉这个地方
+        # 这里的state后面不会保留
         if len(self.type_list) == 0:
             self.state = self.state + 1
 
@@ -232,28 +231,64 @@ cdef class Cluster:
                 为了方便测试，暂时保留，后续再做更改
       
         """
+        # 这一部分的思路是
+        # 先遍历了一遍一个insertion cluster中的所有segment/supporting reads，遍历的时候做了两个事情
+        # 1. 合并reads，因为有些segment可能是来自于同一条supporting reads，所以需要根据raw reads id进行一步合并
+        #   
+        # 2. 判断double clip 的supporting reads
+        #   一条reads，如果两端都clip的话，很难说它在genome上比对是正确的，就像船缺少了锚一样，不稳定
+        #   如果存在这样的double clip supporting reads，这个insertion就打上标签“black”
+
+        # 根据合并之后的segment list计算supporting reads数目
+        #    例如有两个segment：reads1_l, reads1_r, 这样的话，这两个segment只能算一个，只能留下一条insert seq，但这条reads1其实是可以看作是一条spanning reads的，N_supp的数目+2，
+        # 同时统计一下supporting reads的类型，n_m : number of spanning reads, n_l: number of left clip reads, n_r : number of right clip reads
+        # 如果一个insertion它没有spanning reads，而且只有一边的clip reads，也打上black的标签
+
+
+        # 根据insertion的大致位置，抓取周围map到genome上的所有reads
+        # 在这一步需要做两件事，一件是筛选出来哪些是un supporting reads，一件是根据结构特征判断这个区域的insertion是否可取，或者说，这个区域是否是reference TE
+        # 对于un supporting reads筛选条件有跨过insertion 左右breakpoint 30bp(un_support_reads_spand_size) ,这个cutoff理论上应该与op_len的cutoff保持一致，simplify code的时候发现不一致，回头改了测试一下
+        #       而且还希望mapping quality高一点 >50，以及divergency <= 0.1
+        # 从iGV里看在genome上有些reads比对情况，有明显的两端截断情况，而且很整齐，之前在组会上有展示过
+        #    这种情况多见于reference TE以及NNNNNN的区域
+        #    所以根据这个结构特征去做一步筛选
+        #    判断方法是统计insertion 区域double clip reads有多少条，这些double clip的reads 可能不是supporting reads，也可能不是un supporting reads，但它的比对情况可以让我们了解这个区域的比对结构
+        #       但有的insertion虽然supporting reads包含double clip reads，但两边都有，而且有跨过这个insertion的reads(supporting reads和un supporting reads都算)，这部分是可以留下来的
+
+
+        # 如图所示：
+        # 这里面的reads没有箭头的指double clip reads
+        #       -------------------------                          -------------------------    -------------------------
+        #       -------------------------                          -------------------------    -------------------------
+        #       -------------------------                          -------------------------    -------------------------
+        #       -------------------------                          ------------------------------------------------------》（spinning reads）
+        #      ⬆️                       ⬆️                                                    ⬆️
+        #  【insertion1】        【insertion2】                                          【insertion3】
+
+        # 这里insertion1 和insertion2就会被丢掉去，insertion3就会被保留
+
+
+
+
         # supporting reads
         cdef:
             dict black_region = {'start':100000000000,'end':0}
             int black_read_num = 0, sup_black_read_num = 0, l_black_read_num =0,  r_black_read_num = 0,black_n_l = 0,black_n_r = 0, double_clip_reads_num = 0
             int span_read_left_clip_len = 0, span_read_right_clip_len = 0
             list support_span_reads_list = []
+            str span_tag = 'none'
+            list supp_reads_list_id = [], supp_reads_m_list_id = [], supp_reads_c_list_id = [], new_seg_list = [], supp_reads_type = []
+            int num_supp = 0, un_support_reads_spand_size = 30
+            dict  supp_reads_dict = {}
+
             # self.state insertion 的是否保留的标签，有两个值，0和1，0表示这个insertion是假的，会丢掉，1就会被留下
+            # 现在为了分清每个insertion的具体情况，有多种state，会保留下来的stat有 1、16、10、12、14、24 
         
         
         
         if self.state == 0:
             return 0
-
-        supp_reads_list_id = []
-        supp_reads_dict = {}
-
-        supp_reads_m_list_id = []
-        supp_reads_c_list_id = []
-
-        new_seg_list = [] # 用于去掉重复的reads，后续用于做consensus
-        supp_reads_type = []
-        num_supp = 0
+        
 
         black_tag = 'none'
 
@@ -290,10 +325,6 @@ cdef class Cluster:
             # 如果两端截断都超过100，而且数量比较多，那么可能这个区域是genome上的reference TE
             # 作出这种处理是因为在IGV上看出这种两端截断的结构很明显
             # chr2L:2,932,687-2,936,323
-            
-            # print(supp_read.mapping_quality)
-            # 之前因为比对到转座子上的时候会带有flanking region，所以会出现比对附带着reference TE的序列
-            # 现在没有了flanking region，这种情况就不会出现了 
 
             supp_read = candi_seg.read
 
@@ -312,7 +343,7 @@ cdef class Cluster:
                         black_region['start'] = supp_read.reference_start
                     if supp_read.reference_end > black_region['end']:
                         black_region['end'] = supp_read.reference_end
-                    if sup_black_read_num >= 1:
+                    if sup_black_read_num >= 1: # cutoff 设为1是之前有测试过别的cutoff，1可能比较合理，有一条double clip reads后面就得再进行一次判断
                         black_tag = "black"
                     
             else:
@@ -354,26 +385,13 @@ cdef class Cluster:
                         n_l = n_l + 1
         
         
-        # 这里是处理suporting reads里左右两边clip reads数量比例的问题
-        # 如果有一条reads是跨过insertion的，多少clip reads都无所谓
-        # 如果没有跨过insertion的reads，且只有一边有比较多的（>=2）clip reads,这个insertion也会丢掉
-        # 如果两边都有，则计算比例，0.1883698 是算了一下，所有只有clip reads的insertion，左右两边clip reads的比例，拟合出来一个正太分布
-        # 取的是正太分布的（平均值 - 3 * 标准差  ～ 平均值 + 3 * 标准差 ）
+
 
 
         self.supp_reads = str(len(supp_reads_list_id)) +"_|_"+ "_|_".join(supp_reads_list_id)
         self.su_type = "_".join([str(n_m),str(n_l),str(n_r)])
         
-        # unsupporting reads
-        flanking_region_size = 200
-        if self.bp[0] - flanking_region_size <= 0 :
-            start_bp = 1
-        else:
-            start_bp = self.bp[0] - flanking_region_size
-
-       
-        num_unsupp_read = 0 # 这个是为了测试unsupporting reads有重复比对的情况，如果有两条取1.5
-        un_support_reads_spand_size = 30
+        
         
 
         black_n_l = 0
@@ -381,24 +399,22 @@ cdef class Cluster:
         if n_m == 0 and sup_black_read_num == 0:
             if n_l == 0 or n_r == 0:
                 black_tag = 'black'
+                # 如果只有一端clip的reads，并且没有balck reads，black_region就考虑insertion 周围就行了
                 black_region['start'] = self.bp[0]
                 black_region['end'] = self.bp[-1]
 
-
-        print(black_tag)
-        print(n_m,  sup_black_read_num, black_region)
-        span_tag = 'none'
+        # unsupporting reads
+        flanking_region_size = 200
+        if self.bp[0] - flanking_region_size <= 0 :
+            start_bp = 1
+        else:
+            start_bp = self.bp[0] - flanking_region_size
         
         for span_read in self.ref_aln.fetch(contig=self.ref_name, start=start_bp, stop=self.bp[-1] + flanking_region_size):
-            #print(span_read.reference_start, self.bp[0], span_read.reference_end, self.bp[-1])
-            # span_read_id = '_'.join(span_read.query_name.split('_')[3:5])
-            # print(span_read.query_name)
 
             if black_tag == 'black':
                 # 如果有一条好的reads跨过去，这个区域的map可能是正确的
-                
-                # 如果supporting reads里有一条reads是跨过这条black region的，那么这个位置的insertion就会被保留下来
-                # 或者有相反clip的reads也可以
+                # 指比对质量高，两段没有长的clip
                 
                 if span_read.cigartuples[0][0] in (4,5):
                     span_read_left_clip_len = span_read.cigartuples[0][1]
@@ -442,23 +458,12 @@ cdef class Cluster:
             # 如果reads跨过insertion position两端各30bp以上，而且不是supporting reads，这条reads认为是unsuporting reads
             if span_read.query_name not in supp_reads_list_id:
                 if self.bp[0] - span_read.reference_start >= un_support_reads_spand_size and span_read.reference_end - self.bp[-1] >= un_support_reads_spand_size:  
-                    cigar_count = AlignedSegment.get_cigar_stats(span_read)[0]
-                    n_M = cigar_count[0]
-                    NM = cigar_count[-1]
-                    PM = n_M - NM
-                    divergency_uns = (n_M - PM ) / n_M
-                    #print('>>>?')
-                    #print(n_M)
-                    #print(divergency_uns)
+                    divergency_uns = cal_divergency(span_read, 'genome')
 
                     if span_read.mapping_quality >= 60 and divergency_uns <= 0.1:
                         #print(span_read.query_name)
                         if span_read.query_name not in self.unsupp_reads_list:
                             self.unsupp_reads_list.append(span_read.query_name)
-                            num_unsupp_read = num_unsupp_read + 1
-                        else:
-                            print('ckunp')
-                            num_unsupp_read = num_unsupp_read + 1.5
 
         print(">black_read_num")
         print(sup_black_read_num, black_read_num,black_n_l,black_n_r)
@@ -475,6 +480,10 @@ cdef class Cluster:
         # sup_black_read_num ｜ supporting reads中double clip的read的数目，同时也有统计right和left的分布，极端一点，如果全是black supporting read，这个insertion不太可信
         # black_read_num ｜ 这个区域所有double clip reads数目，这是为了区分有的insertion虽然没有black supporting read，但这个区域本身就是好多balck reads，可能得丢掉
         # balck_n_l, balck_n_r, n_l, n_r 这几个对象也是在前几点的基础上的辅助参考，如果只有单边的reads支持，这个insertion很难站得住脚 
+
+        
+        # 这里的条件判断一言难尽
+        # 
         if n_m ==0 and black_tag == 'black':
             if sup_black_read_num != 0:
                 if span_tag == 'span':
@@ -506,6 +515,15 @@ cdef class Cluster:
             start_bp = self.bp[0] - desert_region_size
         span_genome_fa = FastaFile(self.genome_fa).fetch(self.ref_name, start_bp, self.bp[-1] + desert_region_size)
 
+        # 这里是处理suporting reads里左右两边clip reads数量比例的问题
+        # 如果有一条reads是跨过insertion的，多少clip reads都无所谓
+        # 如果没有跨过insertion的reads，且只有一边有比较多的（>=2）clip reads,这个insertion也会丢掉
+        # 如果两边都有，则计算比例，0.1883698 是算了一下，所有只有clip reads的insertion，左右两边clip reads的比例，拟合出来一个正太分布
+        # 取的是正太分布的（平均值 - 3 * 标准差  ～ 平均值 + 3 * 标准差 ）
+
+        # 最开始只有根据left clip和right clip之间的比例来筛选，后面才加了double clip的部分
+        # 加了double clip的判断之后发现能够分辨出只有一端clip supporting reads的insertion是真是假，但因为想再iGV里验证一下，所以对不同的情况都加了state，方便从结果中筛选
+
 
         # if n_m == 0 and len(self.unsupp_reads_list) == 0 :
         if n_m == 0:
@@ -532,56 +550,19 @@ cdef class Cluster:
                     print('>3')
                     self.state = self.state + 13
                     #return 0
+
         # frequency
-        # 计算方式1 简单的除法
-        # frequency0 = float(len(supp_reads_list_id)) / ( len(supp_reads_list_id) + len(self.unsupp_reads_list))
-        frequency0 = float(len(supp_reads_list_id)) / ( len(supp_reads_list_id) + len(self.unsupp_reads_list))
-        # self.frequency = float(num_supp) / (num_supp + num_unsupp_read)
-        n_uns = len( self.unsupp_reads_list )
-        #print('>>>>>')
-        #print(self.unsupp_reads_list)
 
-        # 这是测试的几种几种可能合理的frequency计算方式
-        a = 1; b = 2; c = 1
-        n_supp = a * n_m  + b * (n_l + n_r )
-        n_unsupp = c * len(self.unsupp_reads_list)
-        frequency1 = float(n_supp) / ( n_supp + n_unsupp )
-
-        a = 2; b = 1; c = 2
-        n_supp = a * n_m  + b * ( n_l + n_r )
-        n_unsupp = c * len(self.unsupp_reads_list)
-        frequency2 = float(n_supp) / ( n_supp + n_unsupp )
-
-        a = 2; b = 1; c = 1
-        n_supp = a * n_m  + b * (n_l + n_r )
-        n_unsupp = c * len(self.unsupp_reads_list)
-        frequency3 = float(n_supp) / ( n_supp + n_unsupp )
-
-        a = 1; b = 1; c = 2
-        n_supp = a * n_m  + b * (n_l + n_r )
-        n_unsupp = c * len(self.unsupp_reads_list)
-        frequency4 = float(n_supp) / ( n_supp + n_unsupp )
+        # 最终选择的frequency的计算方法
+        # a = 2; b = 1; c = 2
+        # n_supp = a * n_m  + b * ( n_l + n_r )
+        # n_unsupp = c * len(self.unsupp_reads_list)
+        # frequency2 = float(n_supp) / ( n_supp + n_unsupp )
 
 
-        if n_m + n_l + n_uns == 0:
-            frequency5 = float((n_m + n_r )) / ( n_m + n_r + n_uns )
-        elif n_m + n_r + n_uns == 0:
-            frequency5 = float((n_m + n_l)) / ( n_m + n_l + n_uns )
-        else:
-            frequency5 = ( float((n_m + n_l)) / ( n_m + n_l + n_uns ) + float((n_m + n_r )) / ( n_m + n_r + n_uns ) ) / 2
-        
-        #self.frequency = frequency2
         self.frequency = float(N_supp_2) / ( N_supp_2 + 2*len(self.unsupp_reads_list) )
-        #self.state('N_supp')
-        print(N_supp_2)
-        print(n_supp)
-        print(len(self.unsupp_reads_list))
 
-        # print( n_m, n_r, n_l, n_uns, n_supp, n_unsupp, "_".join(self.unsupp_reads_list) )
-        # print(self.unsupp_reads_list)
         self.seg_list = new_seg_list
-
-        self.frequency_test = "_".join([str(frequency0), str(frequency1), str(frequency2), str(frequency3), str(frequency4), str(frequency5)])
 
 
 
@@ -598,27 +579,21 @@ cdef class Cluster:
         
         is_nested = ''
         if len(list(set(self.type_list))) > 1:
-            is_nested = 'nested'
-
-        # 暂时把frequency < = 0.2的insertion当成 somatic insertion，
-        # 后面要根据frequency 的计算方式进行修改
-
+            is_nested = 'nested' # 前面一步因为跟repeatmasker的注释文件做了intersect，type list中去掉了reference TE，所以，如果一个insertion插入到reference TE中，这里是没有标记nested的
 
         if len(self.seg_list) < 5 and self.frequency <=  2.0 / ((2*len(self.unsupp_reads_list)-1) + 2):
         # if self.frequency < 0.1428: # 1条clip reads ，3条un supporting reads
             insertion_type = 'soma|' + is_nested
+            # self.su_type.split('_')[0] 这个是指supporting reads类型中spanning supporting reads的数量
             if int(self.su_type.split('_')[0]) >= 1 and len(self.seg_list) > 1 :
                 insertion_type = 'germ|' + is_nested
-            # if len(self.seg_list) == 1 :
-            #     if self.seg_list[0].segname[-1] == 'm':
-            #         insertion_type = 'germ|' + is_nested
         else:
             insertion_type = 'germ|' + is_nested
             
 
 
 
-        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, self.frequency, self.frequency_test, strand, self.supp_reads, self.divergency, self.consensus_meth,insertion_type, self.tsd, self.insert_seq_info, self.consensus, self.su_type, self.te_size, self.state )
+        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, self.frequency,  strand, self.supp_reads, self.divergency, self.consensus_meth,insertion_type, self.tsd, self.insert_seq_info, self.consensus, self.su_type, self.te_size, self.state )
 
 
     cpdef get_consensus(self, genome_fa,  genome_idx, te_anno_fa):
@@ -704,17 +679,18 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
         int i = 0, l =  100
         list insert_size_list = []
         str consensus_seq_temp_file =  out_path + ref_name + "/" + c_id  + ".consensus.temp.fa"
+        float divergency, divergency_all # ......这一步当中的所有类型的divergency，是为了评估组装的效果怎么样，最后应该不会出现在最终的bed文件中，当然放一个mismatch的divergncy也是可以的
 
     # return 'none', 'none', 'none'
     consensus_seq_temp_file_ob = open(consensus_seq_temp_file, 'w')
 
     insert_type_list = list(set([ insert_seq.segname[-1] for insert_seq in seg_list ])) # 为了判断是否包含span reads
-    # 在用wtdbg2组装的时候，发现如果组装长度（大致等于插入TE序列长度，这里暂时用insert seq的平均值代替）大于3000的时候，flanksize取200比较好
-    # 如果小于3000，flanksize取300比较好
-    # 但现在看到的也是个别例子，可能还得细化
+    
     insert_size_list = [ len(insert_seq.seq_t) for insert_seq in seg_list ]
-    insert_size = int(sum(insert_size_list) / len(insert_size_list))
-    # print(sorted(insert_size_list))
+    # insert size 判断丢掉了，本来是根据不同的insert size决定insert seq上取多长用于local assembly
+    # 因为测试的时候发现wtdbg2对于不同长度组装效果不一样
+    # 有的短一点组装效果好些，有些长一点组装效果更好
+    # 一般是insertion长度3000以下的话，flanking的长度取长一些比较好，3000以上的话，flanking_size取短一些比较好
 
 
     
@@ -729,6 +705,7 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
         consensus_meth = 'None'
         tsd_positions_st = 'NA'
         tsd_positions_en = 'NA'
+
         return consensus_seq_print, tsd_print ,te_break_info_print, divergency, consensus_meth, tsd_positions_st, tsd_positions_en
 
     seq_raw_id_uniq_list = []  # 记录read的raw id，有的reads 可能在map时同时有 right clip和 left clip两种情况，如果重复的话，只取其中一条就够了，不然supporting reads会有重复
@@ -745,7 +722,8 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
 
     consensus_seq_temp_file_ob.close()
 
-    # if max(insert_size_list) <= 3000:
+
+    # 目前取的flanking size在1500
     if max(insert_size_list) < 0:
         consensus_seq = get_consensus_seq('mafft',consensus_seq_temp_file, out_path, ref_name, c_id, 'local' )
         consensus_meth = 'mafft'
@@ -764,14 +742,10 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
     polish_file_name = out_path + ref_name + "/" + c_id + "_polished.fa"
     
     insert_con_sequence_dict = {}
-    # insert_con_sequence_dict_for_assem = {}
-    # insert_con_sequence_dict_for_assem_indel = {}
 
     polish_file = open(polish_file_name, 'w') # check
     for te_reference in te_type_list:
         insert_con_sequence_dict[te_reference] = ''
-        # insert_con_sequence_dict_for_assem[te_reference] = []
-        # insert_con_sequence_dict_for_assem_indel[te_reference] = []
 
         insert_con_sequence = ''
         te_seq = FastaFile(te_anno_fa).fetch(te_reference)
@@ -1009,20 +983,27 @@ cdef tuple get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref
                 tsd_left + '__' + tsd_right + '__' + tsd_genome + '__pass'
 
     """
-    tsd_temp_file = out_path + ref_name + "/"+ c_id + ".tsd.temp.fa"
-    tsd = ''
+    cdef:
+        str tsd = ''
+        str tsd_l, tsd_r # tsd left and tsd right
+        dict tsd_temp_dic = {}
+        list tsd_temp_list = [], tsd_position
+        int tsd_len
+        str tsd_temp_file = out_path + ref_name + "/"+ c_id + ".tsd.temp.fa"
+    
 
     # 取consensus seq两端非TE的序列写入文件与genome进行比对
     tsd_l = consensus_seq[: seq_break_list[0]]
     tsd_r = consensus_seq[seq_break_list[1]: ]
+
     tsd_temp_file_ob = open(tsd_temp_file, 'w')
     tsd_temp_file_ob.write('>left_tsd\n' + tsd_l + '\n>right_tsd\n' + tsd_r)
     tsd_temp_file_ob.close()
+    
     tsd_bam = align_mm2(genome_idx, tsd_temp_file, out_path + ref_name, thread_mm2=10, mismatch_model="", preset="splice")
 
     tsd_bam_ob = AlignmentFile(tsd_bam, 'rb')
-    tsd_temp_dic = {}
-    tsd_temp_list = []
+
     for read in tsd_bam_ob:
         if read.reference_name != ref_name:
             continue
@@ -1191,11 +1172,11 @@ cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksi
                 seg = Segment(read, segname, read.is_reverse, q_st, q_en, r_st, r_en, rpos, q_st_t, q_en_t, seq_t)
                 if op in (4,5):
                     if q_st == 0:
-                        seg_fa.write('>{}\t{}\n{}\n'.format(segname, len(seq_t), seq_t[:op_len]))
+                        seg_fa.write('>{}\t{}\n{}\n'.format(segname, len(seq_t[:op_len]), seq_t[:op_len])) # 之前insert seq命名中长度不一致，修改一致
                     else:
-                        seg_fa.write('>{}\t{}\n{}\n'.format(segname, len(seq_t), seq_t[-op_len:]))
+                        seg_fa.write('>{}\t{}\n{}\n'.format(segname, len(seq_t[-op_len:]), seq_t[-op_len:]))
                 else:
-                    seg_fa.write('>{}\t{}\n{}\n'.format(segname, len(seq_t), seq[q_st:q_en]))
+                    seg_fa.write('>{}\t{}\n{}\n'.format(segname, len(seq[q_st:q_en]), seq[q_st:q_en]))
                     
 
             else:
@@ -1214,6 +1195,13 @@ cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksi
 
 ## align_mm2 ##
 cdef str align_mm2(str ref, str query, str outpath, int thread_mm2, str mismatch_model="", str preset="map-ont"):
+    # mismatch_model
+    # 这个参数对genome是“”
+    # 对TE是--eqx 
+
+    # preset
+    # 对genome是map ont map-pb
+    # 对TE是splice
     cdef:
         int exitcode
         ## str wk_dir = os.path.dirname(query)
@@ -1221,7 +1209,6 @@ cdef str align_mm2(str ref, str query, str outpath, int thread_mm2, str mismatch
         str q_p = os.path.basename(query).rsplit('.', 1)[0]
         str ref_p = os.path.basename(ref).rsplit('.', 1)[0]
         str out_path = os.path.join(wk_dir, ref_p + '_' + q_p + '.bam')
-        # list cmd_mm2 = ['minimap2', '-t', str(thread_mm2), '-aYx', preset, '--secondary=no', ref, query, '|', 'samtools', 'view', '-bhSG 4', '-', '|', 'samtools', 'sort', '-o', out_path, '-']
         list cmd_mm2 = ['minimap2', '-t', str(thread_mm2), '-aYx', preset, mismatch_model, '--secondary=no',ref, query, '|', 'samtools', 'view', '-bhS', '-', '|', 'samtools', 'sort', '-o', out_path, '-']
         list cmd_idx = ['samtools index ' + out_path]
     
@@ -1253,7 +1240,6 @@ cdef cal_divergency(object read, str ref):
         int n_MM
         float divergency
     cigar_count = AlignedSegment.get_cigar_stats(read)[0]
-    print(cigar_count)
 
     if ref == 'te':
         n_PM = cigar_count[7]
@@ -1282,8 +1268,8 @@ cdef score_te_alignment(object read, dict te_size_dict):
             read - 从 candidate supporting reads中取出来的 insert sequence 比对的TE上的情况
             te_size_dict - 根据 transposon.size 文件建立的记录各 transposon 大小的字典
         Returns:
-            score_te_align - 该比对结果的打分判断结果 0/1
-                0丢弃 1保留
+            score_te_align - 该比对结果的打分判断结果 0 / 0.5 / 1
+                0丢弃 0.5、1暂时保留，如果只有一条supporting reads，且score是0.5，则丢弃
 
     """
     cdef:
@@ -1295,18 +1281,7 @@ cdef score_te_alignment(object read, dict te_size_dict):
     map_te_name = read.reference_name.split(':')[0] # 比对的TE的类型
     map_te_len = int(te_size_dict[map_te_name]) # consensus TE的长度
     insert_te_len = read.reference_length # 比对到transposon的长度
-    
-    # 计算divergency
-    # mismatch / （ mismatch + perfect match ）
-    cigar_count = AlignedSegment.get_cigar_stats(read)[0]
-    # n_M = cigar_count[0]
-    n_PM = cigar_count[7]
-    n_MM = cigar_count[8]
-    # n_MM, n_PM )
-    # NM = cigar_count[-1]
-    # PM = n_M - NM
-    # divergency = (n_M - PM ) / n_M
-    divergency = n_MM / ( n_PM + n_MM )
+    divergency = cal_divergency(read, 'te') # insert seq比对到TE上的divergency，但是这个参数没有考虑到筛选条件中，因为插入进去的TE片段是存在比较高divergency的水平的可能的
 
 
 
@@ -1317,26 +1292,13 @@ cdef score_te_alignment(object read, dict te_size_dict):
 
     if read.query_name[-1] == 'm':
 
-        print(mappbility_for_read)
-        print(mappbility_for_te)
 
         # test.soma.9 之前这个要求 阈值是0.25
         if mappbility_for_te >= 0.15:  # 如果supporitng reads里有跨过这个insertion的reads，而且reads中transposon的序列与consensus序列比例大于0.25，就保留这条alignment
             score_te_align = 1
-        #print('ck3\n'+map_te_name,read.query_name)
-        #print(read.query_alignment_length,read.query_length,read.reference_start,read.reference_end,read.pos)
-        #print(read.query_alignment_start)
-        #print(mappbility_for_read, mappbility_for_te)
+    
     else:
-        
-        #mappbility_for_read = float(read.query_alignment_length) / read.query_length
-        #mappbility_for_te = float(insert_te_len) / map_te_len
-        
-        print('ck3\n'+map_te_name,read.query_name)
-        print(read.query_alignment_length,read.query_length,insert_query_length,read.reference_start,read.reference_end,read.pos)
-        print(read.query_alignment_start, read.query_alignment_end)
-        print(mappbility_for_read, mappbility_for_te,read.mapping_quality)
-        print(divergency)
+
         if read.mapping_quality < 30:
             if divergency < 0.02:  
                 score_te_align = 1
@@ -1350,13 +1312,9 @@ cdef score_te_alignment(object read, dict te_size_dict):
             if mappbility_for_te >= 0.25 and read.mapping_quality >= 60:
                 score_te_align = 1
         
-        # if insert_query_length - read.query_alignment_end > 500:
-        # if insert_query_length - read.query_alignment_length > 500:
         if read.query_alignment_length / insert_query_length < 0.75:
             score_te_align = 0.5
         
-            
-    print('>>'+str(score_te_align))
     return score_te_align
 
 
@@ -1365,13 +1323,10 @@ cdef score_te_alignment(object read, dict te_size_dict):
 ## parse_te ##
 cdef parse_te_aln(dict seg_dict, str te_bam, dict te_size_dict):
     cdef:
-        object te_aln = AlignmentFile(te_bam, "rb"), r, te_not_aln
-        str seg_n, te_not_aln_bam = te_bam[:-4] + '.not_aln.bam'
+        object te_aln = AlignmentFile(te_bam, "rb"), r
+        str seg_n
         int q_st, q_en, score
-        list uncorect_list = []
     
-        list cmd_te_not_aln = ['samtools', 'view', '-bhSf 4', te_bam, '|', 'samtools', 'sort', '-o', te_not_aln_bam, '-']
-        list cmd_sam_index = ['samtools index ' + te_not_aln_bam]
     
     # 这里考虑的是比对到reference TE的情况
     # 但后面发现也存在因为insert片段太短而比对不到TE上的，可能还需要调整比对的参数
@@ -1380,30 +1335,15 @@ cdef parse_te_aln(dict seg_dict, str te_bam, dict te_size_dict):
     ## 然后判断这些reads是不是clip的片段
     ## 如果是，那就代表这些clip的片段没有比对到TE上，
     ## 如果真是一个insertion的话，是应该可以比对到TE上的，因为没有clip的部分已经比对到基因组上了
-    te_not_aln_proc = Popen([" ".join(cmd_te_not_aln)], stderr=DEVNULL, shell=True, executable='/bin/bash')
-    exitcode = te_not_aln_proc.wait()
-    if exitcode != 0:
-        raise Exception("Error")
-    
-    sam_index_proc = Popen(cmd_sam_index, stderr=DEVNULL, shell=True, executable='/bin/bash')
-    exitcode = sam_index_proc.wait()
-    if exitcode != 0:
-        raise Exception("Error: samtools index for {} failed".format(te_not_aln_bam))
-    
-    te_not_aln = AlignmentFile(te_not_aln_bam, "rb")
 
-    for r in te_not_aln:
-        # print(r.query_name[-1])
-        if r.query_name[-1] in ('l', 'r'):
-            raw_read_id = "_".join(r.query_name.split('_')[3:5])
-            uncorect_list.append(raw_read_id)
+    # simplify 说明
+    # 把not align的部分删掉了，clip的部分可能有多个比对情况，如果因为有一种是没有比对上去就丢掉这个clip 片段，可能会丢掉很多真正的insertion片段
+    # 而之前考虑到reads比对到reference TE 造成的clip情况，在后面的判断条件中加了进去，在black region部分
 
-    uncorect_list = []
-    # print(uncorect_list)
 
     for r in te_aln:
         raw_read_id = "_".join(r.query_name.split('_')[3:5])
-        if not r.is_unmapped and r.flag !=4: #  and raw_read_id not in uncorect_list:
+        if not r.is_unmapped and r.flag !=4: 
             score_te = score_te_alignment(r, te_size_dict)
             if score_te > 0:
                 seg_n = r.query_name
@@ -1496,8 +1436,6 @@ cpdef process_cluster(dict cluster_dict, str chrom, str out_path, str genome_fa,
 
     
     for c_id in cluster_dict:
-        print('>------>------>------>')
-        print(c_id)
         cluster_dict[c_id].find_bp()
         cluster_dict[c_id].te_stat(repeatmasker_file, te_size_dict)
         cluster_dict[c_id].static()
