@@ -7,7 +7,7 @@ from mappy import revcomp
 import subprocess
 import sys
 
-
+# Q3: 有一些 module 没必要现在 import, 然后获取参数这部分其实可以用 argparse.ArgumentParser 来完善，具体可以看 simulation/my-define-landscape_random-insertions-freq-range.py
 bamFile=sys.argv[1]
 out_path=sys.argv[2]
 te_index=sys.argv[3]
@@ -28,7 +28,9 @@ for line in open(te_size, 'r'):
     te_size_dic[line[0]] = line[1]
 
 
-
+# Q4: 下面编写的，名为 main 的函数，并不能起到防止错误调用的情形，之后如果要在不改变功能的前提下进行重构，应采用 if __name__ == '__main__' 这一判断
+# 参考 zhihu.com/question/49136398
+# simulation/my-define-landscape_random-insertions-freq-range.py 的结构可能比较相似
 def main(bam=bamFile, te_index=te_index):
     chrom2clusters = dict()
     with ThreadPoolExecutor(max_workers=5) as executor:
@@ -55,6 +57,7 @@ def main(bam=bamFile, te_index=te_index):
             chrom = future2chrom[future]
             chrom2clusters[chrom] = future.result()
         
+        # Q5: 之后我们可以改成以 cluster 为单位进行并行，而不是以 chromosome 为单位？
         future2chrom = {executor.submit(process_cluster, chrom2clusters[chrom], chrom, out_path, genome_fa, genome_idx, te_anno_fa, repeatmasker_file, te_size_dic ):chrom for chrom in chroms}
         for future in as_completed(future2chrom):
             chrom = future2chrom[future]
@@ -67,3 +70,17 @@ def main(bam=bamFile, te_index=te_index):
 
 
 chrom2c = main()
+
+
+# correspond to Q10 & Q11 in read_alignment.pyx
+a=[]
+for i in range(10):
+    if i >= 2:
+        if i >= 5:
+            continue
+        pass
+
+    if i >= 2:
+        a.append(i)
+
+# a == [2, 3, 4]
