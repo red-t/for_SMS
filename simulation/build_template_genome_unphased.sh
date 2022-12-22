@@ -21,15 +21,17 @@ while getopts ":n:r:v:h" OPTION; do
     esac
 done
 
-export PATH=$PATH:/data/tusers/zhongrenhu/Software/anaconda3/bin/
+# Add 
+# export PATH=$PATH:/data/tusers/zhongrenhu/Software/anaconda3/bin/
 
 
-### checking ###
+### Checking ###
 echo -e "which VISOR:\t`which VISOR`"
+echo -e "which bcftools:\t`which bcftools`"
 echo -e "NAME:\t${NAMEs[*]}"
 echo -e "VCF_PATH:\t${VCF_PATH}"
 echo -e "FASTA:\t${FASTA}"
-### checking ###
+### Checking ###
 
 
 for NAME in ${NAMEs[*]}
@@ -40,7 +42,7 @@ do
         VCF=`readlink -f ${VCF_PATH%/}/*vcf.gz`
         bcftools view --threads 10 -v snps -O b -o ${NAME}.tmp.snp.bcf -s ${NAME} -m2 -M2 -c1 -C2 ${VCF}
         bcftools index ${NAME}.tmp.snp.bcf
-        bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%SAMPLE=%GT]\n' ${NAME}.tmp.snp.bcf | grep '1/1' | awk 'OFS=FS="\t"''{print "chr"$1, ($2 -1), $2, "SNP", $4, "0"}' >> ${NAME}.tmp.snp.bed
+        bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%SAMPLE=%GT]\n' ${NAME}.tmp.snp.bcf | grep '1/1' | awk 'BEGIN{OFS=FS="\t"} {print "chr"$1, ($2 -1), $2, "SNP", $4, "0"}' >> ${NAME}.tmp.snp.bed
 
         VISOR HACk -g ${FASTA} -b ${NAME}.tmp.snp.bed -o ${NAME}_templateswithsnp
         mv ${NAME}.tmp.* ${NAME}_templateswithsnp && mv ${NAME}_templateswithsnp/h1.fa ${NAME}_templateswithsnp/${NAME}_template.fa && mv ${NAME}_templateswithsnp/h1.fa.fai ${NAME}_templateswithsnp/${NAME}_template.fa.fai
