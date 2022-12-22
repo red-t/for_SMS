@@ -170,6 +170,8 @@ echo -e "TGS_ERR:\t${TGS_ERR}"
 
 ### Variables Declaration ###
 source /data/tusers/zhongrenhu/Software/anaconda3/etc/profile.d/conda.sh
+prog_path=`readlink -f $0` && prog_path=`dirname $prog_path`
+
 
 
 ### Generate Population Genome Definition (pgd-file) ###
@@ -197,7 +199,7 @@ do
     echo -e "Defining TE landscapes for ${contigs[$i]}:"
     if [ ! -f ${contigs[$i]}/${contigs[$i]}.ins.summary ]; then
         samtools faidx ${REF_FA} ${contigs[$i]} > ${contigs[$i]}.tmp.chasis.fasta && samtools faidx ${contigs[$i]}.tmp.chasis.fasta
-        my-define-landscape_random-insertions-freq-range.py --chassis ${contigs[$i]}.tmp.chasis.fasta --te-seqs ${TE_FA} --N ${POP_SIZE} --divergence-rate ${D_RATE} --germline-count ${tmp_g_count} --somatic-count ${tmp_s_count} --min-distance ${MIN_DIST}
+        python $prog_path/my-define-landscape_random-insertions-freq-range.py --chassis ${contigs[$i]}.tmp.chasis.fasta --te-seqs ${TE_FA} --N ${POP_SIZE} --divergence-rate ${D_RATE} --germline-count ${tmp_g_count} --somatic-count ${tmp_s_count} --min-distance ${MIN_DIST}
         
         # Divide the pgd-file into several subsets
         if [ -f ${contigs[$i]}.tmp.pgd.header ]; then
@@ -235,17 +237,17 @@ do
             # build population geneome
             echo -e "[ Build ${j}th sub population genome of ${contigs[$i]} ]"
             if [ ! -f ${contigs[$i]}.$j.fa ]; then
-                python /data/tusers/zhongrenhu/Software/simulate/build-population-genome.py --pgd ${contigs[$i]}.$j.pgd --te-seqs $TE_FA --chassis ${contigs[$i]}.tmp.chasis.fasta --output ${contigs[$i]}.$j.fa --ins-seq ${contigs[$i]}.ins.sequence --sub_idx $j --sub_size $SUB_POP_SIZE
+                python $prog_path/simulate/build-population-genome.py --pgd ${contigs[$i]}.$j.pgd --te-seqs $TE_FA --chassis ${contigs[$i]}.tmp.chasis.fasta --output ${contigs[$i]}.$j.fa --ins-seq ${contigs[$i]}.ins.sequence --sub_idx $j --sub_size $SUB_POP_SIZE
             fi
             # generate 50X NGS
             echo -e "[ Generate NGS data from ${j}th sub population genome of ${contigs[$i]} ]"
             if [ ! -f ${contigs[$i]}.${j}_2.fastq ]; then
-                python /data/tusers/zhongrenhu/Software/simulate/read_pool-seq_illumina-PE.py --pg ${contigs[$i]}.$j.fa --read-length $NGS_LEN --inner-distance $NGS_INNER --std-dev $NGS_STD --error-rate $NGS_ERR --reads $NGS_READS --fastq1 ${contigs[$i]}.${j}_1.fastq --fastq2 ${contigs[$i]}.${j}_2.fastq
+                python $prog_path/simulate/read_pool-seq_illumina-PE.py --pg ${contigs[$i]}.$j.fa --read-length $NGS_LEN --inner-distance $NGS_INNER --std-dev $NGS_STD --error-rate $NGS_ERR --reads $NGS_READS --fastq1 ${contigs[$i]}.${j}_1.fastq --fastq2 ${contigs[$i]}.${j}_2.fastq
             fi
             # generate 50X TGS
             echo -e "[ Generate TGS data from ${j}th sub population genome of ${contigs[$i]} ]"
             if [ ! -f ${contigs[$i]}.${j}_pacbio.fasta ]; then
-                python /data/tusers/zhongrenhu/Software/simulate/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --std-dev $TGS_STD --error-rate $TGS_ERR --deletion-fraction 0.5 --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
+                python $prog_path/simulate/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --std-dev $TGS_STD --error-rate $TGS_ERR --deletion-fraction 0.5 --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
             fi
             # remove intermediate sub-population genome
             rm ${contigs[$i]}.$j.fa

@@ -57,8 +57,8 @@ sc=SequenceContainer(tetuples)
 
 # read the PGD; must be provided
 print "Loading population genome defintion"
-pgdr=PopGenDefinitionReader(args.pgd_definition,sc)
-tedeftuples=pgdr.read_transposed()
+pgdr=PopGenDefinitionReader(args.pgd_definition,sc) # construct sequence(s) which will be inserted into chasis, mainly change pgdr.tuples, sc.__sc
+tedeftuples=pgdr.read_transposed() # extract insertions that will be inserted to each haploid genome, [[(pos1, insid1),(pos2, insid2), ...], [(pos1, insid1)], ...]
 print "Found {0} TE defintions".format(sc.get_count_definitions())
 print "Will simulate {0} TE insertion sites within a population having {1} haploid genomes".format(pgdr.insertions, pgdr.popsize)
 
@@ -68,7 +68,7 @@ if args.ref_fasta is not None:
      if pgdr.get_chasis() !="":
           raise Exception("Two chasis were provided (fasta file and pop genome definition); invalid, provide only one")
      print "Loading chasis from file "+args.ref_fasta
-     crap,chasis=SequenceUtility.load_chasis(args.ref_fasta)
+     crap,chasis=SequenceUtility.load_chasis(args.ref_fasta) # seq_id, sequence
 else:
      print "No chasis file found; Will use chasis from the population definition file"
      crap="TOY"
@@ -85,10 +85,10 @@ print "Will proceed with chasis having a size of {0} nt".format(len(chasis))
 counter=1 + args.sub_idx*args.sub_size
 fw=FastaWriter(args.output,60)
 print "Start writing population genome"
-for tmp in tedeftuples:
+for tmp in tedeftuples: # [(pos1, insid1),(pos2, insid2), ...]
      # translate into sequences
      seqidtup = [(t[0],str(crap)+"_hg"+str(counter)+";"+t[1]) for t in tmp]
-     seqtup=[(t[0],sc.getTESequence(t[1])) for t in tmp]
+     seqtup=[(t[0],sc.getTESequence(t[1])) for t in tmp] # [(pos1, TESequence),(pos2, TESequence), ...]
      seq_with_te=SeqInserter.insertSequences(chasis,seqtup, args.ins_seq, seqidtup)
      # TODO seqinserter must check if position is smaller than sequence length
 
