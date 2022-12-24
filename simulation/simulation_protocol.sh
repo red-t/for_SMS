@@ -20,14 +20,14 @@ function help_info(){
     echo -e "\t--tgs-maxl <int>\tMax length of TGS reads."
     echo -e "\t--tgs-minl <int>\tMin length of TGS reads."
     echo -e "\t--tgs-len <int>\tMean length of TGS reads."
-    echo -e "\t--tgs-std <int>\tStanard derivation of TGS read length distribution."
+    echo -e "\t--tgs-p <float>\tprobability of negative binomial model applied for TGS length distribution."
     echo -e "\t--tgs-err <float>\terror rate of TGS reads (fraction)."
     echo -e "\t-h \tShow this information"
 }
 
 
 ######## Getting Parameters ########
-ARGS=`getopt -o d:r:t:N:R:h --long sub-N:,germline-count:,avg-somatic-count:,min-distance:,depth:,ngs-len:,ngs-inner:,ngs-std:,ngs-err:,tgs-maxl:,tgs-minl:,tgs-len:,tgs-std:,tgs-err: -n "$0" -- "$@"`
+ARGS=`getopt -o d:r:t:N:R:h --long sub-N:,germline-count:,avg-somatic-count:,min-distance:,depth:,ngs-len:,ngs-inner:,ngs-std:,ngs-err:,tgs-maxl:,tgs-minl:,tgs-len:,tgs-p:,tgs-err: -n "$0" -- "$@"`
 if [ $? != 0 ]; then
     echo "Terminating..."
     exit 1
@@ -106,8 +106,8 @@ do
             TGS_MEANL=$2
             shift 2
             ;;
-        --tgs-std)
-            TGS_STD=$2
+        --tgs-p)
+            TGS_P=$2
             shift 2
             ;;
         --tgs-err)
@@ -140,8 +140,8 @@ done
 [ -z $NGS_ERR] && NGS_ERR=0.0005
 [ -z $TGS_MAXL] && TGS_MAXL=50000
 [ -z $TGS_MINL] && TGS_MINL=1000
-[ -z $TGS_MEANL] && TGS_MEANL=8000
-[ -z $TGS_STD] && TGS_STD=2000
+[ -z $TGS_MEANL] && TGS_MEANL=15000
+[ -z $TGS_P] && TGS_P=0.001
 [ -z $TGS_ERR] && TGS_ERR=0.1
 
 ### Checking Parameters ###
@@ -163,7 +163,7 @@ echo -e "NGS_ERR:\t${NGS_ERR}"
 echo -e "TGS_MAXL:\t${TGS_MAXL}"
 echo -e "TGS_MINL:\t${TGS_MINL}"
 echo -e "TGS_MEANL:\t${TGS_MEANL}"
-echo -e "TGS_STD:\t${TGS_STD}"
+echo -e "TGS_P:\t${TGS_P}"
 echo -e "TGS_ERR:\t${TGS_ERR}"
 ### Checking Parameters ###
 
@@ -231,7 +231,7 @@ do
         cd ${contigs[$i]}
         N_SUB=`awk -v sub_pop=$SUB_POP_SIZE -v pop=$POP_SIZE 'BEGIN{n_sub=int(pop/sub_pop); print n_sub}'`
         NGS_READS=`awk -v depth=$DEPTH -v g_l=$genome_size -v c_l=${contigs_size[$i]} -v n_sub=$N_SUB -v r_l=150 'BEGIN{ratio=c_l/g_l; ngs_reads=int(ratio*(depth*g_l/(2*r_l))/n_sub); print ngs_reads}'`
-        TGS_READS=`awk -v depth=$DEPTH -v g_l=$genome_size -v c_l=${contigs_size[$i]} -v n_sub=$N_SUB -v r_l=10000 'BEGIN{ratio=c_l/g_l; tgs_reads=int(ratio*(depth*g_l/r_l)/n_sub); print tgs_reads}'`
+        TGS_READS=`awk -v depth=$DEPTH -v g_l=$genome_size -v c_l=${contigs_size[$i]} -v n_sub=$N_SUB -v r_l=$TGS_MEANL 'BEGIN{ratio=c_l/g_l; tgs_reads=int(ratio*(depth*g_l/r_l)/n_sub); print tgs_reads}'`
         for((j=0; j<$N_SUB; j++))
         do
             # build population geneome
@@ -247,7 +247,7 @@ do
             # generate 50X TGS
             echo -e "[ Generate TGS data from ${j}th sub population genome of ${contigs[$i]} ]"
             if [ ! -f ${contigs[$i]}.${j}_pacbio.fasta ]; then
-                python $prog_path/simulate/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --std-dev $TGS_STD --error-rate $TGS_ERR --deletion-fraction 0.5 --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
+                python $prog_path/simulate/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --tgs-p $TGS_P --error-rate $TGS_ERR --deletion-fraction 0.5 --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
             fi
             # remove intermediate sub-population genome
             rm ${contigs[$i]}.$j.fa
@@ -265,12 +265,12 @@ rm */*fast*
 
 # simulation_protocol.sh -d ./ -r line_28_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon_for_simulaTE.fa -N 10000 -R 0 --sub-N 50 --germline-count 500 --avg-somatic-count 20 --min-distance 500 --depth 50
 
-
-
-
-
-
-
+# for((i=0; i<$contigs_count; i++))
+# do
+# N_SUB=200
+# TGS_READS=`awk -v depth=$DEPTH -v g_l=$genome_size -v c_l=${contigs_size[$i]} -v n_sub=$N_SUB -v r_l=10000 'BEGIN{ratio=c_l/g_l; tgs_reads=int(ratio*(depth*g_l/r_l)/n_sub); print tgs_reads}'`
+# echo $TGS_READS
+# done
 
 # tmp_ins_count_final=(${INS_NUMs[*]})
 # for((i=0; i<$contigs_count; i++))
@@ -288,10 +288,6 @@ rm */*fast*
 #         echo $i: ${tmp_ins_count[*]}
 #     fi
 # done | cut -f 1
-
-
-
-
 
 # awk '$1~/^>/{gsub(/-/,"_"); print $0} $1!~/^>/{gsub(/[WSRYKMBDHVN]/,"T"); print $0}' dm3.transposon.fa > dm3.transposon_for_simulaTE.fa && samtools faidx dm3.transposon_for_simulaTE.fa
 # nohup simulation_protocol.sh -d ./ -r line_26_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon_for_simulaTE.fa -N 10000 --sub-N 50 --germline-count 500 --avg-somatic-count 20 --min-distance 500 --depth 10 &
