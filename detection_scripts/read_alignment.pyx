@@ -141,7 +141,7 @@ cdef class Cluster:
             list bps
             Segment s
         
-        bps = sorted([s.rpos for s in self.seg_list]) # Q22: left/right breakpoint 是否要分开找呢？因为不同类型的 segment 理论上能提供的 breakpoint 类型也不同
+        bps = sorted([s.rpos for s in self.seg_list]) # check Q22: left/right breakpoint 是否要分开找呢？因为不同类型的 segment 理论上能提供的 breakpoint 类型也不同
         self.bp = [bps[0], bps[-1]]
 
 
@@ -163,7 +163,7 @@ cdef class Cluster:
         """
         cdef:
             str te_temp
-            list te_temp_list=[]
+            list te_temp_list=[], strand_temp_list=[]
         # 暂时输出一个insertion位置上所有可能的TE type
         # 但nested insertion的方向还没处理
 
@@ -174,25 +174,28 @@ cdef class Cluster:
         # TE1   insertion_start    insertion_end
         # TE2   insertion_start    insertion_end
         # ....
-        g = open( self.out_path + self.ref_name + "/" + self.c_id + "te_type.bed", 'w') # Q23: 因为 self.out_path 来源于 SMS.py 当中定义的 out_path，所有有可能末尾不带 '/'
+        g = open( self.out_path + "/" +self.ref_name + "/" + self.c_id + "te_type.bed", 'w') # check Q23: 因为 self.out_path 来源于 SMS.py 当中定义的 out_path，所有有可能末尾不带 '/'
 
         for te_temp in list(set(self.type_list)): # EXP: type_list: [tename1_|_0, tename2_|_1, ...]
             te_temp_list.append(te_temp.split('_|_')[0]) # EXP: te_temp_list: [tename1, tename2, ...]
-            self.orient = int(te_temp.split('_|_')[1]) # Q24: 此处直接修改了 cluster 的 orient 属性，后面是否有其他的修改？
+            
+            te_temp_strand = int(te_temp.split('_|_')[1]) # Q24: 此处直接修改了 cluster 的 orient 属性，后面是否有其他的修改？
 
-            if self.orient == 1:
+            if te_temp_strand == 1:
                 te_temp_strand = '-'
             else:
                 te_temp_strand = '+'
+            strand_temp_list.append(te_temp_strand)
             g.write("\t".join([self.ref_name, str(self.bp[0]-5), str(self.bp[1]+5), te_temp.split('_|_')[0], str(0), te_temp_strand ]) + '\n')
 
         
-        self.te_type = "|".join(te_temp_list) # Q25: 无效操作？因为下面又给这个属性赋予了新的值
+        # self.te_type = "|".join(te_temp_list) # check  Q25: 无效操作？因为下面又给这个属性赋予了新的值
+        self.orient = "|".join(strand_temp_list)
         g.close()
 
         # 前面写入的信息与repeat masker做intersect，保留非repeat masker的部分
-        rm_rmk_cmd = ['bedtools', 'intersect', '-a', repeatmasker_file, '-b', self.out_path + self.ref_name + "/" + self.c_id + "te_type.bed" ,'-wa','-wb', '|','awk', '\'{if($4==$10 && $6==$12){print $4}}\'' ] # Q26: 输出结果的每一列是啥内容？此外，对于每一个 cluster，都会重复这一步 1-vs-N 的 intersection
-        rmk_te_list = os.popen(" ".join(rm_rmk_cmd)).readlines() # Q27: 这个 bedtools 的结果只有一行吗？
+        rm_rmk_cmd = ['bedtools', 'intersect', '-a', repeatmasker_file, '-b', self.out_path + self.ref_name + "/" + self.c_id + "te_type.bed" ,'-wa','-wb', '|','awk', '\'{if($4==$10 && $6==$12){print $4}}\'' ] # check Q26: 输出结果的每一列是啥内容？此外，对于每一个 cluster，都会重复这一步 1-vs-N 的 intersection
+        rmk_te_list = os.popen(" ".join(rm_rmk_cmd)).readlines() # check：可能有多行，但只会有一个repeatmasker位置上的结果 Q27: 这个 bedtools 的结果只有一行吗？
         if len(rmk_te_list) > 0:
             rmk_te = rmk_te_list[0].strip()
             if rmk_te in te_temp_list:
@@ -206,6 +209,7 @@ cdef class Cluster:
         # 如果是0，可能是因为这个地方是一个repeat masker，就丢掉这个地方
         # 这里的state后面不会保留
         # Q28: 所以这里 state 的赋值逻辑是什么？看起来 te_stat 这个方法是对原本的 self.type_list 去重、去除与 repeatmasker result overlap 且 te name 相同的元素？
+        # check28: 现在的标签方便统计
         if len(self.type_list) == 0:
             self.state = self.state + 1
 
@@ -287,23 +291,23 @@ cdef class Cluster:
         
         
         
-        if self.state == 0: # Q29: 没有看到 state 会是 0 的情况？
+        if self.state == 0: # check Q29: 没有看到 state 会是 0 的情况？
             return 0
         
 
         black_tag = 'none'
 
         for candi_seg in self.seg_list:
-            candi_seg_id = '_'.join(candi_seg.segname.split('_')[3:5]) # Q30: qname_qstart，对于每个 segment 而言是 unique 的，并且有一些 qname 本身可能就包含 '_' 符号？
-
-            if candi_seg_id not in supp_reads_dict: # Q30: 这一步应该是要填充 supp_reads_dict，qname_qstart -> segname, 但是最终每一个 value 长度都只为 1，因为 key 都是 unique 的？
+            # candi_seg_id = '_'.join(candi_seg.segname.split('_')[3:5]) # check Q30: qname_qstart，对于每个 segment 而言是 unique 的，并且有一些 qname 本身可能就包含 '_' 符号？
+            candi_seg_id = candi_seg.read.query_name
+            if candi_seg_id not in supp_reads_dict: # check Q30: 这一步应该是要填充 supp_reads_dict，qname_qstart -> segname, 但是最终每一个 value 长度都只为 1，因为 key 都是 unique 的？
                 supp_reads_dict[candi_seg_id] = []
                 supp_reads_dict[candi_seg_id].append(candi_seg.segname)
             else:
                 supp_reads_dict[candi_seg_id].append(candi_seg.segname)
             
 
-            if candi_seg.segname[-1] == 'm': # Q31: 循环结束之后，new_seg_list 应该与 self.seg_list 相同，num_supp 应该仍然为 0，因为 supp_reads_m_list_id、supp_reads_c_list_id 一直为 0 ?
+            if candi_seg.segname[-1] == 'm': # check 添加了append步骤 Q31: 循环结束之后，new_seg_list 应该与 self.seg_list 相同，num_supp 应该仍然为 0，因为 supp_reads_m_list_id、supp_reads_c_list_id 一直为 0 ?
                 if candi_seg_id in supp_reads_m_list_id:
                     continue
                 elif candi_seg_id in supp_reads_c_list_id:
@@ -311,6 +315,8 @@ cdef class Cluster:
                     continue
                 else:
                     new_seg_list.append(candi_seg)
+                    supp_reads_m_list_id.append(candi_seg_id)
+
                 
             else:
                 if candi_seg_id in supp_reads_c_list_id:
@@ -320,6 +326,7 @@ cdef class Cluster:
                     continue
                 else:
                     new_seg_list.append(candi_seg)
+                    supp_reads_c_list_id.append(candi_seg_id)
 
             
             # 处理reads比对到genome上是两端截断的情况，这种区域定义为black region
@@ -333,10 +340,10 @@ cdef class Cluster:
                 if supp_read.cigartuples[0][1] > 30 and supp_read.cigartuples[-1][1] > 30:
                     print('ck')
                     print(candi_seg.segname)
-                    if candi_seg.segname[-1] == 'l': # Q32: l_black_read_num、r_black_read_num 似乎没用？
-                        l_black_read_num = l_black_read_num + 1
-                    if candi_seg.segname[-1] == 'r':
-                        r_black_read_num = r_black_read_num + 1
+                    #if candi_seg.segname[-1] == 'l': # check Q32: l_black_read_num、r_black_read_num 似乎没用？
+                    #    l_black_read_num = l_black_read_num + 1
+                    #if candi_seg.segname[-1] == 'r':
+                    #    r_black_read_num = r_black_read_num + 1
 
                     sup_black_read_num = sup_black_read_num + 1
                     
@@ -366,7 +373,7 @@ cdef class Cluster:
         for srd in supp_reads_dict:
             print('?')
             print(supp_reads_dict[srd])
-            s_temp_list = list(set(supp_reads_dict[srd])) # Q33: [segname]，长度为1？原因和 Q30 一样
+            s_temp_list = list(set(supp_reads_dict[srd])) # check Q33: [segname]，长度为1？原因和 Q30 一样
             s_temp_list_type = [ s[-1] for s in s_temp_list ]
             n_m_t = s_temp_list_type.count('m')
             n_l_t = s_temp_list_type.count('l')
@@ -375,7 +382,7 @@ cdef class Cluster:
                 N_supp_2 = N_supp_2 + 2
                 n_m = n_m + 1
             else:
-                if n_l_t >= 1 and n_r_t >= 1: # Q33: 应该不会有这种情况出现？
+                if n_l_t >= 1 and n_r_t >= 1: # check Q33: 应该不会有这种情况出现？
                     N_supp_2 = N_supp_2 + 2
                     n_m = n_m + 1
                 else:
@@ -438,7 +445,7 @@ cdef class Cluster:
                 #print(span_read.query_name,span_read_left_clip_len,span_read_right_clip_len)
                 if span_read_left_clip_len > 30 and span_read_right_clip_len > 30:
                     # 如果insertion是在double clip之间的，两条以上，极大概率是假的
-                    # Q34: 下面的判断条件与要求正好相反？
+                    # check Q34: 下面的判断条件与要求正好相反？
                     if span_read.reference_end - self.bp[-1] > 25 and self.bp[0] - span_read.reference_start > 25:
                         double_clip_reads_num = double_clip_reads_num + 1
                         if double_clip_reads_num >= 2: 
@@ -485,7 +492,7 @@ cdef class Cluster:
 
         
         # 这里的条件判断一言难尽
-        # Q35: 这一步是为了根据 "(right/left) black reads"、"(right/left) black support reads" 的数量来设置 cluster 的state？不太能看懂下面这些判断的含义
+        # check Q35: 这一步是为了根据 "(right/left) black reads"、"(right/left) black support reads" 的数量来设置 cluster 的state？不太能看懂下面这些判断的含义
         if n_m ==0 and black_tag == 'black':
             if sup_black_read_num != 0:
                 if span_tag == 'span':
@@ -574,10 +581,10 @@ cdef class Cluster:
         cdef:
             str strand
 
-        if self.orient:
-            strand = '-'
-        else:
-            strand = '+'
+        #if self.orient:
+        #    strand = '-'
+        #else:
+        #    strand = '+'
         
         is_nested = ''
         if len(list(set(self.type_list))) > 1:
@@ -595,7 +602,7 @@ cdef class Cluster:
 
 
 
-        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, self.frequency,  strand, self.supp_reads, self.divergency, self.consensus_meth,insertion_type, self.tsd, self.insert_seq_info, self.consensus, self.su_type, self.te_size, self.state )
+        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, self.frequency, self.orient, self.supp_reads, self.divergency, self.consensus_meth,insertion_type, self.tsd, self.insert_seq_info, self.consensus, self.su_type, self.te_size, self.state )
 
 
     cpdef get_consensus(self, genome_fa,  genome_idx, te_anno_fa):
@@ -684,7 +691,7 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
         float divergency, divergency_all # ......这一步当中的所有类型的divergency，是为了评估组装的效果怎么样，最后应该不会出现在最终的bed文件中，当然放一个mismatch的divergncy也是可以的
 
     # return 'none', 'none', 'none'
-    consensus_seq_temp_file_ob = open(consensus_seq_temp_file, 'w')
+    
 
     insert_type_list = list(set([ insert_seq.segname[-1] for insert_seq in seg_list ])) # 为了判断是否包含span reads
     
@@ -699,7 +706,7 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
     # print(insert_type_list)
     # 只有clip supporting reads的insertion先跳过，因为效果不好，还在尝试参数
     # 实在不行就跳过
-    if len(insert_type_list) == 1 and 'm' not in insert_type_list: # Q37: 如果这里判断成功，会使得 consensus_seq_temp_file_ob 不能正常关闭
+    if len(insert_type_list) == 1 and 'm' not in insert_type_list: # Q37: 如果这里判断成功，会使得 consensus_seq_temp_file_ob 不能正常关闭        
         consensus_seq_print = 'None'
         tsd_print = 'None'
         te_break_info_print = 'None'
@@ -710,17 +717,19 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
 
         return consensus_seq_print, tsd_print ,te_break_info_print, divergency, consensus_meth, tsd_positions_st, tsd_positions_en
 
-    seq_raw_id_uniq_list = []  # 记录read的raw id，有的reads 可能在map时同时有 right clip和 left clip两种情况，如果重复的话，只取其中一条就够了，不然supporting reads会有重复
+    # seq_raw_id_uniq_list = []  # 记录read的raw id，有的reads 可能在map时同时有 right clip和 left clip两种情况，如果重复的话，只取其中一条就够了，不然supporting reads会有重复
+    
+    consensus_seq_temp_file_ob = open(consensus_seq_temp_file, 'w')
     for insert_seq in seg_list :
-        insert_type_list = [] # Q38: insert_type_list 在这个循环当中完全无用？
-        seq_raw_id = "_".join(insert_seq.segname.split('_')[3:5]) # EXP: qname_qstart
-        if seq_raw_id not in seq_raw_id_uniq_list:
-            seq_raw_id_uniq_list.append(seq_raw_id)
-        else:
-            continue # Q38: 阴差阳错下，每个 seq_raw_id 都是 unique 的，无法判断至此，但如果判断至此，就会直接跳过本轮循环
-        if insert_seq.segname[-1] != 'c': # Q38: 为什么会是 'c' 呢
-            i = i + 1 # Q38: i 的作用是什么？
-            consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t + "\n" )
+        # insert_type_list = [] # check Q38: insert_type_list 在这个循环当中完全无用？
+        #seq_raw_id = "_".join(insert_seq.segname.split('_')[3:5]) # EXP: qname_qstart
+        #if seq_raw_id not in seq_raw_id_uniq_list:
+        #    seq_raw_id_uniq_list.append(seq_raw_id)
+        #else:
+        #    continue # check Q38: 阴差阳错下，每个 seq_raw_id 都是 unique 的，无法判断至此，但如果判断至此，就会直接跳过本轮循环
+        #if insert_seq.segname[-1] != 'c': # Q38: 为什么会是 'c' 呢
+        #    i = i + 1 # Q38: i 的作用是什么？
+        consensus_seq_temp_file_ob.write( ">" + insert_seq.segname + "\n" + insert_seq.seq_t + "\n" )
 
     consensus_seq_temp_file_ob.close()
 
@@ -746,7 +755,7 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
     insert_con_sequence_dict = {}
 
     polish_file = open(polish_file_name, 'w') # check
-    # Q39: 基于 segment trimmed sequences-vs-transposon 的 alignment pileup, 对 te_type_list 当中的每一种 transposon 进行 "polishing"? 没有 coverage 的地方怎么处理？
+    # check Q39: 基于 segment trimmed sequences-vs-transposon 的 alignment pileup, 对 te_type_list 当中的每一种 transposon 进行 "polishing"? 没有 coverage 的地方怎么处理？
     for te_reference in te_type_list: # EXP: te_type_list: [tename1, tename2, ...], 这里的 te_type_list 是 set 处理过后的
         insert_con_sequence_dict[te_reference] = ''
 
@@ -888,14 +897,14 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
 
         if clip_genome_l[0] in (4, 5):
             if insert_seq_read.is_reverse:
-                break_l = len(consensus_seq) - clip_genome_l[1] # Q40: 如果这里的 'l' 和 'r' 是针对 consensus 原本的序列而言的话，那么此处应当是 break_r ？
+                break_r = len(consensus_seq) - clip_genome_l[1] # check Q40: 如果这里的 'l' 和 'r' 是针对 consensus 原本的序列而言的话，那么此处应当是 break_r ？
             else:
                 break_l = clip_genome_l[1]
         if clip_genome_r[0]  in (4,5):
             if insert_seq_read.is_reverse:
                 break_r = clip_genome_r[1]
             else:
-                break_r = len(consensus_seq) - clip_genome_r[1] # Q40: 同上，并且计算方式应该是 break_l = clip_genome_r[1] ?
+                break_l = len(consensus_seq) - clip_genome_r[1] # check Q40: 同上，并且计算方式应该是 break_l = clip_genome_r[1] ?
         
         break_1 = min([break_l,break_r])
         break_2 = max([break_l,break_r])
@@ -909,11 +918,14 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
         # internal deletion
 
         indel_cigar = insert_seq_read.cigarstring
-        if 'N' in indel_cigar : # Q41: CIGAR string 当中的 N 是指什么？
-            del_pos_list = [int(n_cigar) for n_cigar in re.findall('[0-9]{1,}',indel_cigar.split('N')[0].split('S')[-1])]
+        if 'N' in indel_cigar : # check Q41: CIGAR string 当中的 N 是指什么？
+            cigar_befor_del = indel_cigar.split('N')[0]
+            cigar_del_list = [int(n_cigar[:-1]) for n_cigar in re.findall('[0-9]{1,}D',cigar_befor_del.split('S')[-1])]
+            
+            del_pos_list = [int(n_cigar) for n_cigar in re.findall('[0-9]{1,}',cigar_befor_del.split('S')[-1])]
 
             del_len = del_pos_list[-1]
-            del_pos = sum(del_pos_list[:-1]) # Q41: 这里应该是要计算其它 operation 的长度之和？但是从代码上看，这个 '和' 不包括 'S', 但是包括 'D' 与 'H'(如果有的话)？
+            del_pos = sum(del_pos_list[:-1]) - sum(cigar_del_list) # check Q41: 这里应该是要计算其它 operation 的长度之和？但是从代码上看，这个 '和' 不包括 'S', 但是包括 'D' 与 'H'(如果有的话)？
             seq_break_list_all.append((break_1, break_2,":".join([insert_te , str(insert_seq_read.reference_start),str(insert_seq_read.reference_end) ,break_seq_strand,"with_"+str(del_len)+"_del",str(insert_seq_read.reference_start + del_pos), str(insert_seq_read.reference_start + del_pos + del_len)])))
 
         else:
@@ -942,21 +954,20 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
             consensus_seq_print_list.append(consensus_seq[0:break_p[0]])
             te_break_info_print_list.append("0-"+str(break_p[0])+":genome")
             polished_sequence.append(consensus_seq[0:break_p[0]])
-
-        # insert sequence
-        # Q42: 这里缺 elif 和 else 判断，所以第一个 & 最后一个片段会被 append 两次
-        consensus_seq_print_list.append(consensus_seq[break_p[0]:break_p[1]])
-        te_break_info_print_list.append(str(break_p[0])+"-"+str(break_p[1]) + ":" + break_p[2])
-        if te_insert_strand[break_te_ref] == '-': # Q42: 所以 polishing 的思想是将 polished-TE sequence 片段替换原本的 consensus sequence 片段？
-            polished_sequence.append(revcomp(insert_con_sequence_dict[break_te_ref])[int(break_te_start):int(break_te_end)])
-        else:
-            polished_sequence.append(insert_con_sequence_dict[break_te_ref][int(break_te_start):int(break_te_end)])
-
         # right genome
-        if i == len(seq_break_list_all_sorted) - 1 :
+        elif i == len(seq_break_list_all_sorted) - 1:
             consensus_seq_print_list.append(consensus_seq[break_p[1]:])
             te_break_info_print_list.append( str(break_p[1]) + "-" + str(len(consensus_seq)) + ":genome" )
             polished_sequence.append(consensus_seq[break_p[1]:])
+        else:
+            # insert sequence
+            # check Q42: 这里缺 elif 和 else 判断，所以第一个 & 最后一个片段会被 append 两次
+            consensus_seq_print_list.append(consensus_seq[break_p[0]:break_p[1]])
+            te_break_info_print_list.append(str(break_p[0])+"-"+str(break_p[1]) + ":" + break_p[2])
+            if te_insert_strand[break_te_ref] == '-': # Q42: 所以 polishing 的思想是将 polished-TE sequence 片段替换原本的 consensus sequence 片段？
+                polished_sequence.append(revcomp(insert_con_sequence_dict[break_te_ref])[int(break_te_start):int(break_te_end)])
+            else:
+                polished_sequence.append(insert_con_sequence_dict[break_te_ref][int(break_te_start):int(break_te_end)])
 
     consensus_seq_print = '__'.join(consensus_seq_print_list) + "......" + "__".join(polished_sequence)
     te_break_info_print = '__'.join(te_break_info_print_list)
@@ -1029,7 +1040,7 @@ cdef tuple get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref
                 right_tsd_clip = cigar_list[0][1]
     
     # print(tsd_temp_dic)
-    # Q43: 这里是怎么寻找 TSD 的？没太看懂
+    # check Q43: 这里是怎么寻找 TSD 的？没太看懂
     tsd_position = sorted([ tsd_temp_dic['right_tsd'][0],tsd_temp_dic['right_tsd'][1] ,tsd_temp_dic['left_tsd'][0], tsd_temp_dic['left_tsd'][1]])[1:3]
     tsd_len = tsd_position[1] - tsd_position[0]
     # print(tsd_position)
@@ -1061,17 +1072,7 @@ cdef tuple trim(bint is_reverse, int qlen, str seq, int q_st, int q_en, int op, 
         int q_st_t, q_en_t
         str seq_t
 
-    flanksize_s = flanksize # Q14: 无需单独区分 flanksize_s、flanksize_e
-    flanksize_e = flanksize
-    # 如果是clip reads，clip的部分完全保留
-    if op in (4, 5):
-        if q_st == 0: # l
-            flanksize_s = 0
-        else:
-            flanksize_e = 0
-
-    st_t = q_st - flanksize_s
-    en_t = q_en + flanksize_e
+    # check Q14: 无需单独区分 flanksize_s、flanksize_e
 
     if st_t < 0:
         st_t = 0
@@ -1126,22 +1127,22 @@ cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksi
 
     for op, op_len in read.cigartuples:
         if op in (1, 4, 5) and op_len >= min_len: # I or S or H
-            if op_len > max_len: # Q10: 如果是 op_len > max_len 条件满足，就会跳过此轮循环，进行下一轮，导致本轮循环最后面的语句 start_idx += op_len 无法执行，导致 start_idx 计算错误
+            if op_len > max_len or op != 1 and read.query_length < 300: # Q10: 如果是 op_len > max_len 条件满足，就会跳过此轮循环，进行下一轮，导致本轮循环最后面的语句 start_idx += op_len 无法执行，导致 start_idx 计算错误
+                if op in (0, 1, 4, 7, 8): # index 判断
+                    start_idx += op_len
                 continue
 
-            if op != 1 and read.query_length < 300: # Q11: 和 Q10 一样
-                continue
 
             # find query start & end of the segment
             q_st = start_idx
-            q_en = start_idx + op_len # Q12: 如果是 left-hard-clip, q_st 应当 小于 0, 而 q_en 应等于 0
+            q_en = start_idx + op_len # check Q12: 如果是 left-hard-clip, q_st 应当 小于 0, 而 q_en 应等于 0 ,以query sequence为参照
             
 
             # find reference start & end of the segment
             r_st = ap[q_st - 1]
 
             if op == 5:
-                if start_idx == 0: # Q13: 此处，若是 left-hard-clip，则 r_st = r_en = ap[0]? 
+                if start_idx == 0: # check Q13: 此处，若是 left-hard-clip，则 r_st = r_en = ap[0]? 
                     r_st = ap[0]
                 r_en = r_st
             else:
@@ -1285,7 +1286,7 @@ cdef score_te_alignment(object read, dict te_size_dict):
         int map_te_len, insert_te_len
         str map_te_name
     
-    # Q16: 这里加 split 是因为测试的时候使用的 TE CSS 原本是用来跑 TLDR 的? 据他们的描述，他们的软件能够区分差异细微的 sub-family TE insertion
+    # check Q16: 这里加 split 是因为测试的时候使用的 TE CSS 原本是用来跑 TLDR 的? 据他们的描述，他们的软件能够区分差异细微的 sub-family TE insertion
     map_te_name = read.reference_name.split(':')[0] # 比对的TE的类型
     map_te_len = int(te_size_dict[map_te_name]) # consensus TE的长度
     insert_te_len = read.reference_length # 比对到transposon的长度
@@ -1294,10 +1295,11 @@ cdef score_te_alignment(object read, dict te_size_dict):
 
 
     # 这里考虑read上比对到TE的长度，如果太短就不太可靠，以及如果比对到TE的部分只占read的一小部分，也不太可靠
-    # Q17: 这里的 'read' 本质上是 trimmed sequence，其中可能同时包含很长的 non-TE 片段，以及相对短的 TE 片段，只看比例对较短的TE不公平。所以我觉得可以考虑对 read.query_alignment_length 设置一个 cutoff ?
+    # check Q17: 这里的 'read' 本质上是 trimmed sequence，其中可能同时包含很长的 non-TE 片段，以及相对短的 TE 片段，只看比例对较短的TE不公平。所以我觉得可以考虑对 read.query_alignment_length 设置一个 cutoff ?
     insert_query_length = float( read.query_name.split('_')[-2] )- float(read.query_name.split('_')[-3] )
-    mappbility_for_read = float(read.query_alignment_length) / insert_query_length # Q18: 分子的计算方式是否要考虑 flanksize, 因为针对 insert(I) fragment 写出的片段是包括两端 flanksize 片段的
-    mappbility_for_te = float(insert_te_len) / map_te_len # Q19: 与 Q18 类似
+    mappbility_for_read = float(read.query_alignment_length) / insert_query_length # check Q18: 分子的计算方式是否要考虑 flanksize, 因为针对 insert(I) fragment 写出的片段是包括两端 flanksize 片段的
+    mappbility_for_te = float(insert_te_len) / map_te_len # check Q19: 与 Q18 类似
+    # 这部分的筛选条件需要考虑一下
 
     if read.query_name[-1] == 'm':
 
@@ -1314,7 +1316,7 @@ cdef score_te_alignment(object read, dict te_size_dict):
 
         if mappbility_for_read > 0.6 and read.mapping_quality >= 40:    # 如果reads大部分序列都是属于consensus TE的，这条比对可能是真的
             score_te_align = 1
-        elif read.pos <= 20: # Q20: 对于一些 5' truncated insertion (比如 LINE1) 不太公平?
+        elif read.pos <= 20: # check Q20: 对于一些 5' truncated insertion (比如 LINE1) 不太公平? 测试人的数据再看看
             if mappbility_for_te >= 0.1 and read.mapping_quality >= 30: # 如果与TE比对是从头开始比对，对reads中TE的占比要求可以低一点，如果不是就要求高一点
                 score_te_align = 1
         else:
@@ -1352,7 +1354,7 @@ cdef parse_te_aln(dict seg_dict, str te_bam, dict te_size_dict):
 
     for r in te_aln:
         raw_read_id = "_".join(r.query_name.split('_')[3:5]) # EXP: queryname_qst of each written segment, e.g. read1_100
-        if not r.is_unmapped and r.flag !=4: # Q15: 判断条件重复了？
+        if not r.is_unmapped : # check Q15: 判断条件重复了？
             score_te = score_te_alignment(r, te_size_dict)
             if score_te > 0:
                 seg_n = r.query_name
