@@ -20,14 +20,14 @@ def parse_args():
                                  help='Path of bam file, mapped by minimap2 -Y', default='')
     detect_insertion_setting.add_argument('-o', '--out_path', dest='out_path', type=str,
                                  help='Path of the output', default='./')
-    detect_insertion_setting.add_argument('-t', '--te_index', dest='te_index', type=str, nargs='*',
+    detect_insertion_setting.add_argument('-t', '--te_index', dest='te_index', type=str,
                                  help='Transposon reference sequence index build by minimap2', default='')
     detect_insertion_setting.add_argument('-s', '--te_size', dest='te_size', type=str,
                                  help='Path of ransposon reference size file', default='')
     detect_insertion_setting.add_argument('-f', '--flanksize', dest='flanksize', type=str,
                                  help='Flanksize to the breakpoint', default='')
     detect_insertion_setting.add_argument('-p', '--prefix', dest='prefix', type=str,
-                                 help='Path of ransposon reference size file', default='')
+                                 help='Prefix of output file', default='')
     detect_insertion_setting.add_argument('-g', '--genome_fa', dest='genome_fa', type=str,
                                  help='Path of ransposon reference size file', default='')                             
     detect_insertion_setting.add_argument('-i', '--genome_idx', dest='genome_idx', type=str,

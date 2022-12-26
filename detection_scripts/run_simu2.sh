@@ -110,8 +110,9 @@ do
     prefix_re="SMS"
     # lrft2.py = SMS.py
 
-    python lrft2.py ${OUT_PATH}/${SAMPLE}_tgs.${dep}X.q0.sorted.bam ${OUT_PATH}/SMS ${TRANSPOSON_INDEX} ${TRANSPOSON_SIZE} 1500 ${prefix_re} ${GENOME_FA} ${GENOME_INDEX} ${TE_ANNO_FA} ${REPEATMASKER_FILE}
-    
+    # python lrft2.py ${OUT_PATH}/${SAMPLE}_tgs.${dep}X.q0.sorted.bam ${OUT_PATH}/SMS ${TRANSPOSON_INDEX} ${TRANSPOSON_SIZE} 1500 ${prefix_re} ${GENOME_FA} ${GENOME_INDEX} ${TE_ANNO_FA} ${REPEATMASKER_FILE}
+    python lrft2.py -b ${OUT_PATH}/${SAMPLE}_tgs.${dep}X.q0.sorted.bam -o ${OUT_PATH}/SMS -t ${TRANSPOSON_INDEX} -s ${TRANSPOSON_SIZE} -f 1500 -p ${prefix_re} -g ${GENOME_FA} -i ${GENOME_INDEX} -a ${TE_ANNO_FA} -r ${REPEATMASKER_FILE}
+
     # grep pass ${OUT_PATH}/SMS/${prefix_re}.insertion.bed | grep -v nest | grep -v TART | grep -v del | awk '{split($14,a,"_");split($8,b,"_");dep=a[1]+a[2]+a[3];print b[2],b[3],$9,dep,$15}' > ${OUT_PATH}/SMS/${prefix_re}.${dep}.txt
     # mv ${OUT_PATH}/SMS/${prefix_re}.${dep}.txt /home/boxu/temp/wtdbg2/for_qc/2/
 

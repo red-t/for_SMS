@@ -89,7 +89,8 @@ cdef class Segment:
 ## Cluster ##
 cdef class Cluster:
     cdef public:
-        int orient, state, supp_reads_num
+        int state, supp_reads_num
+        str orient
         float frequency
         str c_id, consensus, consensus_seq, tsd, ref_name, te_type, insert_seq_info
         str out_path, supp_reads, unsupp_reads, span_reads
@@ -282,7 +283,7 @@ cdef class Cluster:
             int span_read_left_clip_len = 0, span_read_right_clip_len = 0
             list support_span_reads_list = []
             str span_tag = 'none'
-            list supp_reads_list_id = [], supp_reads_m_list_id = [], supp_reads_c_list_id = [], new_seg_list = [], supp_reads_type = []
+            list supp_reads_m_list_id = [], supp_reads_c_list_id = [], new_seg_list = [], supp_reads_type = []
             int num_supp = 0, un_support_reads_spand_size = 30
             dict  supp_reads_dict = {}
 
@@ -1383,7 +1384,7 @@ cdef dict collect_seg(object ref_aln, str chrom, str te_idx, str outpath, dict r
         if not read.is_secondary:
             if read.mapping_quality > 0:
                 temp_segs = extract_seg(read, seg_fa, read_seq_dic, flanksize)
-                segs.extend(temp_segs[0])
+                segs.extend(temp_segs)
 
     seg_fa.close()
     seg_dict = dict(segs) # EXP: segname -> Segment, btw 转换完之后也许应该删除 segs 这个列表？
