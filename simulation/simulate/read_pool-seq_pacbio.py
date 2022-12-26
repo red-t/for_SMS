@@ -46,7 +46,7 @@ parser.add_argument("--tgs-loc", type=float, required=False, dest="tgs_loc", def
 parser.add_argument("--tgs-beta", type=float, required=False, dest="tgs_beta", default=None, help="beta of gamma model applied for TGS length generation.")
 parser.add_argument("--rld-file", type=str, required=False, dest="rldfile", default=None, help="read length distribution file; will override --read-length and --std-dev")
 parser.add_argument("--error-rate", type=float, required=False, dest="error_rate", default=0.0, help="the error rate of the reads; indels")
-parser.add_argument("--deletion-fraction", type=float, required=False, dest="delfrac", default=0.5, help="the fraction of deletions, the complementary fraction will be insertions")
+parser.add_argument("--error-fraction", type=str, required=False, dest="err_frac", help="the fraction of each type of errors, mis:del:ins")
 parser.add_argument("--reads", type=int, required=True, dest="reads", default=None, help="the total number of reads")
 parser.add_argument("--fasta", type=str, required=True, dest="fasta", default=None, help="output - a fasta file")
 parser.add_argument("--tgs-maxl", type=int, required=True, dest="tgs_maxl", default=None, help="Max length of TGS reads")
@@ -61,8 +61,8 @@ print "Simulating PacBio Pool-Seq reads"
 print "Reading the length of the population genome"
 pgld=fastaIO.SequenceUtility.get_length_list(args.pop_gen)
 
-print "Getting mutator for PacBio reads with error rate {0} and a fraction of deletions {1} and insertions {2}".format(args.error_rate,args.delfrac,1.0-args.delfrac)
-mutator=Mutator.PacBioMutator(args.error_rate,args.delfrac) # get a suitable mutator; suitability depends on the error rate
+print "Getting mutator for PacBio reads with error rate {0} and error fraction {1}".format(args.error_rate,args.err_frac)
+mutator=Mutator.PacBioMutator(args.error_rate,args.err_frac) # get a suitable mutator; suitability depends on the error rate
 
 readnumbergenerator=CoverageGenerator.RandomReads(args.reads,pgld)
 
@@ -73,6 +73,7 @@ fawriter=fastaIO.FastaWriter(args.fasta,60)
 
 counter=0
 readcount=1
+f_err = open("ErrorPerRead.txt", "a")
 for header,seq in fastaIO.FastaReader(args.pop_gen):
     targetreads=readnumbergenerator.get_reads(counter)
     print "Generating {0} reads for haploid genome {1}".format(targetreads,header)
@@ -91,13 +92,15 @@ for header,seq in fastaIO.FastaReader(args.pop_gen):
         if random.random()<0.5:
                read1=fastaIO.SequenceUtility.rc(read1)
         
-        read1=mutator.mutateseq(read1)
+        read1, errs=mutator.mutateseq(read1)
         
+        f_err.write('{0};{1}:{2}\t{3}\t{4}\t{5}\n'.format(readcount,header,firstposition,errs[0],errs[1],errs[2]))
         h="{0};{1}:{2}".format(readcount,header,firstposition)
         fawriter.write(h,read1)
         readcount+=1
     
 
+f_err.close()
 fawriter.close()
 print "Finished"
 
