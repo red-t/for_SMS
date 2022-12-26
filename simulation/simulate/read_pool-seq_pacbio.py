@@ -41,7 +41,9 @@ Authors
 
 parser.add_argument("--pg", type=str, required=True, dest="pop_gen", default=None, help="the population genome - a fasta file")
 parser.add_argument("--read-length", type=int, required=False, dest="read_length", default=None, help="the mean read length")
-parser.add_argument("--tgs-p", type=float, required=False, dest="tgs_p", default=None, help="probability of negative binomial model applied for TGS length distribution.")
+parser.add_argument("--tgs-alpha", type=float, required=False, dest="tgs_alpha", default=None, help="alpha of gamma model applied for TGS length generation.")
+parser.add_argument("--tgs-loc", type=float, required=False, dest="tgs_loc", default=None, help="loc of gamma model applied for TGS length generation.")
+parser.add_argument("--tgs-beta", type=float, required=False, dest="tgs_beta", default=None, help="beta of gamma model applied for TGS length generation.")
 parser.add_argument("--rld-file", type=str, required=False, dest="rldfile", default=None, help="read length distribution file; will override --read-length and --std-dev")
 parser.add_argument("--error-rate", type=float, required=False, dest="error_rate", default=0.0, help="the error rate of the reads; indels")
 parser.add_argument("--deletion-fraction", type=float, required=False, dest="delfrac", default=0.5, help="the fraction of deletions, the complementary fraction will be insertions")
@@ -64,7 +66,7 @@ mutator=Mutator.PacBioMutator(args.error_rate,args.delfrac) # get a suitable mut
 
 readnumbergenerator=CoverageGenerator.RandomReads(args.reads,pgld)
 
-rldfactory=ReadLengthDistribution.get_rld_factory(args.read_length, args.tgs_p,args.rldfile)
+rldfactory=ReadLengthDistribution.get_rld_factory(args.read_length, args.tgs_alpha, args.tgs_loc, args.tgs_beta, args.rldfile)
 
 # get single-end writer
 fawriter=fastaIO.FastaWriter(args.fasta,60)

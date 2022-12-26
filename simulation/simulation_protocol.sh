@@ -20,14 +20,16 @@ function help_info(){
     echo -e "\t--tgs-maxl <int>\tMax length of TGS reads."
     echo -e "\t--tgs-minl <int>\tMin length of TGS reads."
     echo -e "\t--tgs-len <int>\tMean length of TGS reads."
-    echo -e "\t--tgs-p <float>\tprobability of negative binomial model applied for TGS length distribution."
+    echo -e "\t--tgs-aplha <float>\talpha of gamma distribution model applied for TGS length generation."
+    echo -e "\t--tgs-loc <float>\tloc of gamma distribution model applied for TGS length generation."
+    echo -e "\t--tgs-beta <float>\tbeta of gamma distribution model applied for TGS length generation."
     echo -e "\t--tgs-err <float>\terror rate of TGS reads (fraction)."
     echo -e "\t-h \tShow this information"
 }
 
 
 ######## Getting Parameters ########
-ARGS=`getopt -o d:r:t:N:R:h --long sub-N:,germline-count:,avg-somatic-count:,min-distance:,depth:,ngs-len:,ngs-inner:,ngs-std:,ngs-err:,tgs-maxl:,tgs-minl:,tgs-len:,tgs-p:,tgs-err: -n "$0" -- "$@"`
+ARGS=`getopt -o d:r:t:N:R:h --long sub-N:,germline-count:,avg-somatic-count:,min-distance:,depth:,ngs-len:,ngs-inner:,ngs-alpha:,ngs-loc:,ngs-beta:,ngs-err:,tgs-maxl:,tgs-minl:,tgs-len:,tgs-p:,tgs-err: -n "$0" -- "$@"`
 if [ $? != 0 ]; then
     echo "Terminating..."
     exit 1
@@ -106,8 +108,16 @@ do
             TGS_MEANL=$2
             shift 2
             ;;
-        --tgs-p)
-            TGS_P=$2
+        --tgs-alpha)
+            TGS_ALPHA=$2
+            shift 2
+            ;;
+        --tgs-loc)
+            TGS_LOC=$2
+            shift 2
+            ;;
+        --tgs-beta)
+            TGS_BETA=$2
             shift 2
             ;;
         --tgs-err)
@@ -140,8 +150,10 @@ done
 [ -z $NGS_ERR] && NGS_ERR=0.0005
 [ -z $TGS_MAXL] && TGS_MAXL=50000
 [ -z $TGS_MINL] && TGS_MINL=1000
-[ -z $TGS_MEANL] && TGS_MEANL=15000
-[ -z $TGS_P] && TGS_P=0.001
+[ -z $TGS_MEANL] && TGS_MEANL=8690
+[ -z $TGS_ALPHA] && TGS_ALPHA=3.3567764489878322
+[ -z $TGS_LOC] && TGS_LOC=5999.934752151781
+[ -z $TGS_BETA] && TGS_BETA=801.77408988051
 [ -z $TGS_ERR] && TGS_ERR=0.1
 
 ### Checking Parameters ###
@@ -163,7 +175,9 @@ echo -e "NGS_ERR:\t${NGS_ERR}"
 echo -e "TGS_MAXL:\t${TGS_MAXL}"
 echo -e "TGS_MINL:\t${TGS_MINL}"
 echo -e "TGS_MEANL:\t${TGS_MEANL}"
-echo -e "TGS_P:\t${TGS_P}"
+echo -e "TGS_ALPHA:\t${TGS_ALPHA}"
+echo -e "TGS_LOC:\t${TGS_LOC}"
+echo -e "TGS_BETA:\t${TGS_BETA}"
 echo -e "TGS_ERR:\t${TGS_ERR}"
 ### Checking Parameters ###
 
@@ -247,7 +261,7 @@ do
             # generate 50X TGS
             echo -e "[ Generate TGS data from ${j}th sub population genome of ${contigs[$i]} ]"
             if [ ! -f ${contigs[$i]}.${j}_pacbio.fasta ]; then
-                python $prog_path/simulate/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --tgs-p $TGS_P --error-rate $TGS_ERR --deletion-fraction 0.5 --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
+                python $prog_path/simulate/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --tgs-aplha $TGS_ALPHA --tgs-loc $TGS_LOC --tgs-beta $TGS_BETA --error-rate $TGS_ERR --deletion-fraction 0.5 --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
             fi
             # remove intermediate sub-population genome
             rm ${contigs[$i]}.$j.fa
