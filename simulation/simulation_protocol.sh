@@ -268,7 +268,7 @@ do
             # generate 50X TGS
             echo -e "[ Generate TGS data from ${j}th sub population genome of ${contigs[$i]} ]"
             if [ ! -f ${contigs[$i]}.${j}_pacbio.fasta ]; then
-                python $prog_path/simulate/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --tgs-aplha $TGS_ALPHA --tgs-loc $TGS_LOC --tgs-beta $TGS_BETA --error-rate $TGS_ERR --error-fraction $ERR_FRAC --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
+                python $prog_path/simulate/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --tgs-alpha $TGS_ALPHA --tgs-loc $TGS_LOC --tgs-beta $TGS_BETA --error-rate $TGS_ERR --error-fraction $ERR_FRAC --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
             fi
             # remove intermediate sub-population genome
             rm ${contigs[$i]}.$j.fa
