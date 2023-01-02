@@ -30,7 +30,7 @@ function help_info(){
 
 
 ######## Getting Parameters ########
-ARGS=`getopt -o d:r:t:N:R:h --long sub-N:,germline-count:,avg-somatic-count:,min-distance:,depth:,ngs-len:,ngs-inner:,ngs-std:,tgs-maxl:,tgs-minl:,tgs-len:,tgs-alpha:,tgs-loc:,tgs-beta:,tgs-err:,err-frac: -n "$0" -- "$@"`
+ARGS=`getopt -o d:r:t:N:R:h --long sub-N:,germline-count:,avg-somatic-count:,min-distance:,depth:,ngs-len:,ngs-inner:,ngs-std:,ngs-err:,tgs-maxl:,tgs-minl:,tgs-len:,tgs-alpha:,tgs-loc:,tgs-beta:,tgs-err:,err-frac: -n "$0" -- "$@"`
 if [ $? != 0 ]; then
     echo "Terminating..."
     exit 1

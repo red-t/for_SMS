@@ -28,19 +28,20 @@ class PacBioMutator:
 		ins=self.__ins
 		lseq=list(seq)
 		for i in reversed(muts):
-			if random.random() < self.__misf:
+			rand = random.random()
+			if rand < self.__misf:
 				#mismatch
 				tr=self.__tr[lseq[i]]
 				random.shuffle(tr)
 				lseq[i]=tr[0]
 				err_f.write('{0}M\n'.format(i/bin_len))
 				errs[0] += 1
-			elif random.random() >= self.__misf and random.random() < self.__delf:
+			elif rand >= self.__misf and rand < self.__delf:
 				#deletion
 				del(lseq[i])
 				err_f.write('{0}D\n'.format(i/bin_len))
 				errs[1] += 1
-			elif random.random() >= self.__delf:
+			elif rand >= self.__delf:
 				#insertion
 				random.shuffle(ins)
 				lseq.insert(i,ins[0])
