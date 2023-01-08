@@ -37,6 +37,13 @@ import re
 #            bam文件中sequence序列是与正链一致的，所以insert seq比对到TE的方向就是insertion的方向
 
 
+# remove and add some conditions
+#   tag: rm_condition & new_condition
+# fix some bug 
+#   tag: bug_fix
+# commit: fix : fix some bug, remove and add some conditions
+
+
 ## Segment ##
 cdef class Segment:
     cdef public:
@@ -98,6 +105,7 @@ cdef class Cluster:
         object ref_aln
         str te_idx, divergency, consensus_meth, su_type, te_size, genome_fa
         list score_list
+        str rmk_tag
 
 
     def __init__(self, str c_id, str ref_name, str out_path, object ref_aln, str te_idx, str genome_fa):
@@ -122,6 +130,7 @@ cdef class Cluster:
         self.segname_list = []
         self.te_idx = te_idx
         self.consensus_meth = 'none'
+        self.rmk_tag = 'none'
 
         self.divergency = '0'    # check
         self.su_type = 'none'   # check  # supporting reads type ，有三类，完全跨过insertion，两端clip，测试用的，后面会去掉
@@ -195,12 +204,20 @@ cdef class Cluster:
         g.close()
 
         # 前面写入的信息与repeat masker做intersect，保留非repeat masker的部分
-        rm_rmk_cmd = ['bedtools', 'intersect', '-a', repeatmasker_file, '-b', self.out_path + self.ref_name + "/" + self.c_id + "te_type.bed" ,'-wa','-wb', '|','awk', '\'{if($4==$10 && $6==$12){print $4}}\'' ] # check Q26: 输出结果的每一列是啥内容？此外，对于每一个 cluster，都会重复这一步 1-vs-N 的 intersection
+        # rm_rmk_cmd = ['bedtools', 'intersect', '-a', repeatmasker_file, '-b', self.out_path + self.ref_name + "/" + self.c_id + "te_type.bed" ,'-wa','-wb', '|','awk', '\'{if($4==$10 && $6==$12){print $4}}\'' ] # check Q26: 输出结果的每一列是啥内容？此外，对于每一个 cluster，都会重复这一步 1-vs-N 的 intersection
+        
+        rm_rmk_cmd = ['bedtools', 'intersect', '-a', repeatmasker_file, '-b', self.out_path + self.ref_name + "/" + self.c_id + "te_type.bed" ,'-wa','-wb', '|','awk', '\'BEGIN{FS=OFS="\t"}{print $4,$6,$10,$12}\'' ] # check Q26: 输出结果的每一列是啥内容？此外，对于每一个 cluster，都会重复这一步 1-vs-N 的 intersection
+
         rmk_te_list = os.popen(" ".join(rm_rmk_cmd)).readlines() # check：可能有多行，但只会有一个repeatmasker位置上的结果 Q27: 这个 bedtools 的结果只有一行吗？
         if len(rmk_te_list) > 0:
-            rmk_te = rmk_te_list[0].strip()
-            if rmk_te in te_temp_list:
-                te_temp_list.remove(rmk_te)
+            self.rmk_tag = 'insect_rmk' # 如果跟repeatmasker有intersect，就打个标签
+            for rmk_te_line in rmk_te_list:
+                rmk_te_info = rmk_te_line.strip().split("\t")
+                # print(rmk_te_info)
+                # new_condition
+                if rmk_te_info[0] == rmk_te_info[2] and rmk_te_info[1] == rmk_te_info[3]:
+                    if rmk_te_info[0] in te_temp_list:
+                        te_temp_list.remove(rmk_te_info[0]) 
         
         self.type_list = te_temp_list
         self.te_type = "|".join(self.type_list)
@@ -211,12 +228,16 @@ cdef class Cluster:
         # 这里的state后面不会保留
         # Q28: 所以这里 state 的赋值逻辑是什么？看起来 te_stat 这个方法是对原本的 self.type_list 去重、去除与 repeatmasker result overlap 且 te name 相同的元素？
         # check28: 现在的标签方便统计
-        if len(self.type_list) == 0:
-            self.state = self.state + 1
-
-        if len(self.seg_list) == 1 and len(self.type_list) == 1 :
-            if self.seg_list[0].score_list[0] < 1 or self.seg_list[0].read.mapping_quality < 50 :
-                self.state = self.state + 3
+        
+        # rm_condition
+        # if len(self.type_list) == 0:
+        #     self.state = self.state + 1
+        
+        # rm_condition
+        # 这里的判断放在static里进行
+        # if len(self.seg_list) == 1 and len(self.type_list) == 1 :
+        #     if self.seg_list[0].score_list[0] < 1 or self.seg_list[0].read.mapping_quality < 50 :
+        #         self.state = self.state + 3
 
     # MrBleem
     cpdef static(self):
@@ -279,7 +300,7 @@ cdef class Cluster:
         # supporting reads
         cdef:
             dict black_region = {'start':100000000000,'end':0}
-            int black_read_num = 0, sup_black_read_num = 0, l_black_read_num =0,  r_black_read_num = 0,black_n_l = 0,black_n_r = 0, double_clip_reads_num = 0
+            int black_read_num = 0, sup_black_read_num = 0, spanning_sup_black_read_num=0, l_black_read_num =0,  r_black_read_num = 0,black_n_l = 0,black_n_r = 0, double_clip_reads_num = 0
             int span_read_left_clip_len = 0, span_read_right_clip_len = 0
             list support_span_reads_list = []
             str span_tag = 'none'
@@ -303,31 +324,43 @@ cdef class Cluster:
             candi_seg_id = candi_seg.read.query_name
             if candi_seg_id not in supp_reads_dict: # check Q30: 这一步应该是要填充 supp_reads_dict，qname_qstart -> segname, 但是最终每一个 value 长度都只为 1，因为 key 都是 unique 的？
                 supp_reads_dict[candi_seg_id] = []
-                supp_reads_dict[candi_seg_id].append(candi_seg.segname)
+                # supp_reads_dict[candi_seg_id].append(candi_seg.segname)
+                # new_condition
+                supp_reads_dict[candi_seg_id].append([candi_seg.segname, candi_seg.genome_strand, candi_seg ])
             else:
-                supp_reads_dict[candi_seg_id].append(candi_seg.segname)
+                # supp_reads_dict[candi_seg_id].append(candi_seg.segname)
+                # new_condition
+                # 这里是判断，同一条reads在同一个位置有两次map，但又不是同向的，这种不是我们考虑的一条reads map出现left clip和right clip的情况
+                if candi_seg.genome_strand == supp_reads_dict[candi_seg_id][0][1]:
+                    supp_reads_dict[candi_seg_id].append([candi_seg.segname, candi_seg.genome_strand, candi_seg ])
+                else:
+                    supp_reads_dict.pop(candi_seg_id)
+                    print('conflict')
+                    continue
             
 
             if candi_seg.segname[-1] == 'm': # check 添加了append步骤 Q31: 循环结束之后，new_seg_list 应该与 self.seg_list 相同，num_supp 应该仍然为 0，因为 supp_reads_m_list_id、supp_reads_c_list_id 一直为 0 ?
-                if candi_seg_id in supp_reads_m_list_id:
-                    continue
-                elif candi_seg_id in supp_reads_c_list_id:
-                    num_supp = num_supp + 1
-                    continue
-                else:
-                    new_seg_list.append(candi_seg)
-                    supp_reads_m_list_id.append(candi_seg_id)
+                print(candi_seg.segname)
+                # rm_condition
+            #     if candi_seg_id in supp_reads_m_list_id:
+            #         continue
+            #     elif candi_seg_id in supp_reads_c_list_id:
+            #         num_supp = num_supp + 1
+            #         continue
+            #     else:
+            #         new_seg_list.append(candi_seg)
+            #        supp_reads_m_list_id.append(candi_seg_id)
 
                 
-            else:
-                if candi_seg_id in supp_reads_c_list_id:
-                    num_supp = num_supp + 1
-                    continue
-                elif candi_seg_id in supp_reads_m_list_id:
-                    continue
-                else:
-                    new_seg_list.append(candi_seg)
-                    supp_reads_c_list_id.append(candi_seg_id)
+            # else:
+            #    if candi_seg_id in supp_reads_c_list_id:
+            #         num_supp = num_supp + 1
+            #       continue
+            #    elif candi_seg_id in supp_reads_m_list_id:
+            #        continue
+            #    else:
+            #        new_seg_list.append(candi_seg)
+            #        supp_reads_c_list_id.append(candi_seg_id)
 
             
             # 处理reads比对到genome上是两端截断的情况，这种区域定义为black region
@@ -339,13 +372,17 @@ cdef class Cluster:
 
             if supp_read.cigartuples[0][0] in (4,5) and supp_read.cigartuples[-1][0] in (4, 5):
                 if supp_read.cigartuples[0][1] > 30 and supp_read.cigartuples[-1][1] > 30:
-                    print('ck')
-                    print(candi_seg.segname)
+                    #print('ck')
+                    #print(candi_seg.segname)
                     #if candi_seg.segname[-1] == 'l': # check Q32: l_black_read_num、r_black_read_num 似乎没用？
                     #    l_black_read_num = l_black_read_num + 1
                     #if candi_seg.segname[-1] == 'r':
                     #    r_black_read_num = r_black_read_num + 1
 
+                    # new_condition
+                    # 为了判断spanning reads落在repeat区域的情况
+                    if  candi_seg.segname[-1] == 'm':
+                        spanning_sup_black_read_num = sup_black_read_num + 1
                     sup_black_read_num = sup_black_read_num + 1
                     
                     if black_region['start'] > supp_read.reference_start:
@@ -359,8 +396,8 @@ cdef class Cluster:
                 support_span_reads_list.append(supp_read) # Q32: 'span' 也包括 clip 的 reads?
 
         supp_reads_list_id = supp_reads_dict.keys() # EXP: [qname1_qstart1, qname2_qstart2, ...]
-        print('>supp_reads_list_id')
-        print(supp_reads_list_id)
+        # print('>supp_reads_list_id')
+        # print(supp_reads_list_id)
 
 
 
@@ -370,18 +407,25 @@ cdef class Cluster:
         n_m = 0
         n_l = 0
         n_r = 0
+        s_n_m = 0 # spanning supporting reads number 与n_m不同的是，如果一条reads同时有left clip map和right clip map的情况，n_m执行+1，但s_n_m不执行+1
         # 在这里是为了合并一条reads分开比对的情况
         for srd in supp_reads_dict:
-            print('?')
-            print(supp_reads_dict[srd])
-            s_temp_list = list(set(supp_reads_dict[srd])) # check Q33: [segname]，长度为1？原因和 Q30 一样
+            # print('?')
+            # print(supp_reads_dict[srd])
+            new_seg_list.append(supp_reads_dict[srd][0][2])
+            
+            s_temp_list = list(set([ se[0] for se in supp_reads_dict[srd] ] ))  # check Q33: [segname]，长度为1？原因和 Q30 一样
             s_temp_list_type = [ s[-1] for s in s_temp_list ]
             n_m_t = s_temp_list_type.count('m')
             n_l_t = s_temp_list_type.count('l')
             n_r_t = s_temp_list_type.count('r')
+
+
             if n_m_t > 0:
                 N_supp_2 = N_supp_2 + 2
                 n_m = n_m + 1
+                s_n_m = s_n_m + 1
+
             else:
                 if n_l_t >= 1 and n_r_t >= 1: # check Q33: 应该不会有这种情况出现？
                     N_supp_2 = N_supp_2 + 2
@@ -418,9 +462,21 @@ cdef class Cluster:
             start_bp = 1
         else:
             start_bp = self.bp[0] - flanking_region_size
-        
-        for span_read in self.ref_aln.fetch(contig=self.ref_name, start=start_bp, stop=self.bp[-1] + flanking_region_size):
 
+        # new_condition
+        # 添加coverage和divergency以及mapping quality的feature
+        read_coverage = 0
+        spand_read_divergency_list = []
+        spand_read_mapping_quality_list = []
+
+        for span_read in self.ref_aln.fetch(contig=self.ref_name, start=start_bp, stop=self.bp[-1] + flanking_region_size):
+            # new_condition
+            print("#divergency\t"+str(cal_divergency(span_read,'genome')))
+            cigar_count = AlignedSegment.get_cigar_stats(span_read)[0]
+            spand_read_divergency_list.append(cal_divergency(span_read,'genome'))
+            spand_read_mapping_quality_list.append(span_read.mapping_quality)
+            read_coverage = read_coverage + 1
+            
             if black_tag == 'black':
                 # 如果有一条好的reads跨过去，这个区域的map可能是正确的
                 # 指比对质量高，两段没有长的clip
@@ -450,9 +506,9 @@ cdef class Cluster:
                     if span_read.reference_end - self.bp[-1] > 25 and self.bp[0] - span_read.reference_start > 25:
                         double_clip_reads_num = double_clip_reads_num + 1
                         if double_clip_reads_num >= 2: 
-                            self.state = 0
-                            print('ck_clip_sides')
-                            return 0
+                            self.state = 35
+                            # print('ck_clip_sides')
+                            # return 0
                     #print(self.bp)
                     #print(span_read.reference_start, span_read.reference_end)    
                     black_read_num = black_read_num + 1
@@ -491,75 +547,142 @@ cdef class Cluster:
         # black_read_num ｜ 这个区域所有double clip reads数目，这是为了区分有的insertion虽然没有black supporting read，但这个区域本身就是好多balck reads，可能得丢掉
         # black_n_l, black_n_r, n_l, n_r 这几个对象也是在前几点的基础上的辅助参考，如果只有单边的reads支持，这个insertion很难站得住脚 
 
-        
+               
         # 这里的条件判断一言难尽
         # check Q35: 这一步是为了根据 "(right/left) black reads"、"(right/left) black support reads" 的数量来设置 cluster 的state？不太能看懂下面这些判断的含义
-        if n_m ==0 and black_tag == 'black':
-            if sup_black_read_num != 0:
-                if span_tag == 'span':
-                    if black_read_num <= 3 :
-                        if black_read_num == sup_black_read_num:
-                            if (black_read_num == black_n_l and n_r > 0 ) or (black_read_num == black_n_r  and n_l > 0):
-                                self.state = self.state + 15 # 可留
-                            else:
-                                self.state = self.state + 17 
-                        else:
-                            self.state = self.state + 19 # 
-                    else:
-                        self.state = self.state + 21 # 丢弃的
-                else:
-                    if n_l != 0 and n_r != 0 :
-                        self.state = self.state + 23 # 可留
-                    else:
-                        self.state = self.state + 25
-            else:
-                if black_read_num > 0:
-                    self.state = self.state + 27 # 丢弃的
         
+        # new_condition
+        # 重新理了一下判断条件，让每种情况都有一个state
 
-        # 为了看insertion周围是不是包含 NNNNN 区域
-        desert_region_size = 500
+        # s_n_m ---- spanning的supporting reads数目
+        # black_tag ---- supporting reads中有double clip或者supporting reads只分布在一侧
+        # sup_black_read_num  -----  supporting reads中double clip的数量
+        # span_tag  ---- 是否有reads跨过double clip reads map的区域
+        # black_read_num ----- supporting reads和un supporting reads中double clip的reads的总数
+        # black_read_ratio -----  double clip 的reads占这个区域内reads数的比例
+        # black_n_l ----- 左侧double clip reads分布数量
+        # black_n_r ----- 右侧double clip reads分布数量
+        # n_l    ------  左侧supporting reads分布数量
+        # n_r   ------   右侧supporting reads分布数量
+
+        desert_region_size = 50
         if self.bp[0] - desert_region_size <= 0 :
             start_bp = 1
         else:
             start_bp = self.bp[0] - desert_region_size
         span_genome_fa = FastaFile(self.genome_fa).fetch(self.ref_name, start_bp, self.bp[-1] + desert_region_size)
+        
+                        
+        clip_read_mapp_quality_list = [ r.read.mapping_quality for r in self.seg_list ]
+        clip_read_score_list = [ max(r.score_list) for r in self.seg_list ]
+        # supporting reads 的mapping quality比较小时，不可靠
 
-        # 这里是处理suporting reads里左右两边clip reads数量比例的问题
-        # 如果有一条reads是跨过insertion的，多少clip reads都无所谓
-        # 如果没有跨过insertion的reads，且只有一边有比较多的（>=2）clip reads,这个insertion也会丢掉
-        # 如果两边都有，则计算比例，0.1883698 是算了一下，所有只有clip reads的insertion，左右两边clip reads的比例，拟合出来一个正太分布
-        # 取的是正太分布的（平均值 - 3 * 标准差  ～ 平均值 + 3 * 标准差 ）
-
-        # 最开始只有根据left clip和right clip之间的比例来筛选，后面才加了double clip的部分
-        # 加了double clip的判断之后发现能够分辨出只有一端clip supporting reads的insertion是真是假，但因为想再iGV里验证一下，所以对不同的情况都加了state，方便从结果中筛选
-
-
-        # if n_m == 0 and len(self.unsupp_reads_list) == 0 :
-        if n_m == 0:
-            if 'NNNNNNNNNNNNNNNNN' in span_genome_fa:
-                l_desert_N = span_genome_fa.count('N')
-                if l_desert_N > 100:
-                    print('>0')
-                    self.state = self.state + 7
-                    #return 0
-
-            if n_l == 0 :
-                if n_r >= 4:
-                    self.state = self.state + 9
-                    print('>1')
-                    #return 0
-            elif n_r == 0 :
-                if n_l >= 4:
-                    print('>2')
-                    self.state = self.state + 11
-                    #return 0
+            
+        if max(clip_read_mapp_quality_list) < 60 or max(clip_read_score_list) < 1 :
+            self.state = 3 # 留不住
+        else:
+            if s_n_m != 0:
+                # 有spanning supporting reads的情况
+                # 这种情况应该不会出错
+                
+                if self.rmk_tag == 'insect_rmk':
+                    print("#insect_rmk\t"+ str(spanning_sup_black_read_num) +"\t" + str(black_read_num) )
+                    if spanning_sup_black_read_num > 0:
+                        self.state = 43
+                    elif n_l * n_r == 0 and black_read_num >= 3:
+                        self.state = 45
+                    else:
+                        self.state = 1
+                else:
+                    self.state = 1 # 留住
+                # skip
             else:
-                # 0.1883698是统计了insertion的n_l / n_r 的比例，然后做了个分布，拟合了正太分布模型，取 x-3U x+3U 的区域
-                if  abs( 0.5 - ( float(n_l) / sum([n_l,n_r])) ) >  0.5 - 0.1883698: 
-                    print('>3')
-                    self.state = self.state + 13
-                    #return 0
+                # 没有spanning supporting reads的情况
+                if black_tag != 'black':
+                    # n_r n_l 都不为0 并且
+                    # 没有 double clip 的 reads
+                    # 或者有非 double clip 的 supporting reads 跨过 double clip 的区域
+                    # 看两边clip reads比例来决定
+                    if  abs( 0.5 - ( float(n_l) / sum([n_l,n_r])) ) >  0.5 - 0.1883698: 
+                        #print('>3')
+                        self.state = 5 # 可留
+                    else:
+                        self.state = 7 # 不太可留，可能cutoff需要再看看
+
+                else:
+                    # 有double clip区域而且没有非double clip 的 supporting reads 跨过 double clip 的区域
+                    # 或者n_r == 0 or n_l == 0
+                    if sup_black_read_num == 0:
+                        # n_r == 0 或者n_l == 0 的情况
+                        # 但没有double clip reads
+                        # print('#black_read_num\t' + str(black_read_num))
+                        
+                        if n_l == 0 :
+                            if n_r >= 4 and self.rmk_tag == 'insect_rmk':
+                                self.state = 9 # 不太可留
+                            elif black_read_num >=1 :
+                                self.state = 11 # 应该不可以留
+                            else:
+                                self.state = 39
+                        elif n_r == 0 :
+                            if n_l >= 4 and self.rmk_tag == 'insect_rmk':
+                                self.state = 13 # 不太可留
+                            elif black_read_num >=1 :
+                                self.state = 15 # 应该可以留
+                            else:
+                                self.state = 41
+                    else:
+                        # 有double clip reads的区域
+                        if span_tag == 'span':
+                            # 有跨过double clip区域的其他reads
+                            black_read_ratio = black_read_num/read_coverage
+                            # print(self.bp)
+                            print( '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format("#black_read", str(self.ref_name), str(self.bp[0]), str(self.bp[1]), str(sup_black_read_num), str(black_read_num), str(read_coverage), str(black_read_num/read_coverage)) )
+                            # span_read_left_clip_len
+                            if black_read_num >= 10 :
+                                self.state = 17 # 留不得
+                            elif  black_read_num >=5 and black_read_num <10:
+                                if black_read_ratio <= 0.12 and n_l > 0 and n_r > 0 :
+                                    self.state = 19 # 应该可以留，cutoff，可能需要调
+                                else:
+                                    self.state = 21 # 留不得吧
+                            else:
+                                #if black_read_num == sup_black_read_num:
+                                #    if (black_read_num == black_n_l and n_r > 0 ) or (black_read_num == black_n_r  and n_l > 0):
+                                #        self.state = 23 # 可留 clip reads在两边都有分布
+                                #    else:
+                                #        self.state = 25 # 留不得，只有一边的clip reads
+                                #else:
+                                if sup_black_read_num == 1:
+                                    if  n_l + n_r == 1:
+                                        self.state = 27 # 能不能留要看质量的筛选条件，前面过了就能留
+                                    elif n_l > 0 and n_r > 0:
+                                        self.state = 23
+                                    else:
+                                        self.state = 25
+
+                                else:
+                                    if n_l > 0 and n_r > 0 and black_read_num - ( black_n_l + black_n_r) <= 1 :
+                                        self.state = 29 # 可留
+                                    else:
+                                        self.state = 31 # 留不得
+
+                        else:
+                            # 没有跨过double clip区域的其他reads，就这个区域全是double clip
+                            if n_l != 0 and n_r != 0 :
+                                self.state = 33
+                            else:
+                                self.state = 35
+        if len(self.type_list) == 0:
+            self.state = 0                      
+        #if 'NNNNNNNNNNNNNNNNN' in span_genome_fa:
+            
+        #    l_desert_N = span_genome_fa.count('N')
+        #    self.state = 37
+
+            # print(l_desert_N)
+            # if l_desert_N > 100:
+                
 
         # frequency
 
@@ -570,7 +693,12 @@ cdef class Cluster:
         # frequency2 = float(n_supp) / ( n_supp + n_unsupp )
 
 
-        self.frequency = float(N_supp_2) / ( N_supp_2 + 2*len(self.unsupp_reads_list) )
+        # new_condition
+        # 测试人的数据的时候会有这种情况，后续我去看看具体什么情况，还在测试哪个insertion出了这个问题
+        if N_supp_2 + 2*len(self.unsupp_reads_list) == 0 :
+            self.frequency = 0
+        else:
+            self.frequency = float(N_supp_2) / ( N_supp_2 + 2*len(self.unsupp_reads_list) )
 
         self.seg_list = new_seg_list
 
@@ -689,7 +817,7 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
         int i = 0, l =  100
         list insert_size_list = []
         str consensus_seq_temp_file =  out_path + ref_name + "/" + c_id  + ".consensus.temp.fa"
-        float divergency, divergency_all # ......这一步当中的所有类型的divergency，是为了评估组装的效果怎么样，最后应该不会出现在最终的bed文件中，当然放一个mismatch的divergncy也是可以的
+        str divergency, divergency_all # ......这一步当中的所有类型的divergency，是为了评估组装的效果怎么样，最后应该不会出现在最终的bed文件中，当然放一个mismatch的divergncy也是可以的
 
     # return 'none', 'none', 'none'
     
@@ -903,9 +1031,10 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
                 break_l = clip_genome_l[1]
         if clip_genome_r[0]  in (4,5):
             if insert_seq_read.is_reverse:
-                break_r = clip_genome_r[1]
+                # bug_fix
+                break_l = clip_genome_r[1]
             else:
-                break_l = len(consensus_seq) - clip_genome_r[1] # check Q40: 同上，并且计算方式应该是 break_l = clip_genome_r[1] ?
+                break_r = len(consensus_seq) - clip_genome_r[1] # check Q40: 同上，并且计算方式应该是 break_l = clip_genome_r[1] ?
         
         break_1 = min([break_l,break_r])
         break_2 = max([break_l,break_r])
@@ -955,20 +1084,26 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
             consensus_seq_print_list.append(consensus_seq[0:break_p[0]])
             te_break_info_print_list.append("0-"+str(break_p[0])+":genome")
             polished_sequence.append(consensus_seq[0:break_p[0]])
+        
+        # insert sequence
+
+        # check Q42: 这里缺 elif 和 else 判断，所以第一个 & 最后一个片段会被 append 两次
+        # 这里的遍历是没问题的，没有重复添加，因为遍历的是TE切开的片段
+        # i==0需要在开头加genome，然后再添加TE片段
+        # i==len(seq_break_list_all_sorted) - 1，需要在TE片段后添加一段genome
+        # 而且判断要分开，是有顺序的
+        consensus_seq_print_list.append(consensus_seq[break_p[0]:break_p[1]])
+        te_break_info_print_list.append(str(break_p[0])+"-"+str(break_p[1]) + ":" + break_p[2])
+        if te_insert_strand[break_te_ref] == '-': # Q42: 所以 polishing 的思想是将 polished-TE sequence 片段替换原本的 consensus sequence 片段？
+            polished_sequence.append(revcomp(insert_con_sequence_dict[break_te_ref])[int(break_te_start):int(break_te_end)])
+        else:
+            polished_sequence.append(insert_con_sequence_dict[break_te_ref][int(break_te_start):int(break_te_end)])
+        
         # right genome
-        elif i == len(seq_break_list_all_sorted) - 1:
+        if i == len(seq_break_list_all_sorted) - 1:
             consensus_seq_print_list.append(consensus_seq[break_p[1]:])
             te_break_info_print_list.append( str(break_p[1]) + "-" + str(len(consensus_seq)) + ":genome" )
             polished_sequence.append(consensus_seq[break_p[1]:])
-        else:
-            # insert sequence
-            # check Q42: 这里缺 elif 和 else 判断，所以第一个 & 最后一个片段会被 append 两次
-            consensus_seq_print_list.append(consensus_seq[break_p[0]:break_p[1]])
-            te_break_info_print_list.append(str(break_p[0])+"-"+str(break_p[1]) + ":" + break_p[2])
-            if te_insert_strand[break_te_ref] == '-': # Q42: 所以 polishing 的思想是将 polished-TE sequence 片段替换原本的 consensus sequence 片段？
-                polished_sequence.append(revcomp(insert_con_sequence_dict[break_te_ref])[int(break_te_start):int(break_te_end)])
-            else:
-                polished_sequence.append(insert_con_sequence_dict[break_te_ref][int(break_te_start):int(break_te_end)])
 
     consensus_seq_print = '__'.join(consensus_seq_print_list) + "......" + "__".join(polished_sequence)
     te_break_info_print = '__'.join(te_break_info_print_list)
@@ -1074,6 +1209,8 @@ cdef tuple trim(bint is_reverse, int qlen, str seq, int q_st, int q_en, int op, 
         str seq_t
 
     # check Q14: 无需单独区分 flanksize_s、flanksize_e
+    st_t = q_st - flanksize
+    en_t = q_en + flanksize
 
     if st_t < 0:
         st_t = 0
@@ -1326,7 +1463,7 @@ cdef score_te_alignment(object read, dict te_size_dict):
         
         if read.query_alignment_length / insert_query_length < 0.75:
             score_te_align = 0.5
-        
+    print( '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format("#cutoff",str(score_te_align), map_te_name, str(map_te_len), str(insert_te_len), str(divergency), str(insert_query_length), str(mappbility_for_read), str(mappbility_for_te), str(read.query_alignment_length / insert_query_length)) )
     return score_te_align
 
 
