@@ -1,0 +1,1 @@
+cdef int MAX_POS = (1 << 31) - 1
