@@ -60,7 +60,7 @@ cdef InsertSegment makeInsertSegment(bam1_t *src, int32_t qstart, int32_t qend,
 #
 # ---------------------------------------------------------------
 #
-cdef list parse_cigar(bam1_t *src, uint8_t minl=49):
+cdef int parse_cigar(bam1_t *src, list tmp_segl, uint8_t minl=50):
     '''parse CIGAR
 
     traverse through alignment's CIGAR, extract clip/insert segment.
@@ -69,25 +69,20 @@ cdef list parse_cigar(bam1_t *src, uint8_t minl=49):
     -----------
         src: bam1_t
             single record pointer read from BAM file.
+        tmp_segl: list
+            temporary list used to stored the new InsertSegment ins
+            tances
         minl: uint8_t
-            minimum segment length, S/I CIGAR option with length>minl will be extracted.
-
-    Returns:
-    --------
-        segl: list
-            list of InsertSegment instances.
+            minimum segment length, S/I CIGAR option with length >=
+            minl will be extracted.
     '''
     cdef uint8_t orient=0
     cdef int32_t  qpos=0, rpos, qst, qend
     cdef uint32_t op, l, k, n, m
     cdef uint32_t *cigar_p
-    cdef list segl=[]
     cdef InsertSegment iseg
 
     n = src.core.n_cigar
-    if n == 0:
-        return segl
-    
     m = n-1
     cigar_p = bam_get_cigar(src)
     rpos = src.core.pos
@@ -98,7 +93,7 @@ cdef list parse_cigar(bam1_t *src, uint8_t minl=49):
             qpos += l
             rpos += l
         elif op==1 or op==4 or op==6:
-            if l > minl:
+            if l >= minl:
                 qst = qpos
                 qend = qpos+l
                 if k>0:
@@ -106,12 +101,10 @@ cdef list parse_cigar(bam1_t *src, uint8_t minl=49):
                 if k==m:
                     orient = 2
                 iseg = makeInsertSegment(src,qst,qend,rpos,orient)
-                segl.append(iseg)
+                tmp_segl.append(iseg)
             qpos += l
         elif op==2 or op==3:
             rpos += l
-
-    return segl
 #
 # ---------------------------------------------------------------
 #

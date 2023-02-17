@@ -5,6 +5,11 @@ from libc.string cimport memcpy, memcmp, strncpy, strlen, strdup
 from libc.stdio cimport FILE, printf
 from posix.types cimport off_t
 
+########################################################
+## global variables ##
+cdef int MAX_POS
+cdef dict SEG_DICT
+
 
 cdef extern from "htslib/kstring.h" nogil:
     ctypedef struct kstring_t:

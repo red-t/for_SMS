@@ -1,10 +1,3 @@
-########################################################
-## global variables
-# maximum genomic coordinace
-# for some reason, using 'int' causes overflow
-cdef int MAX_POS = (1 << 31) - 1
-
-
 cdef class BamFile:
     def __cinit__(self, str filepath, int32_t nthreads=1):
         self.threads = nthreads
@@ -78,25 +71,38 @@ cdef class BamFile:
                     hts_set_threads(htsfile, threads)
                 return htsfile
 
-    cpdef Iterator fetch(self, int stid, int maxtid):
-        '''fetch reads aligned on chromosome stid~maxtid
+    cpdef dict fetch(self, uint8_t stid, uint8_t maxtid, uint8_t minl=50):
+        '''fetch reads aligned on chromosome stid ~ maxtid
         
         Usage: fetch(0,2) to fetch reads aligned on 0,1 (tid)
 
         Parameters
         ----------
-        stid: int
+        stid: uint8_t
             tid of start chromosome, include.
 
-        maxtid: int
+        maxtid: uint8_t
+            tid of end chromosome, not include.
+
+        minl: uint8_t
             tid of end chromosome, not include.
         
         Returns
         -------
-        Iterator: Iterator
-		    An iterator over a collection of reads.
+        SEG_DICT: dict
+		    dict of list, tid -> list_of_InsertSegment
         '''
-        return Iterator(self, stid, maxtid)
+        cdef Iterator ite
+        cdef int i
+
+        for i in range(stid, maxtid):
+            SEG_DICT[i] = []
+        
+        ite = Iterator(self, stid, maxtid, minl)
+        for i in ite:
+            continue
+
+        return SEG_DICT
 #
 # ---------------------------------------------------------------
 #
@@ -125,12 +131,14 @@ cdef class IteratorSingle:
 # ---------------------------------------------------------------
 #
 cdef class Iterator:
-    def __init__(self, BamFile bamfile, int stid, int maxtid):
+    def __init__(self, BamFile bamfile, uint8_t stid, uint8_t maxtid, uint8_t minl):
         self.bamfile = bamfile
         self.htsfile = bamfile.htsfile
         self.index = bamfile.index
         self.tid = -1
+        self.stid = stid
         self.maxtid = maxtid
+        self.minl = minl
 
     def nextiter(self):
         # get a new iterator for a chromosome. The file will not be re-opened.
@@ -140,14 +148,9 @@ cdef class Iterator:
         return self
 
     def __next__(self):
-        '''fetch a record and parse it's CIGAR
-
-        Returns
-        -------
-        Iterator: Iterator
-		    An iterator over a collection of reads.
-        '''
-        cdef list segl = []
+        '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
+        cdef int n
+        cdef tmp_segl = []
         # Create an initial iterator
         if self.tid == -1:
             self.tid = self.stid
@@ -157,9 +160,14 @@ cdef class Iterator:
             self.rowiter.cnext()
             # If current iterator is not exhausted, return aligned read
             if self.rowiter.retval > 0:
-                segl = parse_cigar(self.rowiter.b)
-                return segl
+                n = self.rowiter.b.core.n_cigar
+                if n == 0:
+                    continue
+                parse_cigar(self.rowiter.b, tmp_segl, self.minl)
+                continue
 
+            SEG_DICT[self.tid] = tmp_segl
+            tmp_segl = []
             # Otherwise, proceed to next reference or stop
             self.tid += 1
             if self.tid < self.maxtid:

@@ -29,7 +29,7 @@ cdef class BamFile:
 
     cdef _open(self)
     cdef htsFile *_open_htsfile(self) except? NULL
-    cpdef Iterator fetch(self, int stid, int maxtid)
+    cpdef dict fetch(self, uint8_t stid, uint8_t maxtid, uint8_t minl=*)
 
 
 
@@ -57,5 +57,5 @@ cdef class Iterator:
     cdef htsFile *htsfile
     cdef hts_idx_t *index
     cdef IteratorSingle rowiter
-    cdef int tid, stid, maxtid
-    cdef list segl
+    cdef uint8_t stid, maxtid, minl
+    cdef int8_t tid
