@@ -1,4 +1,6 @@
 from htslib_external cimport *
+from pysam.libcutils cimport force_bytes
+from cpython cimport PyBytes_FromStringAndSize
 
 cdef class InsertSegment:
     """A class for insert/clip segment"""

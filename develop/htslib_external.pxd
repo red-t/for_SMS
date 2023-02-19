@@ -3,14 +3,29 @@ from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t
 from libc.stdlib cimport malloc, calloc, realloc, free
 from libc.string cimport memcpy, memcmp, strncpy, strlen, strdup
 from libc.stdio cimport FILE, printf
+from cpython cimport PyBytes_Check
 from posix.types cimport off_t
 
 ########################################################
 ## global variables ##
 cdef int MAX_POS
 cdef dict SEG_DICT
-
-
+cdef str TEXT_ENCODING
+cdef str ERROR_HANDLER
+#
+# ---------------------------------------------------------------
+#
+cdef str charptr_to_str(const char* s)
+#
+# ---------------------------------------------------------------
+#
+cdef extern from "htslib_util.h":
+    char * pysam_bam_get_qname(bam1_t * b)
+    uint8_t pysam_get_qual(bam1_t * b)
+    uint8_t * pysam_bam_get_seq(bam1_t * b)
+#
+# ---------------------------------------------------------------
+#
 cdef extern from "htslib/kstring.h" nogil:
     ctypedef struct kstring_t:
         size_t l, m

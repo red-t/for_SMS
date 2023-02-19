@@ -1,5 +1,24 @@
 # filename: SegmentParser.pyx
 
+cdef inline char* getSequenceInRange(bam1_t *src, uint32_t start, uint32_t end):
+    '''return python string of the sequence in a bam1_t object.'''
+    cdef uint8_t *p
+    cdef uint32_t k
+    cdef char *s
+    cdef bytes seq
+    
+    seq = PyBytes_FromStringAndSize(NULL, end - start)
+    s   = <char*>seq
+    p   = pysam_bam_get_seq(src)
+
+    for k from start <= k < end:
+        # equivalent to seq_nt16_str[bam1_seqi(s, i)] (see bam.c)
+        # note: do not use string literal as it will be a python string
+        s[k-start] = seq_nt16_str[p[k//2] >> 4 * (1 - k%2) & 0xf]
+
+    return seq
+
+
 cdef class InsertSegment:
     def __init__(self):
         # see bam_init1
@@ -24,6 +43,110 @@ cdef class InsertSegment:
 
     def __dealloc__(self):
         bam_destroy1(self._delegate)
+    
+    property qname:
+        '''the query template name (None if not present)'''
+        def __get__(self):
+            cdef bam1_t * src = self._delegate
+            if src.core.l_qname == 0:
+                return None
+            return charptr_to_str(<char *>pysam_bam_get_qname(src))
+    
+    property flag:
+        '''properties flag'''
+        def __get__(self):
+            return self._delegate.core.flag
+    
+    property tid:
+        '''tid, the index of the reference sequence'''
+        def __get__(self):
+            return self._delegate.core.tid
+    
+    property ref_start:
+        '''0-based leftmost coordinate of the alignment'''
+        def __get__(self):
+            return self._delegate.core.pos
+    
+    property mapq:
+        '''mapping quality'''
+        def __get__(self):
+            cdef bam1_t * src = self._delegate
+            return pysam_get_qual(src)
+    
+    property qlen:
+        '''
+        the length of the query/read, corresponds to the length of the
+        sequence supplied in the BAM/SAM file. The length of a query 
+        is 0 if there is no sequence in the BAM/SAM file.
+        '''
+        def __get__(self):
+            return self._delegate.core.l_qseq
+    
+    property qseq:
+        '''read sequence bases'''
+        def __get__(self):
+            cdef bam1_t * src
+            cdef str s
+            src = self._delegate
+            if src.core.l_qseq == 0:
+                return None
+
+            s = charptr_to_str(getSequenceInRange(src, 0, src.core.l_qseq))
+            return s
+    
+    property is_mapped:
+        '''true if read itself is mapped'''
+        def __get__(self):
+            return (self.flag & BAM_FUNMAP) == 0
+    
+    property is_forward:
+        '''true if read is mapped to forward strand'''
+        def __get__(self):
+            return (self.flag & BAM_FREVERSE) == 0
+    
+    property is_secondary:
+        '''true if not primary alignment'''
+        def __get__(self):
+            return (self.flag & BAM_FSECONDARY) != 0
+    
+    property is_supplementary:
+        '''true if this is a supplementary alignment'''
+        def __get__(self):
+            return (self.flag & BAM_FSUPPLEMENTARY) != 0
+    
+    property reference_end:
+        '''
+        aligned reference position of the read on the reference genome.
+        reference_end points to one past the last aligned residue.
+        '''
+        def __get__(self):
+            cdef bam1_t * src
+            src = self._delegate
+            if (self.flag & BAM_FUNMAP) or pysam_get_n_cigar(src) == 0:
+                return None
+            return bam_endpos(src)
+    
+    property reference_length:
+        '''
+        aligned length of the read on the reference genome.
+        equal to `reference_end - reference_start`. 
+        '''
+        def __get__(self):
+            cdef bam1_t * src
+            src = self._delegate
+            if (self.flag & BAM_FUNMAP) or pysam_get_n_cigar(src) == 0:
+                return None
+            return bam_endpos(src) - self._delegate.core.pos
+    
+    cpdef get_tag_i(self, str tag):
+        pass
+    
+    cpdef get_tag_f(self, str tag):
+        pass
+    
+
+
+
 #
 # ---------------------------------------------------------------
 #
