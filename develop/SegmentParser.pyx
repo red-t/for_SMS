@@ -185,17 +185,28 @@ cdef class InsertSegment:
         
         if lqseq == 0:
             return None
-        
         if start < 0:
             start = 0
-        
         if end < 0:
             end = lqseq
 
         s = charptr_to_str(getSequenceInRange(src, start, end))
         return s
     
+    cpdef tuple trim(self, int tsize):
+        cdef int t_qstart, t_qend
 
+        t_qstart = self.qstart - tsize
+        t_qend   = self.qend + tsize
+
+        if t_qstart < 0:
+            t_qstart = 0
+        if t_qend > self.q_len:
+            t_qend = self.q_len
+        
+        # q_st_t = qstart - t_qstart  # EXP: "query start" of the I/S fragment in the trimmed sequence
+        # q_en_t = t_qstart + (self.qend-self.qstart) # EXP: "query end" of the I/S fragment in the trimmed sequence
+        return t_qstart, t_qend
 
 
 #
@@ -205,7 +216,7 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
                                      int32_t qstart,
                                      int32_t qend,
                                      int32_t rpos,
-                                     int16_t orient):
+                                     int16_t stype):
     '''return an InsertSegment object constructed from `src`
     
     Parameters:
@@ -218,8 +229,8 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
             query end of the insert/clip segment, not include.
         rpos: int32_t
             reference position of the insert/clip segment, corresponds to `qend`.
-        orient: int16_t
-            orient of the segment, 0x1:left-clip, 0x2:mid-insert, 0x4:right-clip
+        stype: int16_t
+            segment type, 0x1:left-clip, 0x2:mid-insert, 0x4:right-clip
     
     Returns:
     --------
@@ -232,7 +243,7 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
     dest.qstart = qstart
     dest.qend = qend
     dest.rpos = rpos
-    dest.orient = orient
+    dest.stype = stype
     return dest
 #
 # ---------------------------------------------------------------
@@ -255,7 +266,7 @@ cdef void parse_cigar(bam1_t *src,
             minimum segment length, S/I CIGAR option with length >=
             minl will be extracted.
     '''
-    cdef int16_t        orient  = 0
+    cdef int16_t        stype   = 0
     cdef int16_t        nseg    = 0
     cdef int16_t        otype   = 0
     cdef int32_t        qpos    = 0
@@ -280,15 +291,15 @@ cdef void parse_cigar(bam1_t *src,
                 qst = qpos
                 qend = qpos+l
                 if k==0:
-                    orient = 0x1
+                    stype = 0x1
                     otype |= 0x1
                 elif k==m:
-                    orient = 0x4
+                    stype = 0x4
                     otype |= 0x4
                 else:
-                    orient = 0x2
+                    stype = 0x2
                     otype |= 0x2
-                iseg = makeInsertSegment(src, qst, qend, rpos, orient)
+                iseg = makeInsertSegment(src, qst, qend, rpos, stype)
                 tmp_segl.append(iseg)
                 nseg += 1
             qpos += l
@@ -312,7 +323,7 @@ cdef void compute_feature_single(uint32_t *cigar_p,
     '''compute features for single Insertsegment
     
     compute features for single Insertsegment, including:
-    1. orient:   16-bit integer, keep segment-type(the lower 3 bits),
+    1. stype:    16-bit integer, keep segment-type(the lower 3 bits),
                  alignment-type(lower 4-6 bits), number-of-segments(
                  higher 10 bits).
 
@@ -347,7 +358,7 @@ cdef void compute_feature_single(uint32_t *cigar_p,
     cdef int32_t q_start, q_end
     cdef int32_t op, l, overhang, overhang1
     cdef int32_t pos      = seg._delegate.core.pos
-    cdef int16_t orient   = seg.orient
+    cdef int16_t stype    = seg.stype
     cdef int32_t seg_rpos = seg.rpos
 
     # compute q_start
@@ -366,14 +377,14 @@ cdef void compute_feature_single(uint32_t *cigar_p,
     
     # compute overhang
     overhang = rpos - pos
-    if orient & 0x2:
+    if stype & 0x2:
         overhang = rpos - seg_rpos
         overhang1 = seg_rpos - pos
         if overhang > overhang1:
             overhang = overhang1
 
     # fill features of segment
-    seg.orient   = (nseg << 6) | (otype << 3) | orient
+    seg.stype    = (nseg << 6) | (otype << 3) | stype
     seg.ref_end  = rpos
     seg.q_start  = q_start
     seg.q_end    = q_end
@@ -390,7 +401,7 @@ cdef void compute_feature_multi(uint32_t *cigar_p,
     '''compute features for multiple Insertsegment
 
     compute features for multiple Insertsegment, including:
-    1. orient:   16-bit integer, keep segment-type(the lower 3 bits),
+    1. stype:    16-bit integer, keep segment-type(the lower 3 bits),
                  alignment-type(lower 4-6 bits), number-of-segments(
                  higher 10 bits).
 
@@ -429,7 +440,7 @@ cdef void compute_feature_multi(uint32_t *cigar_p,
     '''
     cdef InsertSegment  seg = tmp_segl[-nseg], p_seg
     cdef int32_t    pos     = seg._delegate.core.pos
-    cdef int16_t    orient  = seg.orient
+    cdef int16_t    stype   = seg.stype
     cdef int32_t    s_rpos  = seg.rpos, p_rpos
     cdef int32_t    op, l, overhang, overhang1
     cdef int32_t    q_start, q_end, dist
@@ -450,13 +461,13 @@ cdef void compute_feature_multi(uint32_t *cigar_p,
     
     # compute overhang for the first segment
     overhang =  rpos - pos
-    if orient & 0x2:
+    if stype & 0x2:
         overhang  = rpos - s_rpos
         overhang1 = s_rpos - pos
         if overhang > overhang1:
             overhang = overhang1
     # fill features of the first segment
-    seg.orient   = (nseg << 6) | (otype << 3) | orient
+    seg.stype    = (nseg << 6) | (otype << 3) | stype
     seg.ref_end  = rpos
     seg.q_start  = q_start
     seg.q_end    = q_end
@@ -469,9 +480,9 @@ cdef void compute_feature_multi(uint32_t *cigar_p,
         # compute overhang
         seg      =  tmp_segl[i]
         s_rpos   =  seg.rpos
-        orient   =  seg.orient
+        stype    =  seg.stype
         overhang =  rpos - pos
-        if orient & 0x2:
+        if stype & 0x2:
             overhang  = rpos - s_rpos
             overhang1 = s_rpos - pos
             if overhang > overhang1:
@@ -483,7 +494,7 @@ cdef void compute_feature_multi(uint32_t *cigar_p,
         dist    = s_rpos - p_rpos
         
         # fill features of segment
-        seg.orient   = (nseg << 6) | (otype << 3) | orient
+        seg.stype    = (nseg << 6) | (otype << 3) | stype
         seg.ref_end  = rpos
         seg.q_start  = q_start
         seg.q_end    = q_end

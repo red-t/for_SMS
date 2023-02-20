@@ -8,7 +8,7 @@ cdef class InsertSegment:
     cdef public:
         int32_t qstart, qend        # position of the segment on query sequence, [qstart, qend) region of query sequence
         int32_t rpos                # position of the segment on reference sequence, rend=rpos, rstart=rpos-1
-        int16_t orient              # left-clip: 0x1, mid-insert: 0x2, right-clip: 0x4
+        int16_t stype               # left-clip: 0x1, mid-insert: 0x2, right-clip: 0x4
         int32_t ref_end             # reference position of the alignment, ref_start=_delegate.core.pos
         int32_t q_start, q_end      # query position of the alignment
         int32_t overhang            # minimum length of the anchor part
@@ -17,6 +17,7 @@ cdef class InsertSegment:
     cpdef int64_t get_tag_i(self, str tag)
     cpdef double  get_tag_f(self, str tag)
     cpdef str     get_seq(self, int start=*, int end=*)
+    cpdef tuple   trim(self, int tsize)
 
 
 
@@ -24,7 +25,7 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
                                      int32_t qstart,
                                      int32_t qend,
                                      int32_t rpos,
-                                     int16_t orient)
+                                     int16_t stype)
 
 
 cdef void parse_cigar(bam1_t *src,

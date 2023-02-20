@@ -38,7 +38,6 @@ cdef class IteratorSingle:
 
     A class for iterating over mapped reads in single chromosome.
     """
-    cdef int retval
     cdef bam1_t *b          # pointer to a record in BAM file, change when call `cnext`
     cdef htsFile *htsfile   # pointer to htsFile structure
     cdef hts_idx_t *index   # pointer to hts_idx_t structure

@@ -1,8 +1,10 @@
 cdef class BamFile:
     def __cinit__(self, str filepath, int32_t nthreads=1):
+        cdef bytes filename = encode_filename(filepath)
+        cdef bytes idxfilename = encode_filename(filepath+".bai")
         self.threads = nthreads
-        self.filename = filename = encode_filename(filepath)
-        self.index_filename = idxfilename = encode_filename(filepath+".bai")
+        self.filename = filename
+        self.index_filename = idxfilename
         self._open()
         
     def close(self):
@@ -57,12 +59,12 @@ cdef class BamFile:
     
     cdef htsFile *_open_htsfile(self) except? NULL:
         '''open BAM file in `rb` mode, return htsFile object if success.'''
-        cdef char *cfilename
-        cdef char *cmode
+        cdef char    *cfilename
+        cdef bytes   mode    = force_bytes('rb')
+        cdef char    *cmode  = mode
         cdef int32_t threads = self.threads - 1
-        cdef htsFile *htsfile=NULL
+        cdef htsFile *htsfile
 
-        cmode = mode = force_bytes('rb')
         if isinstance(self.filename, bytes):
             cfilename = self.filename
             with nogil:
@@ -115,14 +117,15 @@ cdef class IteratorSingle:
     def __init__(self, BamFile bamfile, int tid):
         self.htsfile = bamfile.htsfile
         self.index = bamfile.index
-        self.retval = 0
         with nogil:
             self.iter = sam_itr_queryi(self.index, tid, 0, MAX_POS)
 
     cdef int cnext(self):
         '''cversion of iterator. retval>=0 if success.'''
+        cdef int retval
         with nogil:
-            self.retval = hts_itr_next(self.htsfile.fp.bgzf, self.iter, self.b, self.htsfile)
+            retval = hts_itr_next(self.htsfile.fp.bgzf, self.iter, self.b, self.htsfile)
+            return retval
 
     def __dealloc__(self):
         bam_destroy1(self.b)
@@ -149,17 +152,17 @@ cdef class Iterator:
 
     def __next__(self):
         '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
-        cdef int n, l
-        cdef tmp_segl = []
+        cdef int n, l, retval
+        cdef list tmp_segl = []
         # Create an initial iterator
         if self.tid == -1:
             self.tid = self.stid
             self.nextiter()
 
         while 1:
-            self.rowiter.cnext()
+            retval = self.rowiter.cnext()
             # If current iterator is not exhausted, return aligned read
-            if self.rowiter.retval > 0:
+            if retval > 0:
                 n = self.rowiter.b.core.n_cigar
                 l = self.rowiter.b.core.l_qseq
                 if n==0 or l==0:
