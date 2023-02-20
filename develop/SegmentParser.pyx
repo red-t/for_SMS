@@ -1,6 +1,8 @@
 # filename: SegmentParser.pyx
 
-cdef inline char* getSequenceInRange(bam1_t *src, uint32_t start, uint32_t end):
+cdef inline char* getSequenceInRange(bam1_t *src,
+                                     uint32_t start,
+                                     uint32_t end):
     '''return python string of the sequence in a bam1_t object.'''
     cdef uint8_t *p
     cdef uint32_t k
@@ -114,29 +116,17 @@ cdef class InsertSegment:
         def __get__(self):
             return (self.flag & BAM_FSUPPLEMENTARY) != 0
     
-    property reference_end:
-        '''
-        aligned reference position of the read on the reference genome.
-        reference_end points to one past the last aligned residue.
-        '''
-        def __get__(self):
-            cdef bam1_t * src
-            src = self._delegate
-            if (self.flag & BAM_FUNMAP) or pysam_get_n_cigar(src) == 0:
-                return None
-            return bam_endpos(src)
-    
-    property reference_length:
+    property rlen:
         '''
         aligned length of the read on the reference genome.
-        equal to `reference_end - reference_start`. 
+        equal to `ref_end - _delegate.core.pos`. 
         '''
         def __get__(self):
             cdef bam1_t * src
             src = self._delegate
-            if (self.flag & BAM_FUNMAP) or pysam_get_n_cigar(src) == 0:
+            if (self.flag & BAM_FUNMAP) or src.core.n_cigar == 0:
                 return None
-            return bam_endpos(src) - self._delegate.core.pos
+            return self.ref_end - self._delegate.core.pos
     
     cpdef get_tag_i(self, str tag):
         pass
@@ -150,8 +140,11 @@ cdef class InsertSegment:
 #
 # ---------------------------------------------------------------
 #
-cdef InsertSegment makeInsertSegment(bam1_t *src, int32_t qstart, int32_t qend,
-                                     int32_t rpos, uint8_t orient):
+cdef InsertSegment makeInsertSegment(bam1_t *src,
+                                     int32_t qstart,
+                                     int32_t qend,
+                                     int32_t rpos,
+                                     int16_t orient):
     '''return an InsertSegment object constructed from `src`
     
     Parameters:
@@ -164,8 +157,8 @@ cdef InsertSegment makeInsertSegment(bam1_t *src, int32_t qstart, int32_t qend,
             query end of the insert/clip segment, not include.
         rpos: int32_t
             reference position of the insert/clip segment, corresponds to `qend`.
-        orient: uint8_t
-            orient of the segment, 0:left-clip, 1:mid-insert, 2:right-clip
+        orient: int16_t
+            orient of the segment, 0x1:left-clip, 0x2:mid-insert, 0x4:right-clip
     
     Returns:
     --------
@@ -183,7 +176,9 @@ cdef InsertSegment makeInsertSegment(bam1_t *src, int32_t qstart, int32_t qend,
 #
 # ---------------------------------------------------------------
 #
-cdef int parse_cigar(bam1_t *src, list tmp_segl, uint8_t minl=50):
+cdef void parse_cigar(bam1_t *src,
+                     list tmp_segl,
+                     uint8_t minl=50):
     '''parse CIGAR
 
     traverse through alignment's CIGAR, extract clip/insert segment.
@@ -199,17 +194,21 @@ cdef int parse_cigar(bam1_t *src, list tmp_segl, uint8_t minl=50):
             minimum segment length, S/I CIGAR option with length >=
             minl will be extracted.
     '''
-    cdef uint8_t orient=0
-    cdef int32_t  qpos=0, rpos, qst, qend
-    cdef uint32_t op, l, k, n, m
-    cdef uint32_t *cigar_p
-    cdef InsertSegment iseg
+    cdef int16_t        orient  = 0
+    cdef int16_t        nseg    = 0
+    cdef int16_t        otype   = 0
+    cdef int32_t        qpos    = 0
+    cdef int32_t        rpos, qst, qend
+    cdef uint32_t       op, l, k, n, m
+    cdef uint32_t       *cigar_p
+    cdef InsertSegment  iseg
 
     n = src.core.n_cigar
     m = n-1
     cigar_p = bam_get_cigar(src)
     rpos = src.core.pos
-    for k from 0 <= k < n:      # read through alignment's CIGAR
+    # traverse alignment's CIGAR
+    for k from 0 <= k < n:
         op = cigar_p[k] & BAM_CIGAR_MASK
         l = cigar_p[k] >> BAM_CIGAR_SHIFT
         if op==0 or op==7 or op==8:
@@ -219,20 +218,217 @@ cdef int parse_cigar(bam1_t *src, list tmp_segl, uint8_t minl=50):
             if l >= minl:
                 qst = qpos
                 qend = qpos+l
-                if k>0:
-                    orient = 1
-                if k==m:
-                    orient = 2
-                iseg = makeInsertSegment(src,qst,qend,rpos,orient)
+                if k==0:
+                    orient = 0x1
+                    otype |= 0x1
+                elif k==m:
+                    orient = 0x4
+                    otype |= 0x4
+                else:
+                    orient = 0x2
+                    otype |= 0x2
+                iseg = makeInsertSegment(src, qst, qend, rpos, orient)
                 tmp_segl.append(iseg)
+                nseg += 1
             qpos += l
         elif op==2 or op==3:
             rpos += l
+    
+    if nseg == 1:
+        iseg = tmp_segl[-1]
+        compute_feature_single(cigar_p, n, iseg, rpos, otype, nseg)
+    elif nseg > 1:
+        compute_feature_multi(cigar_p, n, tmp_segl, rpos, otype, nseg)
 #
 # ---------------------------------------------------------------
 #
-cdef traverse_alignment():
-    pass
+cdef void compute_feature_single(uint32_t *cigar_p,
+                                 uint32_t n,
+                                 InsertSegment seg,
+                                 int32_t rpos,
+                                 int16_t otype,
+                                 int16_t nseg):
+    '''compute features for single Insertsegment
+    
+    compute features for single Insertsegment, including:
+    1. orient:   16-bit integer, keep segment-type(the lower 3 bits),
+                 alignment-type(lower 4-6 bits), number-of-segments(
+                 higher 10 bits).
+
+    2. ref_end:  the rightmost base position of an alignment on the 
+                 reference genome (the coordinate of the first base 
+                 after the alignment, exclusive, 0-based).
+
+    3. q_start:  query start of the alignment (inclusive, 0-based.)
+
+    4. q_end:    query end of the alignment (exclusive, 0-based.)
+
+    5. overhang: the anchor length of the segment. (for clip-type s-
+                 egment, equal to reference-alignment-length. for i-
+                 nsert-type segment, choose the smaller one.)
+
+    Parameters:
+    -----------
+        cigar_p: uint32_t *
+            pointer of the alignment's cigar data.
+        n: uint32_t
+            number of cigar.
+        seg: InsertSegment
+            InsertSegment object.
+        rpos: int32_t
+            the last reference position after traversing all the cigar.
+        otype: int16_t
+            type of the alignment, just like SAM flags. (left-clip:0x1,
+            mid-insert:0x2, right-clip:0x4).
+        nseg: int16_t
+            number of segment extracted from the same alignment
+    '''
+    cdef int32_t q_start, q_end
+    cdef int32_t op, l, overhang, overhang1
+    cdef int32_t pos      = seg._delegate.core.pos
+    cdef int16_t orient   = seg.orient
+    cdef int32_t seg_rpos = seg.rpos
+
+    # compute q_start
+    q_start = 0
+    op = cigar_p[0] & BAM_CIGAR_MASK
+    if op==4:
+        l = cigar_p[0] >> BAM_CIGAR_SHIFT
+        q_start = l
+    
+    # compute q_end
+    q_end = seg._delegate.core.l_qseq
+    op = cigar_p[n-1] & BAM_CIGAR_MASK
+    if op==4:
+        l = cigar_p[n-1] >> BAM_CIGAR_SHIFT
+        q_end -= l
+    
+    # compute overhang
+    overhang = rpos - pos
+    if orient & 0x2:
+        overhang = rpos - seg_rpos
+        overhang1 = seg_rpos - pos
+        if overhang > overhang1:
+            overhang = overhang1
+
+    # fill features of segment
+    seg.orient   = (nseg << 6) | (otype << 3) | orient
+    seg.ref_end  = rpos
+    seg.q_start  = q_start
+    seg.q_end    = q_end
+    seg.overhang = overhang
+#
+# ---------------------------------------------------------------
+#
+cdef void compute_feature_multi(uint32_t *cigar_p,
+                                uint32_t n,
+                                list tmp_segl,
+                                int32_t rpos,
+                                int16_t otype,
+                                int16_t nseg):
+    '''compute features for multiple Insertsegment
+
+    compute features for multiple Insertsegment, including:
+    1. orient:   16-bit integer, keep segment-type(the lower 3 bits),
+                 alignment-type(lower 4-6 bits), number-of-segments(
+                 higher 10 bits).
+
+    2. ref_end:  the rightmost base position of an alignment on the 
+                 reference genome (the coordinate of the first base 
+                 after the alignment, exclusive, 0-based).
+
+    3. q_start:  query start of the alignment (inclusive, 0-based.)
+
+    4. q_end:    query end of the alignment (exclusive, 0-based.)
+
+    5. overhang: the anchor length of the segment. (for clip-type s-
+                 egment, equal to reference-alignment-length. for i-
+                 nsert-type segment, choose the smaller one.)
+
+    6. ldist:    reference distance to the upstream segment from the
+                 same alignment.
+
+    7. rdist:    reference distance to the downstream segment.
+
+    Parameters:
+    -----------
+        cigar_p: uint32_t *
+            pointer of the alignment's cigar data.
+        n: uint32_t
+            number of cigar.
+        tmp_segl: list
+            list of InsertSegment objects.
+        rpos: int32_t
+            the last reference position after traversing all the cigar.
+        otype: int16_t
+            type of the alignment, just like SAM flags. (left-clip:0x1,
+            mid-insert:0x2, right-clip:0x4).
+        nseg: int16_t
+            number of segment extracted from the same alignment
+    '''
+    cdef InsertSegment  seg = tmp_segl[-nseg], p_seg
+    cdef int32_t    pos     = seg._delegate.core.pos
+    cdef int16_t    orient  = seg.orient
+    cdef int32_t    s_rpos  = seg.rpos, p_rpos
+    cdef int32_t    op, l, overhang, overhang1
+    cdef int32_t    q_start, q_end, dist
+
+    # compute q_start
+    q_start = 0
+    op = cigar_p[0] & BAM_CIGAR_MASK
+    if op==4:
+        l = cigar_p[0] >> BAM_CIGAR_SHIFT
+        q_start = l
+    
+    # compute q_end
+    q_end = seg._delegate.core.l_qseq
+    op = cigar_p[n-1] & BAM_CIGAR_MASK
+    if op==4:
+        l = cigar_p[n-1] >> BAM_CIGAR_SHIFT
+        q_end = q_end - l
+    
+    # compute overhang for the first segment
+    overhang =  rpos - pos
+    if orient & 0x2:
+        overhang  = rpos - s_rpos
+        overhang1 = s_rpos - pos
+        if overhang > overhang1:
+            overhang = overhang1
+    # fill features of the first segment
+    seg.orient   = (nseg << 6) | (otype << 3) | orient
+    seg.ref_end  = rpos
+    seg.q_start  = q_start
+    seg.q_end    = q_end
+    seg.overhang = overhang
+
+
+    # compute overhang & distance
+    cdef int32_t i
+    for i in range(-nseg+1, 0):
+        # compute overhang
+        seg      =  tmp_segl[i]
+        s_rpos   =  seg.rpos
+        orient   =  seg.orient
+        overhang =  rpos - pos
+        if orient & 0x2:
+            overhang  = rpos - s_rpos
+            overhang1 = s_rpos - pos
+            if overhang > overhang1:
+                overhang = overhang1
+
+        # compute distance
+        p_seg   = tmp_segl[i-1]
+        p_rpos  = p_seg.rpos
+        dist    = s_rpos - p_rpos
+        
+        # fill features of segment
+        seg.orient   = (nseg << 6) | (otype << 3) | orient
+        seg.ref_end  = rpos
+        seg.q_start  = q_start
+        seg.q_end    = q_end
+        seg.overhang = overhang
+        seg.ldist    = dist
+        p_seg.rdist  = dist
 #
 # ---------------------------------------------------------------
 #

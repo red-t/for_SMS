@@ -4,7 +4,7 @@ import pysam
 
 ext = [
     Extension(name="htslib_external", sources=["htslib_external.pyx"],
-                include_dirs=["./htslib"], libraries=["hts"], library_dirs=["./htslib"]),
+                include_dirs=["./htslib"]+pysam.get_include(), libraries=["hts"], library_dirs=["./htslib"]),
     Extension(name="SegmentParser", sources=["SegmentParser.pyx"],
                 include_dirs=["./htslib"]+pysam.get_include(), libraries=["hts"], library_dirs=["./htslib"]),
     Extension(name="AlignmentFileIO", sources=["AlignmentFileIO.pyx"],

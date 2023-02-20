@@ -149,7 +149,7 @@ cdef class Iterator:
 
     def __next__(self):
         '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
-        cdef int n
+        cdef int n, l
         cdef tmp_segl = []
         # Create an initial iterator
         if self.tid == -1:
@@ -161,7 +161,8 @@ cdef class Iterator:
             # If current iterator is not exhausted, return aligned read
             if self.rowiter.retval > 0:
                 n = self.rowiter.b.core.n_cigar
-                if n == 0:
+                l = self.rowiter.b.core.l_qseq
+                if n==0 or l==0:
                     continue
                 parse_cigar(self.rowiter.b, tmp_segl, self.minl)
                 continue
@@ -174,3 +175,8 @@ cdef class Iterator:
                 self.nextiter()
             else:
                 raise StopIteration
+
+
+cpdef test(list tmp_segl, int val):
+    seg=tmp_segl[-1]
+    seg.rpos = val
