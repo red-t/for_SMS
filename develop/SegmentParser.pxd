@@ -14,8 +14,9 @@ cdef class InsertSegment:
         int32_t overhang            # minimum length of the anchor part
         int32_t ldist, rdist        # left/right distance to the neighbor segment
     
-    cpdef get_tag_i(self, str tag)
-    cpdef get_tag_f(self, str tag)
+    cpdef int64_t get_tag_i(self, str tag)
+    cpdef double  get_tag_f(self, str tag)
+    cpdef str     get_seq(self, int start=*, int end=*)
 
 
 

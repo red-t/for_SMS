@@ -75,26 +75,14 @@ cdef class InsertSegment:
             cdef bam1_t * src = self._delegate
             return pysam_get_qual(src)
     
-    property qlen:
+    property q_len:
         '''
-        the length of the query/read, corresponds to the length of the
-        sequence supplied in the BAM/SAM file. The length of a query 
-        is 0 if there is no sequence in the BAM/SAM file.
+        the length of the query/read, corresponds to the length of the 
+        sequence supplied in the BAM/SAM file. The length of a query is
+        0 if there is no sequence in the BAM/SAM file.
         '''
         def __get__(self):
             return self._delegate.core.l_qseq
-    
-    property qseq:
-        '''read sequence bases'''
-        def __get__(self):
-            cdef bam1_t * src
-            cdef str s
-            src = self._delegate
-            if src.core.l_qseq == 0:
-                return None
-
-            s = charptr_to_str(getSequenceInRange(src, 0, src.core.l_qseq))
-            return s
     
     property is_mapped:
         '''true if read itself is mapped'''
@@ -116,10 +104,10 @@ cdef class InsertSegment:
         def __get__(self):
             return (self.flag & BAM_FSUPPLEMENTARY) != 0
     
-    property rlen:
+    property ref_len:
         '''
-        aligned length of the read on the reference genome.
-        equal to `ref_end - _delegate.core.pos`. 
+        aligned length of the read on the reference genome. equal to
+        `ref_end - _delegate.core.pos`. 
         '''
         def __get__(self):
             cdef bam1_t * src
@@ -128,11 +116,84 @@ cdef class InsertSegment:
                 return None
             return self.ref_end - self._delegate.core.pos
     
-    cpdef get_tag_i(self, str tag):
-        pass
+    cpdef int64_t get_tag_i(self, str tag):
+        '''Get an integer aux value
+
+        retrieves integer aux value from the optional alignment sec-
+        tion.
+
+        Parameters:
+        -----------
+        tag: str
+            a two-letter tag denoting the field. can be 'NM', 'AS', 
+            'ms', 'cm', 's1', 's2', 'rl'
+        
+        Returns:
+        --------
+        value: int64_t
+            an integer value correspond to the aux tag.
+        '''
+        cdef bam1_t  *src
+        cdef uint8_t *v
+        cdef bytes   btag
+        cdef int64_t value
+
+        src = self._delegate
+        btag = tag.encode(TEXT_ENCODING, ERROR_HANDLER)
+        v = bam_aux_get(src, btag)
+        if v == NULL:
+            raise KeyError("tag '%s' not present" % tag)
+        
+        value = bam_aux2i(v)
+        return value
     
-    cpdef get_tag_f(self, str tag):
-        pass
+    cpdef double get_tag_f(self, str tag):
+        '''Get an double aux value
+
+        retrieves double aux value from the optional alignment sec-
+        tion.
+
+        Parameters:
+        -----------
+        tag: str
+            a two-letter tag denoting the field. can be 'de'
+        
+        Returns:
+        --------
+        value: double
+            an double value correspond to the aux tag.
+        '''
+        cdef bam1_t  *src
+        cdef uint8_t *v
+        cdef bytes   btag
+        cdef double value
+
+        src = self._delegate
+        btag = tag.encode(TEXT_ENCODING, ERROR_HANDLER)
+        v = bam_aux_get(src, btag)
+        if v == NULL:
+            raise KeyError("tag '%s' not present" % tag)
+        
+        value = bam_aux2f(v)
+        return value
+    
+    cpdef str get_seq(self, int start=-1, int end=-1):
+        '''Get query sequence in specified region'''
+        cdef bam1_t *src = self._delegate
+        cdef int lqseq   = src.core.l_qseq
+        cdef str s
+        
+        if lqseq == 0:
+            return None
+        
+        if start < 0:
+            start = 0
+        
+        if end < 0:
+            end = lqseq
+
+        s = charptr_to_str(getSequenceInRange(src, start, end))
+        return s
     
 
 
