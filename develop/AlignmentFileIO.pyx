@@ -1,11 +1,14 @@
 cdef class BamFile:
-    def __cinit__(self, str filepath, int32_t nthreads=1):
-        cdef bytes filename = encode_filename(filepath)
-        cdef bytes idxfilename = encode_filename(filepath+".bai")
-        self.threads = nthreads
-        self.filename = filename
-        self.index_filename = idxfilename
-        self._open()
+    def __cinit__(self, str filepath, int32_t nthreads=1, str mode='rb', BamFile template=None):
+        cdef bytes bfilepath    = encode_filename(filepath)
+        cdef bytes bidx         = encode_filename(filepath+".bai")
+        cdef bytes bmode        = mode.encode(TEXT_ENCODING, ERROR_HANDLER)
+
+        self.threads    = nthreads
+        self.mode       = bmode
+        self.filename   = bfilepath
+        self.index_filename = bidx
+        self._open(template)
         
     def close(self):
         if self.htsfile:
@@ -14,6 +17,9 @@ cdef class BamFile:
         if self.index:
             hts_idx_destroy(self.index)
             self.index = NULL
+        if self.hdr:
+            bam_hdr_destroy(self.hdr)
+            self.hdr = NULL
 
     def __dealloc__(self):
         if self.htsfile:
@@ -22,6 +28,9 @@ cdef class BamFile:
         if self.index:
             hts_idx_destroy(self.index)
             self.index = NULL
+        if self.hdr:
+            bam_hdr_destroy(self.hdr)
+            self.hdr = NULL
 
     def __enter__(self):
         return self
@@ -30,42 +39,57 @@ cdef class BamFile:
         self.close()
         return False
     
-    cdef _open(self):
-        '''open BAM file and index file'''
-        # open BAM file for reading
+    cdef void _open(self, BamFile template=None):
+        '''open BAM file for reading/writting'''
+        # open file as htsFile 
         self.htsfile = self._open_htsfile()
         if self.htsfile == NULL:
             if errno:
-                raise IOError(errno, "could not open alignment file `{}`: {}".format(force_str(self.filename), force_str(strerror(errno))))
+                raise IOError(errno, "could not open alignment file `{}`: {}".format(
+                    force_str(self.filename),
+                    force_str(strerror(errno))))
             else:
-                raise ValueError("could not open alignment file `{}`".format(force_str(self.filename)))
+                raise ValueError("could not open alignment file `{}`".format(
+                    force_str(self.filename)))
 
-        # bam files require a valid header
-        # cdef bam_hdr_t  *hdr = NULL
-        # with nogil:
-        #     hdr = sam_hdr_read(self.htsfile)
-        # if hdr == NULL:
-        #     raise ValueError("file does not have a valid header, is it BAM format?")
-        # self.header = makeAlignmentHeader(hdr)
-        
-        # open BAM index file to enable random access
-        with nogil:
-            self.index = sam_index_load2(self.htsfile, self.filename, self.index_filename)
-        if not self.index:
-            if errno:
-                raise IOError(errno, force_str(strerror(errno)))
+        # for reading
+        if self.mode == b'rb':
+            # bam files require a valid header
+            with nogil:
+                self.hdr = sam_hdr_read(self.htsfile)
+            if self.hdr == NULL:
+                raise ValueError("file does not have a valid header, is it BAM format?")
+            
+            # open BAM index file to enable random access
+            with nogil:
+                self.index = sam_index_load2(self.htsfile, self.filename, self.index_filename)
+            if not self.index:
+                if errno:
+                    raise IOError(errno, force_str(strerror(errno)))
+                else:
+                    raise IOError('unable to open index file `{}`'.format(
+                        force_str(self.index_filename)))
+        # for writing
+        elif self.mode == b'wb':
+            # copy header from template
+            if template:
+                self.hdr = bam_hdr_dup(template.hdr)
             else:
-                raise IOError('unable to open index file `{}`'.format(force_str(self.index_filename)))
+                raise ValueError("not enough information to construct header. Please provide template")
+            
+            # write header to htsfile
+            with nogil:
+                sam_hdr_write(self.htsfile, self.hdr)
     
     cdef htsFile *_open_htsfile(self) except? NULL:
-        '''open BAM file in `rb` mode, return htsFile object if success.'''
-        cdef char    *cfilename
-        cdef bytes   mode    = force_bytes('rb')
-        cdef char    *cmode  = mode
+        '''open file in 'rb/wb' mode, return htsFile object if success.'''
         cdef int32_t threads = self.threads - 1
+        cdef char    *cmode
+        cdef char    *cfilename
         cdef htsFile *htsfile
 
         if isinstance(self.filename, bytes):
+            cmode     = self.mode
             cfilename = self.filename
             with nogil:
                 htsfile = hts_open(cfilename, cmode)
@@ -74,9 +98,9 @@ cdef class BamFile:
                 return htsfile
 
     cpdef dict fetch(self, uint8_t stid, uint8_t maxtid, uint8_t minl=50):
-        '''fetch reads aligned on chromosome stid ~ maxtid
+        '''fetch reads aligned on chromosome stid ~ maxtid-1
         
-        Usage: fetch(0,2) to fetch reads aligned on 0,1 (tid)
+        Usage: fetch(0, 2) to fetch reads aligned on 0,1 (tid)
 
         Parameters
         ----------
@@ -87,7 +111,8 @@ cdef class BamFile:
             tid of end chromosome, not include.
 
         minl: uint8_t
-            tid of end chromosome, not include.
+            minimum length of the segment. segment with cigar_length < minl
+            will not be used to create a new InsertSegment.
         
         Returns
         -------
@@ -105,6 +130,24 @@ cdef class BamFile:
             continue
 
         return SEG_DICT
+    
+    cpdef void write(self, InsertSegment iseg):
+        '''write a single alignment of `InsertSegment` to disk.
+
+        Usage: write(iseg)
+
+        Parameters
+        ----------
+        iseg: InsertSegment
+            a valid InsertSegment instance.
+        '''
+        cdef int ret
+
+        with nogil:
+            ret = sam_write1(self.htsfile, self.hdr, iseg._delegate)
+        if ret < 0:
+            raise IOError(
+            "sam_write1 failed with error code {}".format(ret))
 #
 # ---------------------------------------------------------------
 #
@@ -178,8 +221,26 @@ cdef class Iterator:
                 self.nextiter()
             else:
                 raise StopIteration
+#
+# ---------------------------------------------------------------
+#
+# cdef void build_cluster(str     filepath,
+#                         int32_t threads,
+#                         uint8_t stid,
+#                         uint8_t maxtid,
+#                         uint8_t minl):
+#     '''build cluster'''
+#     cdef BamFile rbf, wbf
+#     cdef char *rmode = b"rb"
+#     cdef char *wmode = b"wb"
 
+#     rbf = BamFile(filepath, threads)
+#     rbf.fetch(stid, maxtid, minl)
 
+#     pass
+#
+# ---------------------------------------------------------------
+#
 cpdef test(list tmp_segl, int val):
     seg=tmp_segl[-1]
     seg.rpos = val
