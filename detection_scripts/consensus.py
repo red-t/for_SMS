@@ -181,7 +181,9 @@ def consensus_seq(sequences, fre_cuoff, type):
         if i < 0  or i >= seq_len - 15:
             if seq_i_nucle[0][0] == '-':
                if seq_i_nucle[1][1] >= 2 and seq_i_nucle[1][1] > seq_i_nucle[2][1]:
-                    seq = seq_i_nucle[1][0]
+                    consensus_seq_by_anchor.append(seq_i_nucle[1][0]) 
+            else:
+                consensus_seq_by_anchor.append(seq_i_nucle[0][0]) 
         
         if i >= 0 and i < seq_len - 15:
             #print(len(seq_i),seq_i_GAP,seq_i_nucle[0][1])

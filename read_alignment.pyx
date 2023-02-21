@@ -2,6 +2,7 @@ from pysam import AlignmentFile, AlignedSegment, FastaFile
 from uuid import uuid4
 from collections import OrderedDict, defaultdict, Counter
 from bx.intervals.intersection import Intersecter, Interval
+from interval import Interval as internal_Interval
 from mappy import revcomp
 from subprocess import Popen, PIPE, STDOUT, DEVNULL
 import os
@@ -9,7 +10,9 @@ from consensus import get_consensus_seq
 from operator import itemgetter
 import re
 
-
+# coimmit
+# 1 - import "interval" module to detect overlap between two list
+# 2- 
 
 # 目前的筛选条件：
 # 1. primary alignment & supplementary alignment
@@ -74,8 +77,6 @@ cdef class Segment:
         
         self.cord_list.append( (q_st, q_en, r_st, r_en, te_strand) )
         self.orients.append( te_strand )
-        print("test_score")
-        print(score)
         self.score_list.append(score)
 
         # segment里每条supporting reads对应的TE 类型和 方向要保持对应，方便判断nested insertion
@@ -91,15 +92,16 @@ cdef class Segment:
 ## Cluster ##
 cdef class Cluster:
     cdef public:
-        int orient, state, supp_reads_num
+        int  state, supp_reads_num
+        str orient
         float frequency
-        str frequency_test, 
         str c_id, consensus, consensus_seq, tsd, ref_name, te_type, insert_seq_info
         str out_path, supp_reads, unsupp_reads, span_reads
         list type_list, seg_list, orients, bp, supp_reads_list, unsupp_reads_list, span_reads_list, segname_list
         object ref_aln
         str te_idx, divergency, consensus_meth, su_type, te_size, genome_fa
         list score_list
+        str rmk_tag
 
 
     def __init__(self, str c_id, str ref_name, str out_path, object ref_aln, str te_idx, str genome_fa):
@@ -504,6 +506,7 @@ cdef class Cluster:
                         continue
 
                 
+
 
             if span_read.query_name not in supp_reads_list_id:
                 if self.bp[0] - span_read.reference_start >= un_support_reads_spand_size and span_read.reference_end - self.bp[-1] >= un_support_reads_spand_size:  

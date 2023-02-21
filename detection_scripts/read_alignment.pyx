@@ -2,6 +2,7 @@ from pysam import AlignmentFile, AlignedSegment, FastaFile
 from uuid import uuid4
 from collections import OrderedDict, defaultdict, Counter
 from bx.intervals.intersection import Intersecter, Interval
+from interval import Interval as internal_Interval
 from mappy import revcomp
 from subprocess import Popen, PIPE, STDOUT, DEVNULL
 import os
@@ -9,6 +10,20 @@ from consensus import get_consensus_seq
 from operator import itemgetter
 import re
 
+# commits:
+
+# remove and add some conditions
+#   tag: rm_condition & new_condition
+# fix some bug 
+#   tag: bug_fix
+# commit: fix : fix some bug, remove and add some conditions
+
+# 1 - import "interval" to detect overlap between two tuples
+# 2 - split get_consensus() and find_tsd() in try-except part
+# 3 - add insert sequence consensus process
+# 4 - fix bug of constructing polished sequence
+# 5 - check if there any insertion in insert sequence
+# 6 - change some condition in consensus.py
 
 
 # 目前的筛选条件：
@@ -37,11 +52,7 @@ import re
 #            bam文件中sequence序列是与正链一致的，所以insert seq比对到TE的方向就是insertion的方向
 
 
-# remove and add some conditions
-#   tag: rm_condition & new_condition
-# fix some bug 
-#   tag: bug_fix
-# commit: fix : fix some bug, remove and add some conditions
+
 
 
 ## Segment ##
@@ -99,7 +110,7 @@ cdef class Cluster:
         int state, supp_reads_num
         str orient
         float frequency
-        str c_id, consensus, consensus_seq, tsd, ref_name, te_type, insert_seq_info
+        str c_id, consensus, consensus_seq, tsd, ref_name, te_type, insert_seq_info, insert_seq_info_simple
         str out_path, supp_reads, unsupp_reads, span_reads
         list type_list, seg_list, orients, bp, supp_reads_list, unsupp_reads_list, span_reads_list, segname_list
         object ref_aln
@@ -339,8 +350,8 @@ cdef class Cluster:
                     continue
             
 
-            if candi_seg.segname[-1] == 'm': # check 添加了append步骤 Q31: 循环结束之后，new_seg_list 应该与 self.seg_list 相同，num_supp 应该仍然为 0，因为 supp_reads_m_list_id、supp_reads_c_list_id 一直为 0 ?
-                print(candi_seg.segname)
+            # if candi_seg.segname[-1] == 'm': # check 添加了append步骤 Q31: 循环结束之后，new_seg_list 应该与 self.seg_list 相同，num_supp 应该仍然为 0，因为 supp_reads_m_list_id、supp_reads_c_list_id 一直为 0 ?
+            #     print(candi_seg.segname)
                 # rm_condition
             #     if candi_seg_id in supp_reads_m_list_id:
             #         continue
@@ -471,7 +482,7 @@ cdef class Cluster:
 
         for span_read in self.ref_aln.fetch(contig=self.ref_name, start=start_bp, stop=self.bp[-1] + flanking_region_size):
             # new_condition
-            print("#divergency\t"+str(cal_divergency(span_read,'genome')))
+            # print("#divergency\t"+str(cal_divergency(span_read,'genome')))
             cigar_count = AlignedSegment.get_cigar_stats(span_read)[0]
             spand_read_divergency_list.append(cal_divergency(span_read,'genome'))
             spand_read_mapping_quality_list.append(span_read.mapping_quality)
@@ -531,9 +542,9 @@ cdef class Cluster:
                         if span_read.query_name not in self.unsupp_reads_list:
                             self.unsupp_reads_list.append(span_read.query_name)
 
-        print(">black_read_num")
-        print(sup_black_read_num, black_read_num,black_n_l,black_n_r)
-        print(n_m, black_tag, span_tag)
+        # print(">black_read_num")
+        # print(sup_black_read_num, black_read_num,black_n_l,black_n_r)
+        # print(n_m, black_tag, span_tag)
 
         # 筛选
         # 这里主要筛选有double clip的区域
@@ -603,7 +614,7 @@ cdef class Cluster:
                     # 没有 double clip 的 reads
                     # 或者有非 double clip 的 supporting reads 跨过 double clip 的区域
                     # 看两边clip reads比例来决定
-                    if  abs( 0.5 - ( float(n_l) / sum([n_l,n_r])) ) >  0.5 - 0.1883698: 
+                    if  sum([n_l,n_r]) > 0  and abs( 0.5 - ( float(n_l) / sum([n_l,n_r])) ) >  0.5 - 0.1883698: 
                         #print('>3')
                         self.state = 5 # 可留
                     else:
@@ -731,10 +742,11 @@ cdef class Cluster:
 
 
 
-        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, self.frequency, self.orient, self.supp_reads, self.divergency, self.consensus_meth,insertion_type, self.tsd, self.insert_seq_info, self.consensus, self.su_type, self.te_size, self.state )
+        # return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, self.frequency, self.orient, self.supp_reads, self.divergency, self.consensus_meth,insertion_type, self.tsd, self.insert_seq_info, self.consensus, self.su_type, self.te_size, self.state )
+        return '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(self.ref_name, self.bp[0]+1, self.bp[-1]+1, self.te_type, self.frequency, self.orient, self.insert_seq_info_simple, self.supp_reads, self.divergency, self.consensus_meth,insertion_type, self.tsd, self.insert_seq_info, self.consensus, self.su_type,  self.state )
 
 
-    cpdef get_consensus(self, genome_fa,  genome_idx, te_anno_fa):
+    cpdef get_consensus(self, genome_fa,  genome_idx, te_anno_fa, te_size_dict):
         """ define consensus sequence """
         """
         Function:
@@ -755,21 +767,35 @@ cdef class Cluster:
             int i
             
         try:
-            consensus_with_tsd = get_consensus(self.seg_list, self.out_path, self.ref_name, self.te_idx, self.c_id, self.type_list, genome_fa,  genome_idx, te_anno_fa )
-            if consensus_with_tsd[-1] != 'NA':
-                self.bp = [consensus_with_tsd[-2],consensus_with_tsd[-1]]
+            # consensus_with_tsd = get_consensus(self.seg_list, self.out_path, self.ref_name, self.te_idx, self.c_id, self.type_list, genome_fa,  genome_idx, te_anno_fa )[0]
+            consensus_information = get_consensus(self.seg_list, self.out_path, self.ref_name, self.te_idx, self.c_id, self.type_list, genome_fa,  genome_idx, te_anno_fa, te_size_dict )
+            consensus_with_tsd = consensus_information[0]
+            self.type_list = consensus_with_tsd[5]
+            self.te_type = "|".join(consensus_with_tsd[5])
+
+            # if consensus_with_tsd[-1] != 'NA':
+            #     self.bp = [consensus_with_tsd[-2],consensus_with_tsd[-1]]
+            
+            try:
+                tsd_info = get_tsd( consensus_information[1][0], consensus_information[1][1], consensus_information[1][2], consensus_information[1][3], consensus_information[1][4], consensus_information[1][5],  consensus_information[1][6] )
+                if tsd_info[2] != 'NA':
+                    self.bp = [tsd_info[1], tsd_info[2]]
+                consensus_with_tsd = [consensus_with_tsd[0], tsd_info[0], consensus_with_tsd[1], consensus_with_tsd[2], consensus_with_tsd[3], consensus_with_tsd[4]]
+            except:
+                consensus_with_tsd = [consensus_with_tsd[0], "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', consensus_with_tsd[2], consensus_with_tsd[3], consensus_with_tsd[4]]
+
         except(IndexError):
-            consensus_with_tsd = ["IndexError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
+            consensus_with_tsd = ["IndexError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None', 'None']
         except(KeyError):
-            consensus_with_tsd = ["KeyError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
+            consensus_with_tsd = ["KeyError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None', 'None']
         except(ValueError):
-            consensus_with_tsd = ["ValueError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
+            consensus_with_tsd = ["ValueError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None', 'None']
         except(UnboundLocalError):
-            consensus_with_tsd = ["UnboundLocalError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
+            consensus_with_tsd = ["UnboundLocalError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None', 'None']
         except(FileNotFoundError):
-            consensus_with_tsd = ["FileNotFoundError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None','0', 'None']
+            consensus_with_tsd = ["FileNotFoundError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None','0', 'None', 'None']
         except(TypeError):
-            consensus_with_tsd = ["TypeError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None']
+            consensus_with_tsd = ["TypeError", "__".join([self.ref_name, str(self.bp[0]+1), str(self.bp[-1]+1)]), 'None', '0', 'None', 'None']
 
         # 去掉中间文件，如果保留的话，pysam在读consensus.fa的时候会出问题，感觉是因为内存释放的问题，
         rm_temp_c_id_cmd = ['rm', self.out_path + self.ref_name + "/*" + self.c_id + "*"  ]
@@ -780,6 +806,7 @@ cdef class Cluster:
         self.insert_seq_info = consensus_with_tsd[2]
         self.divergency = consensus_with_tsd[3]
         self.consensus_meth = consensus_with_tsd[4]
+        self.insert_seq_info_simple = consensus_with_tsd[5]
         
 
     def find_tsd(self):
@@ -790,7 +817,7 @@ cdef class Cluster:
 
 
 ## consensus
-cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, str c_id, list te_type_list, str genome_fa,  str genome_idx , str te_anno_fa ):
+cdef list get_consensus(list seg_list, str out_path, str ref_name, str te_idx, str c_id, list te_type_list, str genome_fa,  str genome_idx , str te_anno_fa, dict te_size_dict ):
     """
         Function:
             用supporting reads组装一条consensus sequence，
@@ -815,10 +842,12 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
     """
     cdef:
         int i = 0, l =  100
-        list insert_size_list = []
+        list insert_size_list = [],polish_te_type_list = [], seq_break_list_all = []
+    
         str consensus_seq_temp_file =  out_path + ref_name + "/" + c_id  + ".consensus.temp.fa"
+        str insertion_seq_in_te_temp_file =  out_path + ref_name + "/" + c_id  + ".insertion_seq_in_te.temp.fa"
         str divergency, divergency_all # ......这一步当中的所有类型的divergency，是为了评估组装的效果怎么样，最后应该不会出现在最终的bed文件中，当然放一个mismatch的divergncy也是可以的
-
+        dict insert_con_sequence_dict = {}, polish_te_st_en = {}, te_insert_strand = {}
     # return 'none', 'none', 'none'
     
 
@@ -878,22 +907,43 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
     insert_sequence_bam = align_mm2(te_idx, consensus_seq_temp_file, out_path + ref_name, thread_mm2=10,  mismatch_model="--eqx", preset="splice")
     insert_sequence_bam_obj = AlignmentFile(insert_sequence_bam, 'rb') # EXP: cluster 当中，所有 segment trimmed sequence 与 transposon 的比对结果
 
-    te_anno_fa = '/data/tusers/boxu/annotation/dm3/dm3.transposon_for_simulaTE.fa'
+    # te_anno_fa = '/data/tusers/boxu/annotation/dm3/dm3.transposon_for_simulaTE.fa'
     polish_file_name = out_path + ref_name + "/" + c_id + "_polished.fa"
     
-    insert_con_sequence_dict = {}
+    
+    
 
     polish_file = open(polish_file_name, 'w') # check
+
+    consensus_temp_reference_name = insert_sequence_bam_obj.references
+    
+
     # check Q39: 基于 segment trimmed sequences-vs-transposon 的 alignment pileup, 对 te_type_list 当中的每一种 transposon 进行 "polishing"? 没有 coverage 的地方怎么处理？
     for te_reference in te_type_list: # EXP: te_type_list: [tename1, tename2, ...], 这里的 te_type_list 是 set 处理过后的
+        polish_te_st_en[te_reference] = {'start':0,'end':0}
+
         insert_con_sequence_dict[te_reference] = ''
 
         insert_con_sequence = ''
         te_seq = FastaFile(te_anno_fa).fetch(te_reference)
+        polish_start = 1
+        polished_sequence_break = []
+        
+        pref_reference_position = 0
+
         for pileup_col in insert_sequence_bam_obj.pileup(te_reference):
             # pileup_col 是按顺序取出来每个 reference 对应位置上的比对信息
             # get_query_sequences() 可以获得该位置上的每条 read 的碱基信息
             # Q39: 有点好奇 base_col 长什么样的？因为我的环境下安装的 pysam，貌似没有 get_query_sequences 这个方法？
+            if polish_start == 1:
+                polish_te_st_en[te_reference]['start'] = pileup_col.reference_pos
+                polish_start = polish_start + 1
+
+            if pileup_col.reference_pos - pref_reference_position > 1000 and len(insert_con_sequence) > 5:
+                polished_sequence_break.append(insert_con_sequence)
+                insert_con_sequence = ''
+
+
             base_col = pileup_col.get_query_sequences(mark_matches=False, mark_ends=False, add_indels=True)
             anchor_base_list = []
             indel_base_list = []
@@ -924,18 +974,48 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
             
             # indel after this position
             # indel_base_list
-            if len(indel_base_list) == 0:
-                continue
-            map_base_list_dict = Counter(indel_base_list)
-            map_base_list = [(x,map_base_list_dict[x]) for x in map_base_list_dict ]
-            map_base_list_sorted = sorted(map_base_list, key = itemgetter(1), reverse=True)
-            if map_base_list_sorted[0][0] != "*" and map_base_list_sorted[0][1] >= len(base_col) * 0.5:
-                insert_con_sequence = insert_con_sequence + map_base_list_sorted[0][0].split('-')[0]
+            if len(indel_base_list) > 0:
+                 #continue
+                map_base_list_dict = Counter(indel_base_list)
+                map_base_list = [(x,map_base_list_dict[x]) for x in map_base_list_dict ]
+                map_base_list_sorted = sorted(map_base_list, key = itemgetter(1), reverse=True)
 
-        insert_con_sequence_dict[te_reference] = insert_con_sequence
-        polish_file.write(">"+te_reference+"\n"+insert_con_sequence+"\n") # check
+                # insert te sequence中还可能有insertion
+                if len(map_base_list_sorted[0][0]) > 15:
+                    insertion_seq_list = [ x for x in indel_base_list if len(x) > 15 ]
+                    if len(insertion_seq_list) >= 3:
+                        insertion_seq_in_te_temp_file_obj = open(insertion_seq_in_te_temp_file,'w')
+                        for insertion_seq_in_te_index in range(len(insertion_seq_list)):
+                            insertion_seq_in_te_temp_file_obj.write(">seq" + str(insertion_seq_in_te_index) + "\n" + insertion_seq_list[insertion_seq_in_te_index] + "\n" )
+                        insertion_seq_in_te_temp_file_obj.close()
+
+                        # insertion_consensus_seq_in_te = get_consensus_seq_mafft(insertion_seq_in_te_temp_file, 0.75, 'seq', 1 )
+                        insertion_consensus_seq_in_te = get_consensus_seq('mafft', insertion_seq_in_te_temp_file, out_path, ref_name, c_id, 'local' )
+                        
+
+
+                if map_base_list_sorted[0][0] != "*" and map_base_list_sorted[0][1] >= len(base_col) * 0.5:
+                    insert_con_sequence = insert_con_sequence + map_base_list_sorted[0][0].split('-')[0]
+            pref_reference_position = pileup_col.reference_pos
+        
+        if polish_start == 1:
+            continue
+        polish_te_type_list.append(te_reference)
+        polished_sequence_break.append(insert_con_sequence)
+        
+        polish_te_st_en[te_reference]['end'] = pileup_col.reference_pos
+        # print(polished_sequence_break)
+
+        # insert_con_sequence_dict[te_reference] = insert_con_sequence
+        insert_con_sequence_dict[te_reference] = polished_sequence_break
+        # polish_file.write(">"+te_reference+"\n"+insert_con_sequence+"\n") # check
+        polish_file.write(">"+te_reference+"\n"+"".join(polished_sequence_break)+"\n")
+    
+    
     polish_file.close() # check
     # print(insert_con_sequence_dict)
+
+    te_type_list = polish_te_type_list
 
     # test for polished seq
     # print(te_type_list)
@@ -971,8 +1051,7 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
     consensus_insert_bam = align_mm2(te_idx, out_path + ref_name + "/" + c_id + ".consensus.fa", out_path + ref_name, thread_mm2=10, mismatch_model=mis_mo, preset="splice")
     consensus_insert_bam_read = AlignmentFile(consensus_insert_bam, "rb") # EXP: 这个是通过 wtdbg2 生成的 trimmed sequence consensus sequence 与 transposon 比对的结果
 
-    seq_break_list_all = []
-    te_insert_strand = {}
+    
     # Q40: 确定 wtdbg2_CSS-vs-TE 比对结果当中每条 alignment 在 CSS 当中的 起始/终止位点、比对到哪个 TE、比对方向、有没有大片段的 deletion，而后按照终止位点进行排序。排序结果储存在 seq_break_list_all_sorted 当中？
     for insert_seq_read in consensus_insert_bam_read:
         
@@ -1048,29 +1127,85 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
         # internal deletion
 
         indel_cigar = insert_seq_read.cigarstring
-        if 'N' in indel_cigar : # check Q41: CIGAR string 当中的 N 是指什么？
-            cigar_befor_del = indel_cigar.split('N')[0]
-            cigar_del_list = [int(n_cigar[:-1]) for n_cigar in re.findall('[0-9]{1,}D',cigar_befor_del.split('S')[-1])]
-            
-            del_pos_list = [int(n_cigar) for n_cigar in re.findall('[0-9]{1,}',cigar_befor_del.split('S')[-1])]
 
-            del_len = del_pos_list[-1]
-            del_pos = sum(del_pos_list[:-1]) - sum(cigar_del_list) # check Q41: 这里应该是要计算其它 operation 的长度之和？但是从代码上看，这个 '和' 不包括 'S', 但是包括 'D' 与 'H'(如果有的话)？
-            seq_break_list_all.append((break_1, break_2,":".join([insert_te , str(insert_seq_read.reference_start),str(insert_seq_read.reference_end) ,break_seq_strand,"with_"+str(del_len)+"_del",str(insert_seq_read.reference_start + del_pos), str(insert_seq_read.reference_start + del_pos + del_len)])))
+        # 根据te_size_dict中te的长度判断TE的起始和末端，进行一个修正
+        if insert_seq_read.reference_start - 1 - polish_te_st_en[insert_te]['start'] <= 2:
+            insert_seq_read_te_start = polish_te_st_en[insert_te]['start']
+            if break_seq_strand == '+':
+                break_1 = break_1 - (insert_seq_read.reference_start - 1 - polish_te_st_en[insert_te]['start'])
+            else:
+                break_2 = break_2 + (insert_seq_read.reference_start - 1 - polish_te_st_en[insert_te]['start'])
 
         else:
-            seq_break_list_all.append((break_1, break_2,":".join([insert_te , str(insert_seq_read.reference_start),str(insert_seq_read.reference_end) ,break_seq_strand ])))
-    
+            insert_seq_read_te_start = insert_seq_read.reference_start
+            
+
+        
+        if polish_te_st_en[insert_te]['end'] - insert_seq_read.reference_end + 1 <= 3 :
+            insert_seq_read_te_end = polish_te_st_en[insert_te]['end']
+            if break_seq_strand == '+':
+                break_2 = break_2 + (polish_te_st_en[insert_te]['end'] - insert_seq_read.reference_end + 1)
+            else:
+                break_1 = break_1 - (polish_te_st_en[insert_te]['end'] - insert_seq_read.reference_end + 1)
+        else:
+            insert_seq_read_te_end = insert_seq_read.reference_end
+            
+        
+        # insertion and deletion in insert TE sequence
+
+        indel_info = []
+        start_idx = 0
+        for op,op_len in insert_seq_read.cigartuples:
+            
+            if op == 3 and op_len > 15:
+                del_len = op_len
+                del_pos = start_idx
+                # print(del_len, del_pos , insert_seq_read.reference_start + del_pos)
+                indel_info.append("with_"+str(del_len)+"_del:"+ str(insert_seq_read.reference_start + del_pos)+ ":" +str(insert_seq_read.reference_start + del_pos+ del_len))
+
+            if op == 1 and op_len > 15:
+                ins_len = op_len
+                ins_pos = start_idx
+                # print(ins_len, ins_pos, insert_seq_read.reference_start + ins_pos)
+                indel_info.append("with_"+str(ins_len)+"_ins:"+ str(insert_seq_read.reference_start + ins_pos))
+
+
+            if op in (0, 2, 3, 7, 8):
+                start_idx += op_len
+        if len(indel_info) > 0:
+            seq_break_list_all.append((break_1, break_2,":".join([insert_te , str(insert_seq_read_te_start),str(insert_seq_read_te_end) ,break_seq_strand, "|".join(indel_info) ])))
+        else:
+            seq_break_list_all.append((break_1, break_2,":".join([insert_te , str(insert_seq_read_te_start),str(insert_seq_read_te_end) ,break_seq_strand ])))
+        
+      
     seq_break_list_all_sorted = sorted(seq_break_list_all, key = itemgetter(1))
     # print(seq_break_list_all_sorted)
 
 
-    polished_sequence = insert_con_sequence 
+    seq_break_dict = {}
+    seq_break_polish_flag_dic = {}
+    polish_flag = 'polish'
+    for seq_break_info in seq_break_list_all_sorted:
+        seq_break_info_te = seq_break_info[2].split(":")
+        if seq_break_info_te[0] not in seq_break_dict:
+            seq_break_dict[seq_break_info_te[0]] = [seq_break_info_te[1],seq_break_info_te[2]]
+            seq_break_polish_flag_dic[seq_break_info_te[0]] = polish_flag
+        else:
+            # print(seq_break_dict[seq_break_info_te[0]])
+            # print(int(seq_break_info_te[1]), int(seq_break_info_te[2]))
+            pref_interval = internal_Interval(int(seq_break_dict[seq_break_info_te[0]][0]), int(seq_break_dict[seq_break_info_te[0]][1]) )
+            next_interval = internal_Interval(int(seq_break_info_te[1]), int(seq_break_info_te[2]))
+            if pref_interval.overlaps(next_interval):
+                polish_flag = 'no_polish'
+                seq_break_polish_flag_dic[seq_break_info_te[0]] = polish_flag
+
     polished_sequence = []
 
 
     consensus_seq_print_list = []
     te_break_info_print_list = []
+    te_break_info_print_list_simple = []
+    te_break_info_index = {}
     # Q42: 将 consensus sequence 片段与 polished TEs sequence 片段进行拼接
     for i in range(len(seq_break_list_all_sorted)):
         break_p = seq_break_list_all_sorted[i]
@@ -1079,11 +1214,18 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
         break_te_start = break_te_info[1]
         break_te_end = break_te_info[2]
 
+        if break_te_ref not in te_break_info_index:
+            te_break_info_index[break_te_ref] = 1
+        else:
+            te_break_info_index[break_te_ref] = te_break_info_index[break_te_ref] + 1
+
+
         # left genome
         if i == 0:
             consensus_seq_print_list.append(consensus_seq[0:break_p[0]])
             te_break_info_print_list.append("0-"+str(break_p[0])+":genome")
             polished_sequence.append(consensus_seq[0:break_p[0]])
+            pref_break = break_p[0]
         
         # insert sequence
 
@@ -1092,13 +1234,31 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
         # i==0需要在开头加genome，然后再添加TE片段
         # i==len(seq_break_list_all_sorted) - 1，需要在TE片段后添加一段genome
         # 而且判断要分开，是有顺序的
+        if break_p[0] - pref_break > 0:
+            consensus_seq_print_list.append( consensus_seq[ pref_break : break_p[0] ].lower() )
+            polished_sequence.append( consensus_seq[ pref_break : break_p[0] ].lower() )
+            te_break_info_print_list.append( str(pref_break) + "-" + str(break_p[0]-1) + ":" + "unknown" )
+        elif break_p[0] - pref_break < 0:
+            consensus_seq_print_list.append( consensus_seq[ break_p[0] : pref_break ].lower() )
+            polished_sequence.append( consensus_seq[ break_p[0] : pref_break  ].lower() )
+            te_break_info_print_list.append( str(break_p[0]) + "-" + str(pref_break-1) + ":" + "unknown" )
+
+        pref_break = break_p[1]
+
         consensus_seq_print_list.append(consensus_seq[break_p[0]:break_p[1]])
-        te_break_info_print_list.append(str(break_p[0])+"-"+str(break_p[1]) + ":" + break_p[2])
-        if te_insert_strand[break_te_ref] == '-': # Q42: 所以 polishing 的思想是将 polished-TE sequence 片段替换原本的 consensus sequence 片段？
-            polished_sequence.append(revcomp(insert_con_sequence_dict[break_te_ref])[int(break_te_start):int(break_te_end)])
-        else:
-            polished_sequence.append(insert_con_sequence_dict[break_te_ref][int(break_te_start):int(break_te_end)])
+        te_break_info_print_list.append(str(break_p[0]) + "-" + str(break_p[1]) + ":" + break_p[2])
         
+        te_break_info_print_list_simple.append(break_p[2])
+        # insert sequence中，除了TE sequence，还有别的不知名的序列 
+        if seq_break_polish_flag_dic[break_te_ref] == 'polish':
+            if te_insert_strand[break_te_ref] == '-': # Q42: 所以 polishing 的思想是将 polished-TE sequence 片段替换原本的 consensus sequence 片段？
+                polished_sequence.append(revcomp(insert_con_sequence_dict[break_te_ref])[int(break_te_start):int(break_te_end)])
+            else:
+                polished_sequence.append(insert_con_sequence_dict[break_te_ref][int(break_te_start):int(break_te_end)])
+        else:
+            polished_sequence.append(consensus_seq[ break_p[0]:break_p[1] ])
+        
+
         # right genome
         if i == len(seq_break_list_all_sorted) - 1:
             consensus_seq_print_list.append(consensus_seq[break_p[1]:])
@@ -1107,6 +1267,7 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
 
     consensus_seq_print = '__'.join(consensus_seq_print_list) + "......" + "__".join(polished_sequence)
     te_break_info_print = '__'.join(te_break_info_print_list)
+    te_break_info_print_simple = "|".join(te_break_info_print_list_simple)
     seq_break_list_tsd = [seq_break_list_all_sorted[0][0], seq_break_list_all_sorted[-1][1]]
 
     
@@ -1120,7 +1281,8 @@ cdef tuple get_consensus(list seg_list, str out_path, str ref_name, str te_idx, 
     
     
     # return  consensus_seq_print , tsd_print , te_break_info_print, str(n_MM) + "_" + str(divergency) + "_" + str(divergency_polish) , consensus_meth
-    return  consensus_seq_print , tsd_print , te_break_info_print, str(n_MM) + "_" + str(divergency) + "|" + str(divergency_indel) + "|" + str(divergency_all) + "_" + str(divergency_polish)+ "|" + str(divergency_polish_indel) + "|" + str(divergency_polish_all) , consensus_meth, tsd_positions_st, tsd_positions_en
+    # return  consensus_seq_print , tsd_print , te_break_info_print, str(n_MM) + "_" + str(divergency) + "|" + str(divergency_indel) + "|" + str(divergency_all) + "_" + str(divergency_polish)+ "|" + str(divergency_polish_indel) + "|" + str(divergency_polish_all) , consensus_meth, tsd_positions_st, tsd_positions_en
+    return  [[consensus_seq_print , te_break_info_print, str(n_MM) + "_" + str(divergency) + "|" + str(divergency_indel) + "|" + str(divergency_all) + "_" + str(divergency_polish)+ "|" + str(divergency_polish_indel) + "|" + str(divergency_polish_all) , consensus_meth, te_break_info_print_simple, sorted(polish_te_type_list) ],[consensus_seq, seq_break_list_tsd, out_path, ref_name, c_id, genome_fa,  genome_idx]]
 
 
 cdef tuple get_tsd(str consensus_seq, list seq_break_list, str out_path, str ref_name, str c_id, str genome_fa,  str genome_idx ):
@@ -1341,7 +1503,7 @@ cdef list extract_seg(object read, object seg_fa, dict read_seq_dic, int flanksi
 
 
 ## align_mm2 ##
-cdef str align_mm2(str ref, str query, str outpath, int thread_mm2, str mismatch_model="", str preset="map-ont"):
+cdef str align_mm2(str ref, str query, str outpath, int thread_mm2, str mismatch_model="", str preset="map-ont", str secondary="--secondary=no"):
     # mismatch_model
     # 这个参数对genome是“”
     # 对TE是--eqx 
@@ -1356,7 +1518,7 @@ cdef str align_mm2(str ref, str query, str outpath, int thread_mm2, str mismatch
         str q_p = os.path.basename(query).rsplit('.', 1)[0]
         str ref_p = os.path.basename(ref).rsplit('.', 1)[0]
         str out_path = os.path.join(wk_dir, ref_p + '_' + q_p + '.bam')
-        list cmd_mm2 = ['minimap2', '-t', str(thread_mm2), '-aYx', preset, mismatch_model, '--secondary=no',ref, query, '|', 'samtools', 'view', '-bhS', '-', '|', 'samtools', 'sort', '-o', out_path, '-']
+        list cmd_mm2 = ['minimap2', '-t', str(thread_mm2), '-aYx', preset, mismatch_model, secondary, ref, query, '|', 'samtools', 'view', '-bhS', '-', '|', 'samtools', 'sort', '-o', out_path, '-']
         list cmd_idx = ['samtools index ' + out_path]
     
 
@@ -1396,7 +1558,10 @@ cdef cal_divergency(object read, str ref):
         n_M = n_PM + n_MM
         n_all = n_M + n_ins + n_del
 
-        divergency = float(n_MM) / ( n_PM + n_MM )
+        if n_PM + n_MM != 0:
+            divergency = float(n_MM) / ( n_PM + n_MM )
+        else:
+            divergency = 1
 
     if ref == 'genome':
         n_M = cigar_count[0]
@@ -1593,7 +1758,7 @@ cpdef process_cluster(dict cluster_dict, str chrom, str out_path, str genome_fa,
         
         if cluster_dict[c_id].state == 0:
             continue 
-        cluster_dict[c_id].get_consensus(genome_fa, genome_idx, te_anno_fa)
+        cluster_dict[c_id].get_consensus(genome_fa, genome_idx, te_anno_fa, te_size_dict)
         fout.write(cluster_dict[c_id].cluster2bed())
 
     fout.close()
