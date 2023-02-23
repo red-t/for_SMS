@@ -19,8 +19,24 @@ cdef inline char* getSequenceInRange(bam1_t *src,
         s[k-start] = seq_nt16_str[p[k//2] >> 4 * (1 - k%2) & 0xf]
 
     return seq
+#
+# ---------------------------------------------------------------
+#
+cdef int16_t LEFT_CLIP  = 0x1
+cdef int16_t MID_INSERT = 0x2
+cdef int16_t RIGHT_CLIP = 0x4
 
+cdef inline bint is_clip_or_insert(uint32_t op):
+    return op in {BAM_CSOFT_CLIP, BAM_CINS}
 
+cdef inline bint is_match(uint32_t op):
+    return op in {BAM_CMATCH, BAM_CEQUAL, BAM_CDIFF}
+
+cdef inline bint is_del_or_skip(uint32_t op):
+    return op in {BAM_CDEL, BAM_CREF_SKIP}
+#
+# ---------------------------------------------------------------
+#
 cdef class InsertSegment:
     def __init__(self):
         # see bam_init1
@@ -266,7 +282,7 @@ cdef int parse_cigar(bam1_t *src,
         tmp_segl: list
             temporary list used to stored the new InsertSegment ins
             tances.
-            
+        
         minl: uint8_t
             minimum segment length, S/I CIGAR option with length >=
             minl will be extracted.
@@ -276,11 +292,10 @@ cdef int parse_cigar(bam1_t *src,
         nseg: int16_t
             number of insert segments extracted from this alignment
     '''
-    cdef int16_t        stype   = 0
     cdef int16_t        nseg    = 0
     cdef int16_t        otype   = 0
     cdef int32_t        qpos    = 0
-    cdef int32_t        rpos, qst, qend
+    cdef int32_t        rpos, qend
     cdef uint32_t       op, l, k, n, m
     cdef uint32_t       *cigar_p
     cdef InsertSegment  iseg
@@ -293,27 +308,25 @@ cdef int parse_cigar(bam1_t *src,
     for k from 0 <= k < n:
         op = cigar_p[k] & BAM_CIGAR_MASK
         l = cigar_p[k] >> BAM_CIGAR_SHIFT
-        if op==0 or op==7 or op==8:
+        if is_match(op):
             qpos += l
             rpos += l
-        elif op==1 or op==4 or op==6:
+        elif is_clip_or_insert(op):
             if l >= minl:
-                qst = qpos
                 qend = qpos+l
                 if k==0:
-                    stype = 0x1
-                    otype |= 0x1
+                    iseg   = makeInsertSegment(src, qpos, qend, rpos, LEFT_CLIP)
+                    otype |= LEFT_CLIP
                 elif k==m:
-                    stype = 0x4
-                    otype |= 0x4
+                    iseg   = makeInsertSegment(src, qpos, qend, rpos, RIGHT_CLIP)
+                    otype |= RIGHT_CLIP
                 else:
-                    stype = 0x2
-                    otype |= 0x2
-                iseg = makeInsertSegment(src, qst, qend, rpos, stype)
+                    iseg   = makeInsertSegment(src, qpos, qend, rpos, MID_INSERT)
+                    otype |= MID_INSERT
                 tmp_segl.append(iseg)
                 nseg += 1
             qpos += l
-        elif op==2 or op==3:
+        elif is_del_or_skip(op):
             rpos += l
     
     if nseg == 1:
@@ -389,7 +402,7 @@ cdef void compute_feature_single(uint32_t *cigar_p,
     
     # compute overhang
     overhang = rpos - pos
-    if stype & 0x2:
+    if stype & MID_INSERT:
         overhang = rpos - seg_rpos
         overhang1 = seg_rpos - pos
         if overhang > overhang1:
@@ -473,7 +486,7 @@ cdef void compute_feature_multi(uint32_t *cigar_p,
     
     # compute overhang for the first segment
     overhang =  rpos - pos
-    if stype & 0x2:
+    if stype & MID_INSERT:
         overhang  = rpos - s_rpos
         overhang1 = s_rpos - pos
         if overhang > overhang1:
@@ -494,7 +507,7 @@ cdef void compute_feature_multi(uint32_t *cigar_p,
         s_rpos   =  seg.rpos
         stype    =  seg.stype
         overhang =  rpos - pos
-        if stype & 0x2:
+        if stype & MID_INSERT:
             overhang  = rpos - s_rpos
             overhang1 = s_rpos - pos
             if overhang > overhang1:
