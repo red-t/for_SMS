@@ -251,7 +251,7 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
 #
 # ---------------------------------------------------------------
 #
-cdef void parse_cigar(bam1_t *src,
+cdef int parse_cigar(bam1_t *src,
                      list tmp_segl,
                      uint8_t minl=50):
     '''parse CIGAR
@@ -262,12 +262,19 @@ cdef void parse_cigar(bam1_t *src,
     -----------
         src: bam1_t
             single record pointer read from BAM file.
+
         tmp_segl: list
             temporary list used to stored the new InsertSegment ins
-            tances
+            tances.
+            
         minl: uint8_t
             minimum segment length, S/I CIGAR option with length >=
             minl will be extracted.
+    
+    Returns:
+    --------
+        nseg: int16_t
+            number of insert segments extracted from this alignment
     '''
     cdef int16_t        stype   = 0
     cdef int16_t        nseg    = 0
@@ -314,6 +321,8 @@ cdef void parse_cigar(bam1_t *src,
         compute_feature_single(cigar_p, n, iseg, rpos, otype, nseg)
     elif nseg > 1:
         compute_feature_multi(cigar_p, n, tmp_segl, rpos, otype, nseg)
+    
+    return nseg
 #
 # ---------------------------------------------------------------
 #
@@ -504,11 +513,3 @@ cdef void compute_feature_multi(uint32_t *cigar_p,
         seg.overhang = overhang
         seg.ldist    = dist
         p_seg.rdist  = dist
-#
-# ---------------------------------------------------------------
-#
-cdef merge_intervals():
-    pass
-#
-# ---------------------------------------------------------------
-#

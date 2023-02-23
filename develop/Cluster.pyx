@@ -12,49 +12,53 @@ cdef class Cluster:
 #
 # ---------------------------------------------------------------
 #
-cpdef void merge_segments(BamFile wbf,
-                          list    segments,
+cpdef void merge_segments(list    segments,
                           int     tid,
-                          int     fsize):
-    '''merge overlapped segments into cluster'''
-    cdef list clusters = []
+                          int     maxdist):
+    '''merge overlapped segments into cluster
+    
+    Parameters:
+    -----------
+        segments: list
+            list of segments, sorted by rpos
+        
+        tid: int
+            chromosome id of the segments
+        
+        maxdist: int
+            max merging distance. segments with distance larger t-
+            han maxdist will not be merged in to the same cluster
+    '''
     cdef Cluster c
     cdef InsertSegment s
+    cdef list clusters = []
     cdef int i, j, start, end, n
     
-    # 开始合并
     i = 0
     n = len(segments)
     while i < n:
         s     = segments[i]
         c     = Cluster()
         start = s.rpos - 1
-        end   = s.rpos + fsize
-
-        # 添加 cluster 的第一个 segment
+        end   = s.rpos + maxdist
         c.add(s)
-        wbf.write(s)
 
-        # 寻找需要合并的区间
+        # try to merge segments within maxdist iteratively
         j = i + 1
         while j < n:
             s = segments[j]
             if s.rpos <= end:
-                # 如果有 overlap，将segment添加到cluster当中
                 c.add(s)
-                wbf.write(s)
-                # 更新区间的边界
-                end = s.rpos + fsize
+                end = s.rpos + maxdist
                 j += 1
             else:
                 break
         
-        # 将 cluster 添加到结果当中
         c.start = start
-        c.end   = end - fsize
+        c.end   = end - maxdist
         c.nseg  = j - i
         clusters.append(c)
-        # 跳过已经合并的区间
+        # jump merged segments
         i = j
     
     CLUSTER_DICT[tid] = clusters
@@ -67,8 +71,39 @@ cpdef dict build_cluster(str     fpath   = 'ex2.bam',
                          uint8_t stid    = 0,
                          uint8_t maxtid  = 15,
                          uint8_t minl    = 50,
-                         uint8_t fsize   = 50):
-    '''build cluster'''
+                         uint8_t maxdist = 50):
+    '''build cluster
+    Parameters:
+    -----------
+        fpath: str
+            path of input BAM file.
+        
+        outpath: str
+            file name/path for the output alignments that contain
+            insert segment(s).
+        
+        threads: int32_t
+            nummber of threads used for BAM file I/O.
+        
+        stid: uint8_t
+            start tid, cluster building start from stid-th contig.
+        
+        maxtid: uint8_t
+            max tid, cluster building end at (maxtid-1)-th contig.
+        
+        minl: uint8_t
+            minimun segment length, cigar operation with length < 
+            minl will not be used to create insert segment.
+        
+        maxdist: uint8_t
+            max merging distance, segments with distance larger t-
+            han maxdist will not be merged in to the same cluster.
+    
+    Returns:
+    --------
+        CLUSTER_DICT: dict
+            dictionary of clusters, tid -> list_of_Cluster.
+    '''
     cdef BamFile rbf, wbf
     cdef str  rmode = "rb"
     cdef str  wmode = "wb"
@@ -76,22 +111,23 @@ cpdef dict build_cluster(str     fpath   = 'ex2.bam',
     cdef list segments
     cdef dict SEG_DICT
 
-    # read and parse alignments
+    # parse alignments
     rbf = BamFile(fpath, threads, rmode)
-    SEG_DICT = rbf.fetch(stid, maxtid, minl)
-
-    # create a BamFile object for writing
     wbf = BamFile(outpath, threads, wmode, rbf)
-    rbf.close(); del rbf
+    SEG_DICT = rbf.fetch(wbf, stid, maxtid, minl)
 
-    # call merge_intervals() for segments on each chromosome 
+    # close file after I/O
+    rbf.close(); del rbf
+    wbf.close(); del wbf
+
+    # build cluster fo each chromosome
     for tid in range(stid, maxtid):
-        # 按照 rpos 排序
+        # sort segments by rpos
         segments = SEG_DICT[tid]
         segments.sort()
 
-        # 合并相邻的区间，创建 cluster
-        merge_segments(wbf, segments, tid, fsize)
+        # merge segments into cluster
+        merge_segments(segments, tid, maxdist)
     
-    wbf.close(); del wbf; del SEG_DICT
+    del SEG_DICT
     return CLUSTER_DICT

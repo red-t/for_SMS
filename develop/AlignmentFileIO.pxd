@@ -38,8 +38,8 @@ cdef class BamFile:
 
     cdef  void      _open(self, BamFile template=*)
     cdef  htsFile   *_open_htsfile(self) except? NULL
-    cpdef dict      fetch(self, uint8_t stid, uint8_t maxtid, uint8_t minl=*)
-    cpdef void       write(self, InsertSegment iseg)
+    cpdef dict      fetch(self, BamFile wbf, uint8_t stid, uint8_t maxtid, uint8_t minl=*)
+    cpdef void      write(self, InsertSegment iseg)
 
 
 
@@ -58,11 +58,12 @@ cdef class IteratorSingle:
 
 
 cdef class Iterator:
-    """Iterator(BamFile bamfile, int stid, int maxtid)
+    """Iterator(BamFile bamfile, BamFile wbf, int stid, int maxtid)
 
     A class for iterating over mapped reads in all specified chromosomes
     """
     cdef BamFile bamfile
+    cdef BamFile wbf
     cdef htsFile *htsfile
     cdef hts_idx_t *index
     cdef IteratorSingle rowiter

@@ -28,6 +28,6 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
                                      int16_t stype)
 
 
-cdef void parse_cigar(bam1_t *src,
-                      list tmp_segl,
-                      uint8_t minl=*)
+cdef int parse_cigar(bam1_t *src,
+                     list tmp_segl,
+                     uint8_t minl=*)

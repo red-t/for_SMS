@@ -97,13 +97,16 @@ cdef class BamFile:
                     hts_set_threads(htsfile, threads)
                 return htsfile
 
-    cpdef dict fetch(self, uint8_t stid, uint8_t maxtid, uint8_t minl=50):
+    cpdef dict fetch(self, BamFile wbf, uint8_t stid, uint8_t maxtid, uint8_t minl=50):
         '''fetch reads aligned on chromosome stid ~ maxtid-1
         
         Usage: fetch(0, 2) to fetch reads aligned on 0,1 (tid)
 
         Parameters
         ----------
+        wbf: BamFile
+            BamFile object opened for writting.
+
         stid: uint8_t
             tid of start chromosome, include.
 
@@ -125,7 +128,7 @@ cdef class BamFile:
         for i in range(stid, maxtid):
             SEG_DICT[i] = []
         
-        ite = Iterator(self, stid, maxtid, minl)
+        ite = Iterator(self, wbf, stid, maxtid, minl)
         for i in ite:
             continue
 
@@ -177,8 +180,9 @@ cdef class IteratorSingle:
 # ---------------------------------------------------------------
 #
 cdef class Iterator:
-    def __init__(self, BamFile bamfile, uint8_t stid, uint8_t maxtid, uint8_t minl):
+    def __init__(self, BamFile bamfile, BamFile wbf, uint8_t stid, uint8_t maxtid, uint8_t minl):
         self.bamfile = bamfile
+        self.wbf = wbf
         self.htsfile = bamfile.htsfile
         self.index = bamfile.index
         self.tid = -1
@@ -197,6 +201,7 @@ cdef class Iterator:
         '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
         cdef int n, l, retval
         cdef list tmp_segl = []
+        cdef InsertSegment iseg
         # Create an initial iterator
         if self.tid == -1:
             self.tid = self.stid
@@ -210,7 +215,10 @@ cdef class Iterator:
                 l = self.rowiter.b.core.l_qseq
                 if n==0 or l==0:
                     continue
-                parse_cigar(self.rowiter.b, tmp_segl, self.minl)
+                retval = parse_cigar(self.rowiter.b, tmp_segl, self.minl)
+                if retval > 0:
+                    iseg = tmp_segl[-1]
+                    self.wbf.write(iseg)
                 continue
 
             SEG_DICT[self.tid] = tmp_segl
@@ -221,9 +229,3 @@ cdef class Iterator:
                 self.nextiter()
             else:
                 raise StopIteration
-#
-# ---------------------------------------------------------------
-#
-cpdef test(list tmp_segl, int val):
-    seg=tmp_segl[-1]
-    seg.rpos = val
