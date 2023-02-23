@@ -46,6 +46,9 @@ cdef class InsertSegment:
     def __dealloc__(self):
         bam_destroy1(self._delegate)
     
+    def __lt__(self, InsertSegment other):
+        return self.rpos < other.rpos
+    
     property qname:
         '''the query template name (None if not present)'''
         def __get__(self):

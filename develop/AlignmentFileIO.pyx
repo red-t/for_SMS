@@ -224,23 +224,6 @@ cdef class Iterator:
 #
 # ---------------------------------------------------------------
 #
-# cdef void build_cluster(str     filepath,
-#                         int32_t threads,
-#                         uint8_t stid,
-#                         uint8_t maxtid,
-#                         uint8_t minl):
-#     '''build cluster'''
-#     cdef BamFile rbf, wbf
-#     cdef char *rmode = b"rb"
-#     cdef char *wmode = b"wb"
-
-#     rbf = BamFile(filepath, threads)
-#     rbf.fetch(stid, maxtid, minl)
-
-#     pass
-#
-# ---------------------------------------------------------------
-#
 cpdef test(list tmp_segl, int val):
     seg=tmp_segl[-1]
     seg.rpos = val

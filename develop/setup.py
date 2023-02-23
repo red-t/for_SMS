@@ -8,6 +8,8 @@ ext = [
     Extension(name="SegmentParser", sources=["SegmentParser.pyx"],
                 include_dirs=["./htslib"]+pysam.get_include(), libraries=["hts"], library_dirs=["./htslib"]),
     Extension(name="AlignmentFileIO", sources=["AlignmentFileIO.pyx"],
+                include_dirs=["./htslib"]+pysam.get_include(), libraries=["hts"], library_dirs=["./htslib"]),
+    Extension(name="Cluster", sources=["Cluster.pyx"],
                 include_dirs=["./htslib"]+pysam.get_include(), libraries=["hts"], library_dirs=["./htslib"])
     ]
 
