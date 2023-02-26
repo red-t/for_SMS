@@ -8,13 +8,13 @@ cdef class Cluster:
 
     cpdef add(self, InsertSegment iseg):
         '''add adjacent segment into cluster'''
-        self.segments.append(iseg)
+        self.segments.append((iseg.qstart, iseg.qend, iseg.rpos, iseg.stype, iseg.qname))
 #
 # ---------------------------------------------------------------
 #
-cpdef void merge_segments(list    segments,
-                          int     tid,
-                          int     maxdist):
+cdef void merge_segments(list    segments,
+                         int     tid,
+                         int     maxdist):
     '''merge overlapped segments into cluster
     
     Parameters:
@@ -65,22 +65,17 @@ cpdef void merge_segments(list    segments,
 #
 # ---------------------------------------------------------------
 #
-cpdef dict build_cluster(str     fpath   = 'ex2.bam',
-                         str     outpath = 'all_supp_reads.bam',
-                         int32_t threads = 5,
-                         uint8_t stid    = 0,
-                         uint8_t maxtid  = 15,
-                         uint8_t minl    = 50,
-                         uint8_t maxdist = 50):
+cpdef dict build_cluster(str     fpath,
+                         int32_t threads,
+                         uint8_t stid,
+                         uint8_t maxtid,
+                         uint8_t minl,
+                         uint8_t maxdist):
     '''build cluster
     Parameters:
     -----------
         fpath: str
             path of input BAM file.
-        
-        outpath: str
-            file name/path for the output alignments that contain
-            insert segment(s).
         
         threads: int32_t
             nummber of threads used for BAM file I/O.
@@ -105,11 +100,12 @@ cpdef dict build_cluster(str     fpath   = 'ex2.bam',
             dictionary of clusters, tid -> list_of_Cluster.
     '''
     cdef BamFile rbf, wbf
-    cdef str  rmode = "rb"
-    cdef str  wmode = "wb"
     cdef int  tid
     cdef list segments
     cdef dict SEG_DICT
+    cdef str  rmode   = "rb"
+    cdef str  wmode   = "wb"
+    cdef str  outpath = "tmp.all_supp_reads.{}.bam".format(stid)
 
     # parse alignments
     rbf = BamFile(fpath, threads, rmode)

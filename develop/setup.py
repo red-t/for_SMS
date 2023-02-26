@@ -10,6 +10,8 @@ ext = [
     Extension(name="AlignmentFileIO", sources=["AlignmentFileIO.pyx"],
                 include_dirs=["./htslib"]+pysam.get_include(), libraries=["hts"], library_dirs=["./htslib"]),
     Extension(name="Cluster", sources=["Cluster.pyx"],
+                include_dirs=["./htslib"]+pysam.get_include(), libraries=["hts"], library_dirs=["./htslib"]),
+    Extension(name="ParallelTemplate", sources=["ParallelTemplate.pyx"],
                 include_dirs=["./htslib"]+pysam.get_include(), libraries=["hts"], library_dirs=["./htslib"])
     ]
 
