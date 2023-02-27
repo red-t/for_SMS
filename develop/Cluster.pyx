@@ -8,7 +8,11 @@ cdef class Cluster:
 
     cpdef add(self, InsertSegment iseg):
         '''add adjacent segment into cluster'''
-        self.segments.append((iseg.qstart, iseg.qend, iseg.rpos, iseg.stype, iseg.qname))
+        self.segments.append((iseg.qstart,
+                              iseg.qend,
+                              iseg.rpos,
+                              iseg.stype,
+                              iseg.qname))
 #
 # ---------------------------------------------------------------
 #

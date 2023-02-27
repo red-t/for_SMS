@@ -20,25 +20,31 @@ cdef class BamFile:
     ----------
     filepath: str
         Alias for `filename`.
+
     nthreads: int32_t
         Number of threads to use for decompressing BAM files. (Default=1)
+
     mode: str
         opening mode, 'rb' for reading, 'wb' for writing. (Default='rb')
+
     template: BamFile
         an exisiting BamFile instance, it is necessary for writting. (Default=None)
     """
-    # cdef    AlignmentHeader header
-    cdef    htsFile *htsfile        # pointer to htsFile structure
-    cdef    hts_idx_t *index        # pointer to hts_idx_t structure
-    cdef    bam_hdr_t  *hdr         # pointer to bam_hdr_t structure
-    cdef    char *filename          # filename as supplied by user
-    cdef    char *index_filename    # filename of index
-    cdef    char *mode              # opening mode
-    cdef    int32_t threads         # number of threads to use
+    cdef    htsFile   *htsfile          # pointer to htsFile structure
+    cdef    hts_idx_t *index            # pointer to hts_idx_t structure
+    cdef    bam_hdr_t *hdr              # pointer to bam_hdr_t structure
+    cdef    char      *filename         # filename as supplied by user
+    cdef    char      *index_filename   # filename of index
+    cdef    char      *mode             # opening mode
+    cdef    int32_t   threads           # number of threads to use
 
     cdef  void      _open(self, BamFile template=*)
     cdef  htsFile   *_open_htsfile(self) except? NULL
-    cpdef dict      fetch(self, BamFile wbf, uint8_t stid, uint8_t maxtid, uint8_t minl=*)
+    cpdef dict      fetch(self,
+                          BamFile wbf,
+                          uint8_t stid,
+                          uint8_t maxtid,
+                          uint8_t minl=*)
     cpdef void      write(self, InsertSegment iseg)
 
 
@@ -48,8 +54,8 @@ cdef class IteratorSingle:
 
     A class for iterating over mapped reads in single chromosome.
     """
-    cdef bam1_t *b          # pointer to a record in BAM file, change when call `cnext`
-    cdef htsFile *htsfile   # pointer to htsFile structure
+    cdef bam1_t    *b       # pointer to a record in BAM file, change when call `cnext`
+    cdef htsFile   *htsfile # pointer to htsFile structure
     cdef hts_idx_t *index   # pointer to hts_idx_t structure
     cdef hts_itr_t *iter    # pointer to hts_itr_t structure, iterator from htslib
 
@@ -62,10 +68,10 @@ cdef class Iterator:
 
     A class for iterating over mapped reads in all specified chromosomes
     """
-    cdef BamFile bamfile
-    cdef BamFile wbf
-    cdef htsFile *htsfile
-    cdef hts_idx_t *index
+    cdef BamFile        bamfile
+    cdef BamFile        wbf
+    cdef htsFile        *htsfile
+    cdef hts_idx_t      *index
     cdef IteratorSingle rowiter
-    cdef uint8_t stid, maxtid, minl
-    cdef int8_t tid
+    cdef uint8_t        stid, maxtid, minl
+    cdef int8_t         tid

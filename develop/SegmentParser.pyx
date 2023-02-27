@@ -1,6 +1,6 @@
 # filename: SegmentParser.pyx
 
-cdef inline char* getSequenceInRange(bam1_t *src,
+cdef inline char* getSequenceInRange(bam1_t   *src,
                                      uint32_t start,
                                      uint32_t end):
     '''return python string of the sequence in a bam1_t object.'''
@@ -42,14 +42,16 @@ cdef class InsertSegment:
         # see bam_init1
         self._delegate = <bam1_t*>calloc(1, sizeof(bam1_t))
         if self._delegate == NULL:
-            raise MemoryError("could not allocated memory of {} bytes".format(sizeof(bam1_t)))
+            raise MemoryError("could not allocated memory of "
+                              "{} bytes".format(sizeof(bam1_t)))
         # allocate some memory. If size is 0, calloc does not return a
         # pointer that can be passed to free() so allocate 40 bytes
         # for a new read
         self._delegate.m_data = 40
         self._delegate.data = <uint8_t *>calloc(self._delegate.m_data, 1)
         if self._delegate.data == NULL:
-            raise MemoryError("could not allocate memory of {} bytes".format(self._delegate.m_data))
+            raise MemoryError("could not allocate memory of "
+                              "{} bytes".format(self._delegate.m_data))
         self._delegate.l_data = 0
         # set some data to make read approximately legit.
         # Note, SAM writing fails with q_name of length 0
@@ -96,9 +98,9 @@ cdef class InsertSegment:
     
     property q_len:
         '''
-        the length of the query/read, corresponds to the length of the 
-        sequence supplied in the BAM/SAM file. The length of a query is
-        0 if there is no sequence in the BAM/SAM file.
+        the length of the query/read, corresponds to the length of 
+        the sequence supplied in the BAM/SAM file. The length of a
+        query is 0 if there is no sequence in the BAM/SAM file.
         '''
         def __get__(self):
             return self._delegate.core.l_qseq
@@ -185,7 +187,7 @@ cdef class InsertSegment:
         cdef bam1_t  *src
         cdef uint8_t *v
         cdef bytes   btag
-        cdef double value
+        cdef double  value
 
         src = self._delegate
         btag = tag.encode(TEXT_ENCODING, ERROR_HANDLER)
@@ -242,14 +244,20 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
     -----------
         src: bam1_t
             a bam1_t pointer, point to a single alignment record.
+
         qstart: int32_t
             query start of the insert/clip segment, include.
+
         qend: int32_t
             query end of the insert/clip segment, not include.
+
         rpos: int32_t
-            reference position of the insert/clip segment, corresponds to `qend`.
+            reference position of the insert/clip segment, corres-
+            ponds to `qend`.
+            
         stype: int16_t
-            segment type, 0x1:left-clip, 0x2:mid-insert, 0x4:right-clip
+            segment type, 0x1:left-clip, 0x2:mid-insert, 0x4:right-
+            clip
     
     Returns:
     --------
@@ -342,9 +350,9 @@ cdef int parse_cigar(bam1_t *src,
 cdef void compute_feature_single(uint32_t *cigar_p,
                                  uint32_t n,
                                  InsertSegment seg,
-                                 int32_t rpos,
-                                 int16_t otype,
-                                 int16_t nseg):
+                                 int32_t  rpos,
+                                 int16_t  otype,
+                                 int16_t  nseg):
     '''compute features for single Insertsegment
     
     compute features for single Insertsegment, including:
@@ -368,15 +376,20 @@ cdef void compute_feature_single(uint32_t *cigar_p,
     -----------
         cigar_p: uint32_t *
             pointer of the alignment's cigar data.
+
         n: uint32_t
             number of cigar.
+
         seg: InsertSegment
             InsertSegment object.
+
         rpos: int32_t
             the last reference position after traversing all the cigar.
+
         otype: int16_t
             type of the alignment, just like SAM flags. (left-clip:0x1,
             mid-insert:0x2, right-clip:0x4).
+
         nseg: int16_t
             number of segment extracted from the same alignment
     '''
@@ -419,10 +432,10 @@ cdef void compute_feature_single(uint32_t *cigar_p,
 #
 cdef void compute_feature_multi(uint32_t *cigar_p,
                                 uint32_t n,
-                                list tmp_segl,
-                                int32_t rpos,
-                                int16_t otype,
-                                int16_t nseg):
+                                list     tmp_segl,
+                                int32_t  rpos,
+                                int16_t  otype,
+                                int16_t  nseg):
     '''compute features for multiple Insertsegment
 
     compute features for multiple Insertsegment, including:
@@ -451,15 +464,20 @@ cdef void compute_feature_multi(uint32_t *cigar_p,
     -----------
         cigar_p: uint32_t *
             pointer of the alignment's cigar data.
+
         n: uint32_t
             number of cigar.
+
         tmp_segl: list
             list of InsertSegment objects.
+
         rpos: int32_t
             the last reference position after traversing all the cigar.
+
         otype: int16_t
             type of the alignment, just like SAM flags. (left-clip:0x1,
             mid-insert:0x2, right-clip:0x4).
+            
         nseg: int16_t
             number of segment extracted from the same alignment
     '''
