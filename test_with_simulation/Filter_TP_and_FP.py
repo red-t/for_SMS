@@ -38,10 +38,10 @@ def classification(qbed, rbed):
     '''
 
     tabix        = pysam.TabixFile(rbed)
-    tp_outf      = open("TP.bed", "w")
     fp_outf      = open("FP.bed", "w")
     special_outf = open("Special.bed", "w")
 
+    oid_id  = {}
     tp_dict = {}
     fp_dict = {}
     for l in open(qbed, "r"):
@@ -63,13 +63,13 @@ def classification(qbed, rbed):
             try:
                 row = ite.next()
                 n  += 1
-                tp_outf.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
-                              chrom, l[1], l[2], row[3], l[4], l[5], l[3]))
+                # oid <- [tchrom, tstart, tend, tid, nseg, tstrand, ostart, oend, oid, nconsist]
+                oid_id[l[3]]  = [row[0], row[1], row[2], row[3], l[4], row[5], l[1], l[2], l[3], 0]
                 tp_dict[l[3]] = set()
             except StopIteration:
                 if n == 0:
                     fp_outf.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(
-                                chrom, l[1], l[2], l[3], l[4], '*'))
+                                  chrom, l[1], l[2], l[3], l[4], '*'))
                     fp_dict[l[3]] = set()
                 break
         
@@ -77,30 +77,61 @@ def classification(qbed, rbed):
             special_outf.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(
                                chrom, l[1], l[2], l[3], l[4], '*'))
 
-    tp_outf.close()
     fp_outf.close()
     special_outf.close()
-    return tp_dict, fp_dict
+    return tp_dict, fp_dict, oid_id
 
 # ---------------------------------------------------------------
 
-def tp_filter(segf, tp_dict, idxreads, rbf):
+def tp_filter(segf, tp_dict, fp_dict, oid_id, idxreads, rbf):
 
     # fetch all support alignments of tp candidates
     for l in open(segf, "r"):
-        l = l.split()
-        if l[7] in tp_dict:
-            tp_dict[l[7]].add((l[16], int(l[11])))
+        l     = l.split()
+        chr   = l[0]
+        oid   = l[7]
+        rpos  = int(l[11])
+        qname = l[16]
+        
+        # determine if candidate of segment overlaps with ground truth
+        if oid in tp_dict:
+            tp_dict[oid].add((qname, rpos))
+            # determine if chr of segment consist with candidate
+            qchr  = qname.split("_")[0]
+            qchr  = qchr.split(";")[1]
+            if chr == qchr:
+                oid_id[oid][-1] += 1
+    # ---------------------------------------------------
+    # open file for writting
+    fp_outf = open("FP.bed", "a")
+    tp_outf = open("TP.bed", "a")
+    oids    = list(tp_dict.keys())
+    for oid in oids:
+        if oid_id[oid][-1] == 0:
+            tp_dict.pop(oid)
+            fp_outf.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                          oid_id[oid][0], oid_id[oid][6], oid_id[oid][7],
+                          oid_id[oid][8], oid_id[oid][4], "*"))
+            fp_dict[oid] = set()
+        else:
+            tp_outf.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                          oid_id[oid][0], oid_id[oid][1], oid_id[oid][2],
+                          oid_id[oid][3], oid_id[oid][4], oid_id[oid][5],
+                          oid_id[oid][6], oid_id[oid][7], oid_id[oid][8]))
 
+    # close
+    fp_outf.close()
+    tp_outf.close()
+    # ---------------------------------------------------
     # filter & write out tp support alignments
-    for id in tp_dict:
+    for oid in tp_dict:
 
         # open output file for each tp candidate
-        wbfn = 'tp_{}.bam'.format(id)
-        wbf = pysam.AlignmentFile(wbfn, "wb", template=rbf)
+        wbfn = 'tp_{}.bam'.format(oid)
+        wbf  = pysam.AlignmentFile(wbfn, "wb", template=rbf)
         
         # filter tp support alignment based on it's segment information
-        for qname, rpos in tp_dict[id]:
+        for qname, rpos in tp_dict[oid]:
             ite = idxreads.find(qname)
             while 1:
                 try:
@@ -121,19 +152,22 @@ def fp_filter(segf, fp_dict, idxreads, rbf):
 
     # fetch all support alignments of fp candidates
     for l in open(segf, "r"):
-        l = l.split()
-        if l[7] in fp_dict:
-            fp_dict[l[7]].add((l[16], int(l[11])))
+        l     = l.split()
+        oid   = l[7]
+        rpos  = int(l[11])
+        qname = l[16]
+        if oid in fp_dict:
+            fp_dict[oid].add((qname, rpos))
 
     # filter & write out fp support alignments
-    for id in fp_dict:
+    for oid in fp_dict:
 
         # open output file for each fp candidate
-        wbfn = 'fp_{}.bam'.format(id)
+        wbfn = 'fp_{}.bam'.format(oid)
         wbf = pysam.AlignmentFile(wbfn, "wb", template=rbf)
         
         # filter fp support alignment based on it's segment information
-        for qname, rpos in fp_dict[id]:
+        for qname, rpos in fp_dict[oid]:
             ite = idxreads.find(qname)
             while 1:
                 try:
@@ -150,7 +184,7 @@ def fp_filter(segf, fp_dict, idxreads, rbf):
 
 # ---------------------------------------------------------------
 
-def init_tp_dict(chr):
+def init_tp_dict(chrom):
     '''initialize tp_dict from TP.bed
 
     Returns
@@ -161,12 +195,18 @@ def init_tp_dict(chr):
     '''
     tp_dict = {}
     for l in open("TP.bed", "r"):
-        l = l.strip().split()
-        if l[0] == chr:
-            if l[3] in tp_dict:
-                tp_dict[l[3]].append((l[0], int(l[1]), int(l[2]), l[6]))
+        l     = l.strip().split()
+        chr   = l[0]
+        start = int(l[1])
+        end   = int(l[2])
+        id    = l[3]
+        oid   = l[8]
+
+        if chr == chrom:
+            if id in tp_dict:
+                tp_dict[id].append((chr, start, end, oid))
             else:
-                tp_dict[l[3]] = [(l[0], int(l[1]), int(l[2]), l[6])]
+                tp_dict[id] = [(chr, start, end, oid)]
 
     return tp_dict
 
@@ -216,7 +256,7 @@ def find_target_hg(pgdf, tp_dict, ins2hg, sub_size=50):
 
 # ---------------------------------------------------------------
 
-def deep_filter(tp_dict, ins2hg):
+def deep_filter(tp_dict, ins2hg, chr):
     '''fiter tp alignments based on hg
 
     filter true support/unsupport alignments based on tp_dict a-
@@ -239,6 +279,7 @@ def deep_filter(tp_dict, ins2hg):
         insl = tp_dict[id]
         for ins in insl:
             n   = 0
+            m   = 0
             oid = ins[3]
 
             # open file for reading
@@ -254,9 +295,18 @@ def deep_filter(tp_dict, ins2hg):
             # filter true/false support alignments
             # based on target & source hg
             for read in rbf.fetch():
+                # filter by qchr & chr
+                qchr = read.query_name.split("_")[0]
+                qchr = qchr.split(";")[1]
+                if qchr != chr:
+                    n += 1
+                    tp_f.write(read)
+                    continue
+                # filter by source & target hg
                 hg = read.query_name.split("hg")[1]
                 hg = int(hg.split(":")[0])
                 if hg in ins2hg[id]:
+                    m += 1
                     tp_t.write(read)
                 else:
                     n += 1
@@ -268,9 +318,14 @@ def deep_filter(tp_dict, ins2hg):
             rbf.close()
 
             # build index
-            if n == 0:
+            if   n == 0:
+                # print("all support alignments of {} is true".format(oid))
                 cmd_idx = ['mv tp_{}.bam tp_t_{}.bam && mv tp_{}.bam.bai tp_t_{}.bam.bai && rm tp_f_{}.bam'.format(oid, oid, oid, oid, oid)]
+            elif m == 0:
+                print("all support alignments of {} is false".format(oid))
+                cmd_idx = ['mv tp_{}.bam tp_f_{}.bam && mv tp_{}.bam.bai tp_f_{}.bam.bai && rm tp_t_{}.bam'.format(oid, oid, oid, oid, oid)]
             else:
+                # print("there are both true & flase support alignments of {}".format(oid))
                 cmd_idx = ['rm tp_{}.bam && rm tp_{}.bam.bai && samtools index tp_t_{}.bam && samtools index tp_f_{}.bam'.format(oid, oid, oid, oid)]
 
             idx_proc = Popen(cmd_idx, stderr=DEVNULL, shell=True, executable='/bin/bash')
@@ -293,10 +348,10 @@ if __name__ == '__main__':
     idxreads.build()
 
     # classify TP/FP based on ground truth
-    tp_dict, fp_dict = classification(args.qbed, args.rbed)
+    tp_dict, fp_dict, oid_id = classification(args.qbed, args.rbed)
 
     # primary filter
-    tp_filter(args.segf, tp_dict, idxreads, rbf)
+    tp_filter(args.segf, tp_dict, fp_dict, oid_id, idxreads, rbf)
     fp_filter(args.segf, fp_dict, idxreads, rbf)
 
     # close
@@ -318,7 +373,7 @@ if __name__ == '__main__':
             find_target_hg(pgdf, tp_dict, ins2hg)
         
         # perform deep filteration
-        deep_filter(tp_dict, ins2hg)
+        deep_filter(tp_dict, ins2hg, chr)
 
 
 # python Filter_TP_and_FP.py

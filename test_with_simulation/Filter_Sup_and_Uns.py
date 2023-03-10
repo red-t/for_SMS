@@ -123,14 +123,23 @@ def filter_true_sup_aln(ins_dict, ins2hg, alnf, outdir="./", flank=50):
 
         # filter sup/unsup alignments based on source & target hg
         for read in alnf.fetch(chrom, start, end):
+            # filter by qchr & chr
+            qchr = read.query_name.split("_")[0]
+            qchr = qchr.split(";")[1]
+            if qchr != chrom:
+                m += 1
+                ff.write(read)
+                continue
+
+            # filter by source & target hg
             hg = read.query_name.split("hg")[1]
             hg = int(hg.split(":")[0])
             if hg in ins2hg[ins_id]:
-                tf.write(read)
                 n += 1
+                tf.write(read)
             else:
-                ff.write(read)
                 m += 1
+                ff.write(read)
         
         # close
         tf.close()
