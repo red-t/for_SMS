@@ -32,3 +32,7 @@ done
 
 cat header tmp.sam | samtools view -b -o tp_f_merge.bam -
 samtools sort -o tmp.bam tp_f_merge.bam && mv tmp.bam tp_f_merge.bam && samtools index tp_f_merge.bam && rm tmp.sam
+
+if [ -f 'TP_new.bed' ];then
+    mv TP_new.bed TP.bed
+fi
