@@ -151,7 +151,7 @@ for l in open("TP.bed", "r"):
     oed = l[7]
     cid = l[8]
 
-    TP[cid] = [0]*21
+    TP[cid] = [0]*22
     TP[cid][0] = chr
     TP[cid][1] = ost
     TP[cid][2] = oed
@@ -159,7 +159,8 @@ for l in open("TP.bed", "r"):
     TP[cid][4] = nseg
     TP[cid][5] = strand
     TP[cid][19] = []
-    TP[cid][20] = id
+    TP[cid][20] = 0
+    TP[cid][21] = id
 
     # judge high/low freq
     t = chr + id
@@ -202,7 +203,8 @@ for l in open("TP_seg.txt", "r"):
         TP[cid][19].append(qlen)
 
     # parse segment mapq
-    if mapq<45:
+    TP[cid][20] += mapq
+    if mapq<60:
         TP[cid][18] += 1
 
 # 5. writting TP
@@ -221,6 +223,9 @@ for cid in TP:
         TP[cid][19] = str(sum(TP[cid][19])/len(TP[cid][19]))
     else:
         TP[cid][19] = str(0)
+
+    # compute average mapq
+    TP[cid][20] = str(float(TP[cid][20])/int(TP[cid][4]))
 
     # transfer int --> str
     TP[cid][7] = str(TP[cid][7])
@@ -249,7 +254,7 @@ for l in open("FP.bed", "r"):
     nseg   = l[4]
     strand = l[5]
 
-    FP[cid] = [0]*20
+    FP[cid] = [0]*21
     FP[cid][0] = chr
     FP[cid][1] = st
     FP[cid][2] = ed
@@ -257,6 +262,7 @@ for l in open("FP.bed", "r"):
     FP[cid][4] = nseg
     FP[cid][5] = strand
     FP[cid][19] = []
+    FP[cid][20] = 0
 
     # judge high/low freq
     FP[cid][11] = 'N'
@@ -294,7 +300,8 @@ for l in open("FP_seg.txt", "r"):
         FP[cid][19].append(qlen)
 
     # parse segment mapq
-    if mapq<45:
+    FP[cid][20] += mapq
+    if mapq<60:
         FP[cid][18] += 1
 
 # 5. writting FP
@@ -313,6 +320,9 @@ for cid in FP:
         FP[cid][19] = str(sum(FP[cid][19])/len(FP[cid][19]))
     else:
         FP[cid][19] = str(0)
+    
+    # compute average mapq
+    FP[cid][20] = str(float(FP[cid][20])/int(FP[cid][4]))
 
     # transfer int --> str
     FP[cid][7] = str(FP[cid][7])

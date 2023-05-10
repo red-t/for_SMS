@@ -109,8 +109,8 @@ nohup python compute_seg_stats.py &
 # 3. FP_seg.txt
 # 4. FP_stats.bed
 
-# TP_stats.bed（21列）:
-# chr   start   end cid nseg    strand  ctype   n1  l1  n2  l2  freq_type   ntype   entropy balance_ratio   nL  nM  nR  low_mapq_frac   avg_midsegL id
-# FP_stats.bed（20列）:
-# chr   start   end cid nseg    strand  ctype   n1  l1  n2  l2  freq_type   ntype   entropy balance_ratio   nL  nM  nR  low_mapq_frac   avg_midsegL
+# TP_stats.bed（22列）:
+# chr   start   end cid nseg    strand  ctype   n1  l1  n2  l2  freq_type   ntype   entropy balance_ratio   nL  nM  nR  low_mapq_frac   avg_midsegL avg_mapq    id
+# FP_stats.bed（21列）:
+# chr   start   end cid nseg    strand  ctype   n1  l1  n2  l2  freq_type   ntype   entropy balance_ratio   nL  nM  nR  low_mapq_frac   avg_midsegL avg_mapq
 ```
