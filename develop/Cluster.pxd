@@ -24,7 +24,6 @@ cdef void merge_segments(list    segments,
 #
 cpdef dict build_cluster(str     fpath,
                          int32_t threads,
-                         uint8_t stid,
-                         uint8_t maxtid,
+                         uint8_t tid,
                          uint8_t minl,
                          uint8_t maxdist)

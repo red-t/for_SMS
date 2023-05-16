@@ -71,8 +71,7 @@ cdef void merge_segments(list    segments,
 #
 cpdef dict build_cluster(str     fpath,
                          int32_t threads,
-                         uint8_t stid,
-                         uint8_t maxtid,
+                         uint8_t tid,
                          uint8_t minl,
                          uint8_t maxdist):
     '''build cluster
@@ -104,30 +103,25 @@ cpdef dict build_cluster(str     fpath,
             dictionary of clusters, tid -> list_of_Cluster.
     '''
     cdef BamFile rbf, wbf
-    cdef int  tid
     cdef list segments
     cdef dict SEG_DICT
     cdef str  rmode   = "rb"
     cdef str  wmode   = "wb"
-    cdef str  outpath = "tmp.all_supp_reads.{}.bam".format(stid)
+    cdef str  outpath = "tmp.all_supp_reads.{}.bam".format(tid)
 
     # parse alignments
     rbf = BamFile(fpath, threads, rmode)
     wbf = BamFile(outpath, threads, wmode, rbf)
-    SEG_DICT = rbf.fetch(wbf, stid, maxtid, minl)
+    SEG_DICT = rbf.extract_seg(wbf, tid, minl)
 
     # close file after I/O
     rbf.close(); del rbf
     wbf.close(); del wbf
-
-    # build cluster fo each chromosome
-    for tid in range(stid, maxtid):
-        # sort segments by rpos
-        segments = SEG_DICT[tid]
-        segments.sort()
-
-        # merge segments into cluster
-        merge_segments(segments, tid, maxdist)
+    
+    # merge segments into cluster
+    segments = SEG_DICT[tid]
+    segments.sort()
+    merge_segments(segments, tid, maxdist)
     
     del SEG_DICT
     return CLUSTER_DICT

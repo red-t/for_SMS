@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 cdef class BamFile:
     def __cinit__(self,
@@ -99,27 +100,24 @@ cdef class BamFile:
                     hts_set_threads(htsfile, threads)
                 return htsfile
 
-    cpdef dict fetch(self,
-                     BamFile wbf,
-                     uint8_t stid,
-                     uint8_t maxtid,
-                     uint8_t minl=50):
-        '''fetch reads aligned on chromosome stid ~ maxtid-1
+    cpdef dict extract_seg(self,
+                           BamFile wbf,
+                           int tid,
+                           int minl=50):
+        '''extract segments from chromosome tid
         
-        Usage: fetch(0, 2) to fetch reads aligned on 0,1 (tid)
+        Usage: extract_seg(0, 50) to extract segments with length >= 50
+            from chromosome 0.
 
         Parameters
         ----------
         wbf: BamFile
             BamFile object opened for writting.
 
-        stid: uint8_t
-            tid of start chromosome, include.
+        tid: int
+            tid of the target chromosome.
 
-        maxtid: uint8_t
-            tid of end chromosome, not include.
-
-        minl: uint8_t
+        minl: int
             minimum length of the segment. segment with cigar_length < minl
             will not be used to create a new InsertSegment.
         
@@ -129,12 +127,9 @@ cdef class BamFile:
 		    dict of list, tid -> list_of_InsertSegment
         '''
         cdef Iterator ite
-        cdef int i
-
-        for i in range(stid, maxtid):
-            SEG_DICT[i] = []
         
-        ite = Iterator(self, wbf, stid, maxtid, minl)
+        SEG_DICT[tid] = []
+        ite = Iterator(self, wbf, tid, minl)
         for i in ite:
             continue
 
@@ -159,23 +154,36 @@ cdef class BamFile:
 #
 # ---------------------------------------------------------------
 #
-cdef class IteratorSingle:
+cdef class Iterator:
     def __cinit__(self):
-        self.b = <bam1_t*>calloc(1, sizeof( bam1_t))
+        self.b = <bam1_t*>calloc(1, sizeof(bam1_t))
         if self.b == NULL:
             raise MemoryError("could not allocate memory of size {}".format(sizeof(bam1_t)))
 
     def __init__(self,
                  BamFile bamfile,
-                 int tid):
+                 BamFile wbf,
+                 int tid,
+                 int minl):
 
+        self.bamfile = bamfile
         self.htsfile = bamfile.htsfile
         self.index   = bamfile.index
+        self.wbf     = wbf
+        self.tid     = tid
+        self.minl    = minl
         with nogil:
             self.iter = sam_itr_queryi(self.index,
                                        tid,
                                        0,
                                        MAX_POS)
+    
+    def __dealloc__(self):
+        bam_destroy1(self.b)
+        hts_itr_destroy(self.iter)
+    
+    def __iter__(self):
+        return self
 
     cdef int cnext(self):
         '''cversion of iterator. retval>=0 if success.'''
@@ -186,67 +194,31 @@ cdef class IteratorSingle:
                                   self.b,
                                   self.htsfile)
             return retval
-
-    def __dealloc__(self):
-        bam_destroy1(self.b)
-        hts_itr_destroy(self.iter)
-#
-# ---------------------------------------------------------------
-#
-cdef class Iterator:
-    def __init__(self,
-                 BamFile bamfile,
-                 BamFile wbf,
-                 uint8_t stid,
-                 uint8_t maxtid,
-                 uint8_t minl):
-                 
-        self.bamfile = bamfile
-        self.wbf     = wbf
-        self.htsfile = bamfile.htsfile
-        self.index   = bamfile.index
-        self.tid     = -1
-        self.stid    = stid
-        self.maxtid  = maxtid
-        self.minl    = minl
-
-    def nextiter(self):
-        # get a new iterator for a chromosome. The file will not be re-opened.
-        self.rowiter = IteratorSingle(self.bamfile, self.tid)
-
-    def __iter__(self):
-        return self
-
+    
     def __next__(self):
         '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
         cdef int    n, l, retval
+        cdef int    N = 0
         cdef list   tmp_segl = []
-        
-        # Create an initial iterator
-        if self.tid == -1:
-            self.tid = self.stid
-            self.nextiter()
+
+        template = np.zeros((10000, 18), dtype=np.intc)
+        segs = np.zeros((10000, 18), dtype=np.intc)
+        cdef int[:,::1] segs_view = segs
 
         while 1:
-            retval = self.rowiter.cnext()
+            retval = self.cnext()
             # If current iterator is not exhausted, return aligned read
             if retval > 0:
-                n = self.rowiter.b.core.n_cigar
-                l = self.rowiter.b.core.l_qseq
+                n = self.b.core.n_cigar
+                l = self.b.core.l_qseq
                 if n==0 or l==0:
                     continue
-                retval = parse_cigar(self.rowiter.b,
+                retval = parse_cigar(self.b,
                                      tmp_segl,
                                      self.minl)
                 if retval > 0:
-                    self.wbf.write(self.rowiter.b)
+                    self.wbf.write(self.b)
                 continue
 
             SEG_DICT[self.tid] = tmp_segl
-            tmp_segl = []
-            # Otherwise, proceed to next reference or stop
-            self.tid += 1
-            if self.tid < self.maxtid:
-                self.nextiter()
-            else:
-                raise StopIteration
+            raise StopIteration

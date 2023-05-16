@@ -42,26 +42,26 @@ cpdef dict build_cluster_parallel(str fpath,
     cdef set    futures
     cdef list   idx
     cdef dict   result={}, ret
-    cdef int    nchroms, nbatch, i, stid
+    cdef int    nchroms, i
     
     bf = AlignmentFile(fpath, "rb")
     nchroms = bf.nreferences
     bf.close(); del bf
 
     # allocate tid range for each process
-    idx = []
-    nbatch = int(nchroms/nprocess)
-    for i in range(nprocess):
-        stid = i * nbatch
-        if i == nprocess-1:
-            idx.append((stid, nchroms))
-        else:
-            idx.append((stid, stid+nbatch))
+    # idx = []
+    # nbatch = int(nchroms/nprocess)
+    # for i in range(nprocess):
+    #     stid = i * nbatch
+    #     if i == nprocess-1:
+    #         idx.append((stid, nchroms))
+    #     else:
+    #         idx.append((stid, stid+nbatch))
 
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
         futures = set([executor.submit(build_cluster, fpath,
-                                       nthreads, x[0], x[1],
-                                       minl, maxdist) for x in idx])
+                                       nthreads, i,
+                                       minl, maxdist) for i in range(nchroms)])
         # merge result from each process
         for future in as_completed(futures):
             ret = future.result()
