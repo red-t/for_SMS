@@ -1,9 +1,8 @@
 from htslib_external cimport *
-from SegmentParser cimport parse_cigar
+from SegmentParser cimport parse_cigar, parse_cigar1
 from libc.stdlib cimport malloc, calloc, realloc, free
 from libc.errno  cimport errno
 from libc.string cimport strerror
-
 
 cdef class BamFile:
     """BamFile(str filepath, int nthreads=1, str mode='rb', BamFile template=None)
@@ -57,6 +56,7 @@ cdef class Iterator:
     cdef htsFile   *htsfile # pointer to htsFile structure
     cdef hts_idx_t *index   # pointer to hts_idx_t structure
     cdef hts_itr_t *iter    # pointer to hts_itr_t structure, iterator from htslib
+    cdef object     segs
     cdef int        minl
     cdef int        tid
 

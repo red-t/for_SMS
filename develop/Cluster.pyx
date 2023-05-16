@@ -18,7 +18,8 @@ cdef class Cluster:
 #
 cdef void merge_segments(list    segments,
                          int     tid,
-                         int     maxdist):
+                         int     maxdist,
+                         segs):
     '''merge overlapped segments into cluster
     
     Parameters:
@@ -65,7 +66,7 @@ cdef void merge_segments(list    segments,
         # jump merged segments
         i = j
     
-    CLUSTER_DICT[tid] = clusters
+    CLUSTER_DICT[tid] = (clusters, segs)
 #
 # ---------------------------------------------------------------
 #
@@ -119,9 +120,9 @@ cpdef dict build_cluster(str     fpath,
     wbf.close(); del wbf
     
     # merge segments into cluster
-    segments = SEG_DICT[tid]
+    segments, segs = SEG_DICT[tid]
     segments.sort()
-    merge_segments(segments, tid, maxdist)
+    merge_segments(segments, tid, maxdist, segs)
     
     del SEG_DICT
     return CLUSTER_DICT

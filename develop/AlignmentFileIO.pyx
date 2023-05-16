@@ -133,6 +133,7 @@ cdef class BamFile:
         for i in ite:
             continue
 
+        SEG_DICT[tid] = (SEG_DICT[tid], ite.segs)
         return SEG_DICT
     
     cdef void write(self, bam1_t *src):
@@ -197,28 +198,40 @@ cdef class Iterator:
     
     def __next__(self):
         '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
-        cdef int    n, l, retval
+        cdef int    n, retval
         cdef int    N = 0
+        cdef int    offset = 0
         cdef list   tmp_segl = []
 
+        self.segs = np.zeros((10000, 18), dtype=np.intc)
         template = np.zeros((10000, 18), dtype=np.intc)
-        segs = np.zeros((10000, 18), dtype=np.intc)
-        cdef int[:,::1] segs_view = segs
+        cdef int[:,::1] segs_view = self.segs
+        cdef int    M = segs_view.shape[0] - 10
 
         while 1:
             retval = self.cnext()
-            # If current iterator is not exhausted, return aligned read
+            # If current iterator is not exhausted, parse the alignment
             if retval > 0:
                 n = self.b.core.n_cigar
-                l = self.b.core.l_qseq
-                if n==0 or l==0:
+                if n==0:
                     continue
-                retval = parse_cigar(self.b,
-                                     tmp_segl,
-                                     self.minl)
+
+                if N<M:
+                    retval = parse_cigar(self.b, segs_view, N, offset, self.minl)
+                    retval = parse_cigar1(self.b, tmp_segl, self.minl)
+                else:
+                    # extend the array
+                    self.segs = np.concatenate((self.segs, template))
+                    segs_view = self.segs
+                    retval = parse_cigar(self.b, segs_view, N, offset, self.minl)
+                    retval = parse_cigar1(self.b, tmp_segl, self.minl)
+
                 if retval > 0:
+                    # total number of extracted segments
+                    N += retval
                     self.wbf.write(self.b)
                 continue
 
+            self.segs = self.segs[:N,]
             SEG_DICT[self.tid] = tmp_segl
             raise StopIteration

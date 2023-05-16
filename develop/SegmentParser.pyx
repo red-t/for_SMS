@@ -37,6 +37,109 @@ cdef inline bint is_del_or_skip(uint32_t op):
 #
 # ---------------------------------------------------------------
 #
+cdef int parse_cigar(bam1_t *src,
+                     int[:, ::1] segs,
+                     int N,
+                     int offset,
+                     int minl=50):
+    '''parse CIGAR
+
+    traverse through alignment's CIGAR, extract clip/insert segment.
+
+    Parameters:
+    -----------
+        src: bam1_t*
+            pointer to a single alignment record in BAM file.
+
+        segs: int[:, ::1]
+            typed memoryview of a numpy arrary, which will be used 
+            to store features of extracted segments.
+        
+        minl: int
+            minimum segment length, S/I CIGAR option with length >=
+            minl will be extracted.
+
+        offset: int
+            offset of current record in the BAM file.
+    
+    Returns:
+    --------
+        nseg: int32_t
+            number of insert segments extracted from this alignment
+    '''
+    cdef int32_t        ith         = 1
+    cdef int32_t        nseg        = 0
+    cdef int32_t        nmatch      = 0
+    cdef int32_t        aln_flag    = 0
+    cdef int32_t        qpos        = 0
+    cdef int32_t        rpos, qend, idx, op, l, k, n, m
+    cdef uint32_t       *cigar_p
+
+    n = src.core.n_cigar
+    m = n-1
+    rpos    = src.core.pos
+    cigar_p = bam_get_cigar(src)
+    # traverse alignment's CIGAR
+    for k from 0 <= k < n:
+        op = cigar_p[k] & BAM_CIGAR_MASK
+        l  = cigar_p[k] >> BAM_CIGAR_SHIFT
+        if is_match(op):
+            qpos   += l
+            rpos   += l
+            nmatch += l
+        elif is_clip_or_insert(op):
+            if l >= minl:
+                idx  = N + nseg
+                qend = qpos + l
+                if k==0:
+                    segs[idx, 2]  = qpos
+                    segs[idx, 3]  = qend
+                    segs[idx, 4]  = rpos
+                    segs[idx, 5]  = LEFT_CLIP
+                    segs[idx, 10] = ith
+                    segs[idx, 12] = nmatch
+                    aln_flag |= LEFT_CLIP
+                elif k==m:
+                    segs[idx, 2]  = qpos
+                    segs[idx, 3]  = qend
+                    segs[idx, 4]  = rpos
+                    segs[idx, 5]  = RIGHT_CLIP
+                    segs[idx, 10] = ith
+                    segs[idx, 12] = nmatch
+                    aln_flag |= RIGHT_CLIP
+                else:
+                    segs[idx, 2]  = qpos
+                    segs[idx, 3]  = qend
+                    segs[idx, 4]  = rpos
+                    segs[idx, 5]  = MID_INSERT
+                    segs[idx, 10] = ith
+                    segs[idx, 12] = nmatch
+                    aln_flag |= MID_INSERT
+                ith  += 1
+                nseg += 1
+            qpos += l
+        elif is_del_or_skip(op):
+            rpos += l
+    
+    if nseg > 0:
+        idx  = N+nseg
+        segs[N:idx, 0]  = src.core.flag
+        segs[N:idx, 1]  = src.core.qual
+        segs[N:idx, 6]  = aln_flag
+        segs[N:idx, 7]  = offset
+        segs[N:idx, 8]  = src.core.pos
+        segs[N:idx, 9]  = rpos
+        segs[N:idx, 11] = nseg
+        segs[N:idx, 13] = nmatch
+    
+    return nseg
+#
+# ---------------------------------------------------------------
+#
+
+
+
+
 cdef class InsertSegment:
     def __init__(self):
         # see bam_init1
@@ -229,7 +332,6 @@ cdef class InsertSegment:
         # q_en_t = t_qstart + (self.qend-self.qstart) # EXP: "query end" of the I/S fragment in the trimmed sequence
         return t_qstart, t_qend
 
-
 #
 # ---------------------------------------------------------------
 #
@@ -275,7 +377,7 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
 #
 # ---------------------------------------------------------------
 #
-cdef int parse_cigar(bam1_t *src,
+cdef int parse_cigar1(bam1_t *src,
                      list tmp_segl,
                      uint8_t minl=50):
     '''parse CIGAR

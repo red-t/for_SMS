@@ -2,6 +2,12 @@ from htslib_external cimport *
 from pysam.libcutils cimport force_bytes
 from cpython cimport PyBytes_FromStringAndSize
 
+cdef int parse_cigar(bam1_t *src,
+                     int[:, ::1] segs,
+                     int N,
+                     int offset,
+                     int minl=*)
+
 cdef class InsertSegment:
     """A class for insert/clip segment"""
     cdef bam1_t *_delegate
@@ -28,6 +34,6 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
                                      int16_t stype)
 
 
-cdef int parse_cigar(bam1_t *src,
+cdef int parse_cigar1(bam1_t *src,
                      list tmp_segl,
                      uint8_t minl=*)

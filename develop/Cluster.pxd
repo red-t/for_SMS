@@ -18,7 +18,8 @@ cdef class Cluster:
 #
 cdef void merge_segments(list    segments,
                          int     tid,
-                         int     maxdist)
+                         int     maxdist,
+                         segs)
 #
 # ---------------------------------------------------------------
 #
