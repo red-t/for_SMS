@@ -1,11 +1,13 @@
+import os
+
 cdef class BamFile:
     def __cinit__(self,
                   str     filepath,
                   int32_t nthreads = 1,
                   str     mode     = 'rb',
                   BamFile template = None):
-        cdef bytes bfilepath    = encode_filename(filepath)
-        cdef bytes bidx         = encode_filename(filepath+".bai")
+        cdef bytes bfilepath    = os.fsencode(filepath)
+        cdef bytes bidx         = os.fsencode(filepath+".bai")
         cdef bytes bmode        = mode.encode(TEXT_ENCODING, ERROR_HANDLER)
 
         self.threads    = nthreads
@@ -50,11 +52,11 @@ cdef class BamFile:
         if self.htsfile == NULL:
             if errno:
                 raise IOError(errno, "could not open alignment file `{}`: {}".format(
-                    force_str(self.filename),
-                    force_str(strerror(errno))))
+                    self.filename.decode(TEXT_ENCODING, ERROR_HANDLER),
+                    strerror(errno)))
             else:
                 raise ValueError("could not open alignment file `{}`".format(
-                    force_str(self.filename)))
+                    self.filename.decode(TEXT_ENCODING, ERROR_HANDLER)))
 
         # for reading
         if self.mode == b'rb':
@@ -69,10 +71,10 @@ cdef class BamFile:
                 self.index = sam_index_load2(self.htsfile, self.filename, self.index_filename)
             if not self.index:
                 if errno:
-                    raise IOError(errno, force_str(strerror(errno)))
+                    raise IOError(errno, strerror(errno))
                 else:
                     raise IOError('unable to open index file `{}`'.format(
-                        force_str(self.index_filename)))
+                        self.index_filename.decode(TEXT_ENCODING, ERROR_HANDLER)))
         # for writing
         elif self.mode == b'wb':
             # copy header from template
@@ -87,16 +89,12 @@ cdef class BamFile:
     
     cdef htsFile *_open_htsfile(self) except? NULL:
         '''open file in 'rb/wb' mode, return htsFile object if success.'''
-        cdef int32_t threads = self.threads - 1
-        cdef char    *cmode
-        cdef char    *cfilename
+        cdef int32_t threads = self.threads
         cdef htsFile *htsfile
 
         if isinstance(self.filename, bytes):
-            cmode     = self.mode
-            cfilename = self.filename
             with nogil:
-                htsfile = hts_open(cfilename, cmode)
+                htsfile = hts_open(self.filename, self.mode)
                 if htsfile != NULL:
                     hts_set_threads(htsfile, threads)
                 return htsfile
@@ -142,20 +140,19 @@ cdef class BamFile:
 
         return SEG_DICT
     
-    cpdef void write(self, InsertSegment iseg):
-        '''write a single alignment of `InsertSegment` to disk.
-
-        Usage: write(iseg)
+    cdef void write(self, bam1_t *src):
+        '''write a single alignment to disk.
 
         Parameters
         ----------
-        iseg: InsertSegment
-            a valid InsertSegment instance.
+        src: bam1_t*
+            bam1_t type pointer, which point to the source memory address
+            of the alignment loaded into memory.
         '''
         cdef int ret
 
         with nogil:
-            ret = sam_write1(self.htsfile, self.hdr, iseg._delegate)
+            ret = sam_write1(self.htsfile, self.hdr, src)
         if ret < 0:
             raise IOError(
             "sam_write1 failed with error code {}".format(ret))
@@ -224,7 +221,7 @@ cdef class Iterator:
         '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
         cdef int    n, l, retval
         cdef list   tmp_segl = []
-        cdef InsertSegment iseg
+        
         # Create an initial iterator
         if self.tid == -1:
             self.tid = self.stid
@@ -242,8 +239,7 @@ cdef class Iterator:
                                      tmp_segl,
                                      self.minl)
                 if retval > 0:
-                    iseg = tmp_segl[-1]
-                    self.wbf.write(iseg)
+                    self.wbf.write(self.rowiter.b)
                 continue
 
             SEG_DICT[self.tid] = tmp_segl

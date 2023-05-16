@@ -1,7 +1,6 @@
 from htslib_external cimport *
-from SegmentParser cimport parse_cigar, InsertSegment
+from SegmentParser cimport parse_cigar
 from libc.stdlib cimport malloc, calloc, realloc, free
-from pysam.libcutils cimport encode_filename, force_str
 from libc.errno  cimport errno
 from libc.string cimport strerror
 
@@ -14,7 +13,7 @@ cdef class BamFile:
        and for writing, a template is necessary.
     2. Using `BamFile.fetch(mintid, maxtid, minl)` to traverse all aligned reads and e-
        xtracted "insert segments".
-    3. Using `BamFile.write(iseg)` to write single alignment of `iseg` to disk.
+    3. Using `BamFile.write()` to write single alignment to disk.
 
     Parameters
     ----------
@@ -38,14 +37,14 @@ cdef class BamFile:
     cdef    char      *mode             # opening mode
     cdef    int32_t   threads           # number of threads to use
 
-    cdef  void      _open(self, BamFile template=*)
-    cdef  htsFile   *_open_htsfile(self) except? NULL
-    cpdef dict      fetch(self,
-                          BamFile wbf,
-                          uint8_t stid,
-                          uint8_t maxtid,
-                          uint8_t minl=*)
-    cpdef void      write(self, InsertSegment iseg)
+    cdef    void      _open(self, BamFile template=*)
+    cdef    htsFile   *_open_htsfile(self) except? NULL
+    cpdef   dict      fetch(self,
+                            BamFile wbf,
+                            uint8_t stid,
+                            uint8_t maxtid,
+                            uint8_t minl=*)
+    cdef    void       write(self, bam1_t *src)
 
 
 
