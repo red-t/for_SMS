@@ -2,11 +2,29 @@ from htslib_external cimport *
 from pysam.libcutils cimport force_bytes
 from cpython cimport PyBytes_FromStringAndSize
 
+cdef packed struct custom_dtype_struct:
+    uint16_t    flag
+    uint8_t     mapq
+    int32_t     qst
+    int32_t     qed
+    int32_t     rpos
+    uint8_t     sflag
+    uint8_t     rflag
+    int64_t     offset
+    int32_t     refst
+    int32_t     refed
+    uint8_t     ith
+    uint8_t     nseg
+    int32_t     overhang
+    int32_t     nmatch
+    uint8_t     loc_flag1
+    uint8_t     loc_flag2
+
 cdef int parse_cigar(bam1_t *src,
-                     int[:, ::1] segs,
-                     int N,
-                     int offset,
-                     int minl=*)
+                     custom_dtype_struct[::1] segs,
+                     int32_t N,
+                     int64_t offset,
+                     int32_t minl=*)
 
 cdef class InsertSegment:
     """A class for insert/clip segment"""
@@ -36,4 +54,4 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
 
 cdef int parse_cigar1(bam1_t *src,
                      list tmp_segl,
-                     uint8_t minl=*)
+                     int32_t minl=*)

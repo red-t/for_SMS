@@ -1,6 +1,28 @@
 import os
 import numpy as np
 
+
+CUSTOM_DTYPE = np.dtype([
+    ('flag',        np.uint16),
+    ('mapq',        np.uint8),
+    ('qst',         np.int32),
+    ('qed',         np.int32),
+    ('rpos',        np.int32),
+    ('sflag',       np.uint8),
+    ('rflag',       np.uint8),
+    ('offset',      np.int64),
+    ('refst',       np.int32),
+    ('refed',       np.int32),
+    ('ith',         np.uint8),
+    ('nseg',        np.uint8),
+    ('overhang',    np.int32),
+    ('nmatch',      np.int32),
+    ('loc_flag1',   np.uint8),
+    ('loc_flag2',   np.uint8),
+])
+#
+# ---------------------------------------------------------------
+#
 cdef class BamFile:
     def __cinit__(self,
                   str     filepath,
@@ -188,25 +210,29 @@ cdef class Iterator:
 
     cdef int cnext(self):
         '''cversion of iterator. retval>=0 if success.'''
-        cdef int retval
+        cdef int        retval
+        cdef int64_t    offset
+        
         with nogil:
+            offset = bgzf_tell(self.htsfile.fp.bgzf)
             retval = hts_itr_next(self.htsfile.fp.bgzf,
                                   self.iter,
                                   self.b,
                                   self.htsfile)
-            return retval
+        self.offset = offset
+        return retval
     
     def __next__(self):
         '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
-        cdef int    n, retval
-        cdef int    N = 0
-        cdef int    offset = 0
-        cdef list   tmp_segl = []
+        cdef int32_t    n, retval
+        cdef int32_t    N = 0
+        cdef int64_t    offset
+        cdef list       tmp_segl = []
 
-        self.segs = np.zeros((10000, 18), dtype=np.intc)
-        template = np.zeros((10000, 18), dtype=np.intc)
-        cdef int[:,::1] segs_view = self.segs
-        cdef int    M = segs_view.shape[0] - 10
+        self.segs = np.zeros(10000, dtype=CUSTOM_DTYPE)
+        template  = np.zeros(10000, dtype=CUSTOM_DTYPE)
+        cdef custom_dtype_struct[::1] segs_view = self.segs
+        cdef int32_t M = segs_view.shape[0] - 10
 
         while 1:
             retval = self.cnext()
@@ -217,13 +243,13 @@ cdef class Iterator:
                     continue
 
                 if N<M:
-                    retval = parse_cigar(self.b, segs_view, N, offset, self.minl)
+                    retval = parse_cigar(self.b, segs_view, N, self.offset, self.minl)
                     retval = parse_cigar1(self.b, tmp_segl, self.minl)
                 else:
                     # extend the array
                     self.segs = np.concatenate((self.segs, template))
                     segs_view = self.segs
-                    retval = parse_cigar(self.b, segs_view, N, offset, self.minl)
+                    retval = parse_cigar(self.b, segs_view, N, self.offset, self.minl)
                     retval = parse_cigar1(self.b, tmp_segl, self.minl)
 
                 if retval > 0:

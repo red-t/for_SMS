@@ -22,9 +22,9 @@ cdef inline char* getSequenceInRange(bam1_t   *src,
 #
 # ---------------------------------------------------------------
 #
-cdef int16_t LEFT_CLIP  = 0x1
-cdef int16_t MID_INSERT = 0x2
-cdef int16_t RIGHT_CLIP = 0x4
+cdef int8_t LEFT_CLIP  = 0x1
+cdef int8_t MID_INSERT = 0x2
+cdef int8_t RIGHT_CLIP = 0x4
 
 cdef inline bint is_clip_or_insert(uint32_t op):
     return op in {BAM_CSOFT_CLIP, BAM_CINS}
@@ -38,10 +38,10 @@ cdef inline bint is_del_or_skip(uint32_t op):
 # ---------------------------------------------------------------
 #
 cdef int parse_cigar(bam1_t *src,
-                     int[:, ::1] segs,
-                     int N,
-                     int offset,
-                     int minl=50):
+                     custom_dtype_struct[::1] segs,
+                     int32_t N,
+                     int64_t offset,
+                     int32_t minl=50):
     '''parse CIGAR
 
     traverse through alignment's CIGAR, extract clip/insert segment.
@@ -51,26 +51,29 @@ cdef int parse_cigar(bam1_t *src,
         src: bam1_t*
             pointer to a single alignment record in BAM file.
 
-        segs: int[:, ::1]
-            typed memoryview of a numpy arrary, which will be used 
-            to store features of extracted segments.
+        segs: custom_dtype_struct[::1]
+            typed memoryview of a structed numpy arrary, which will 
+            be used to store features of extracted segments.
+
+        N: int32_t
+            cumulative total number of extracted segments.
         
-        minl: int
+        offset: int64_t
+            offset of current record in the BAM file.
+        
+        minl: int32_t
             minimum segment length, S/I CIGAR option with length >=
             minl will be extracted.
-
-        offset: int
-            offset of current record in the BAM file.
     
     Returns:
     --------
-        nseg: int32_t
+        nseg: int8_t
             number of insert segments extracted from this alignment
     '''
-    cdef int32_t        ith         = 1
-    cdef int32_t        nseg        = 0
+    cdef int8_t         ith         = 1
+    cdef int8_t         nseg        = 0
+    cdef int8_t         aln_flag    = 0
     cdef int32_t        nmatch      = 0
-    cdef int32_t        aln_flag    = 0
     cdef int32_t        qpos        = 0
     cdef int32_t        rpos, qend, idx, op, l, k, n, m
     cdef uint32_t       *cigar_p
@@ -92,28 +95,28 @@ cdef int parse_cigar(bam1_t *src,
                 idx  = N + nseg
                 qend = qpos + l
                 if k==0:
-                    segs[idx, 2]  = qpos
-                    segs[idx, 3]  = qend
-                    segs[idx, 4]  = rpos
-                    segs[idx, 5]  = LEFT_CLIP
-                    segs[idx, 10] = ith
-                    segs[idx, 12] = nmatch
+                    segs[idx].qst      = qpos
+                    segs[idx].qed      = qend
+                    segs[idx].rpos     = rpos
+                    segs[idx].sflag    = LEFT_CLIP
+                    segs[idx].ith      = ith
+                    segs[idx].overhang = nmatch
                     aln_flag |= LEFT_CLIP
                 elif k==m:
-                    segs[idx, 2]  = qpos
-                    segs[idx, 3]  = qend
-                    segs[idx, 4]  = rpos
-                    segs[idx, 5]  = RIGHT_CLIP
-                    segs[idx, 10] = ith
-                    segs[idx, 12] = nmatch
+                    segs[idx].qst      = qpos
+                    segs[idx].qed      = qend
+                    segs[idx].rpos     = rpos
+                    segs[idx].sflag    = RIGHT_CLIP
+                    segs[idx].ith      = ith
+                    segs[idx].overhang = nmatch
                     aln_flag |= RIGHT_CLIP
                 else:
-                    segs[idx, 2]  = qpos
-                    segs[idx, 3]  = qend
-                    segs[idx, 4]  = rpos
-                    segs[idx, 5]  = MID_INSERT
-                    segs[idx, 10] = ith
-                    segs[idx, 12] = nmatch
+                    segs[idx].qst      = qpos
+                    segs[idx].qed      = qend
+                    segs[idx].rpos     = rpos
+                    segs[idx].sflag    = MID_INSERT
+                    segs[idx].ith      = ith
+                    segs[idx].overhang = nmatch
                     aln_flag |= MID_INSERT
                 ith  += 1
                 nseg += 1
@@ -123,14 +126,15 @@ cdef int parse_cigar(bam1_t *src,
     
     if nseg > 0:
         idx  = N+nseg
-        segs[N:idx, 0]  = src.core.flag
-        segs[N:idx, 1]  = src.core.qual
-        segs[N:idx, 6]  = aln_flag
-        segs[N:idx, 7]  = offset
-        segs[N:idx, 8]  = src.core.pos
-        segs[N:idx, 9]  = rpos
-        segs[N:idx, 11] = nseg
-        segs[N:idx, 13] = nmatch
+        for k from N <= k < idx:
+            segs[k].flag    = src.core.flag
+            segs[k].mapq    = src.core.qual
+            segs[k].rflag   = aln_flag
+            segs[k].offset  = offset
+            segs[k].refst   = src.core.pos
+            segs[k].refed   = rpos
+            segs[k].nseg    = nseg
+            segs[k].nmatch  = nmatch
     
     return nseg
 #
@@ -379,7 +383,7 @@ cdef InsertSegment makeInsertSegment(bam1_t *src,
 #
 cdef int parse_cigar1(bam1_t *src,
                      list tmp_segl,
-                     uint8_t minl=50):
+                     int32_t minl=50):
     '''parse CIGAR
 
     traverse through alignment's CIGAR, extract clip/insert segment.
@@ -393,7 +397,7 @@ cdef int parse_cigar1(bam1_t *src,
             temporary list used to stored the new InsertSegment ins
             tances.
         
-        minl: uint8_t
+        minl: int32_t
             minimum segment length, S/I CIGAR option with length >=
             minl will be extracted.
     
@@ -406,7 +410,7 @@ cdef int parse_cigar1(bam1_t *src,
     cdef int16_t        otype   = 0
     cdef int32_t        qpos    = 0
     cdef int32_t        rpos, qend
-    cdef uint32_t       op, l, k, n, m
+    cdef int32_t        op, l, k, n, m
     cdef uint32_t       *cigar_p
     cdef InsertSegment  iseg
 
