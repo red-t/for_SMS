@@ -1,5 +1,5 @@
 from htslib_external cimport *
-from SegmentParser cimport parse_cigar, parse_cigar1, seg_dtype_struct
+from SegmentParser cimport parse_cigar, seg_dtype_struct
 from libc.stdlib cimport malloc, calloc, realloc, free
 from libc.errno  cimport errno
 from libc.string cimport strerror
@@ -38,10 +38,10 @@ cdef class BamFile:
 
     cdef    void      _open(self, BamFile template=*)
     cdef    htsFile   *_open_htsfile(self) except? NULL
-    cpdef   dict      extract_seg(self,
-                                  BamFile wbf,
-                                  int tid,
-                                  int minl=*)
+    cpdef   object     extract_seg(self,
+                                   BamFile wbf,
+                                   int tid,
+                                   int minl=*)
     cdef    void       write(self, bam1_t *src)
 
 
@@ -52,7 +52,7 @@ cdef class Iterator:
     """
     cdef BamFile    bamfile
     cdef BamFile    wbf
-    cdef bam1_t    *b       # pointer to a record in BAM file, change when call `cnext`
+    cdef bam1_t    *b       # pointer to a record in BAM file, changes when calling `cnext`
     cdef htsFile   *htsfile # pointer to htsFile structure
     cdef hts_idx_t *index   # pointer to hts_idx_t structure
     cdef hts_itr_t *iter    # pointer to hts_itr_t structure, iterator from htslib

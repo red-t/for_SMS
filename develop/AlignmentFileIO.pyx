@@ -122,10 +122,10 @@ cdef class BamFile:
                     hts_set_threads(htsfile, threads)
                 return htsfile
 
-    cpdef dict extract_seg(self,
-                           BamFile wbf,
-                           int tid,
-                           int minl=50):
+    cpdef object extract_seg(self,
+                             BamFile wbf,
+                             int tid,
+                             int minl=50):
         '''extract segments from chromosome tid
         
         Usage: extract_seg(0, 50) to extract segments with length >= 50
@@ -145,18 +145,16 @@ cdef class BamFile:
         
         Returns
         -------
-        SEG_DICT: dict
-		    dict of list, tid -> list_of_InsertSegment
+        segs: object
+		    strctured numpy array with `dtype=SEG_DTYPE`.
         '''
         cdef Iterator ite
-        
-        SEG_DICT[tid] = []
+
         ite = Iterator(self, wbf, tid, minl)
         for i in ite:
             continue
 
-        SEG_DICT[tid] = (SEG_DICT[tid], ite.segs)
-        return SEG_DICT
+        return ite.segs
     
     cdef void write(self, bam1_t *src):
         '''write a single alignment to disk.
@@ -226,8 +224,6 @@ cdef class Iterator:
         '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
         cdef int32_t    n, retval, M
         cdef int32_t    N = 0
-        cdef int64_t    offset
-        cdef list       tmp_segl = []
         cdef seg_dtype_struct[::1] segs_view
 
         self.segs = np.zeros(10000, dtype=SEG_DTYPE)
@@ -248,8 +244,6 @@ cdef class Iterator:
                     M = segs_view.shape[0] - 20
 
                 retval = parse_cigar(self.b, segs_view, N, self.offset, self.minl)
-                retval = parse_cigar1(self.b, tmp_segl, self.minl)
-                    
                 if retval > 0:
                     # total number of extracted segments
                     N += retval
@@ -257,6 +251,5 @@ cdef class Iterator:
                 continue
 
             self.segs = self.segs[:N,]
-            SEG_DICT[self.tid] = tmp_segl
             del template
             raise StopIteration

@@ -1,27 +1,6 @@
 # filename: SegmentParser.pyx
 
-cdef inline char* getSequenceInRange(bam1_t   *src,
-                                     uint32_t start,
-                                     uint32_t end):
-    '''return python string of the sequence in a bam1_t object.'''
-    cdef uint8_t *p
-    cdef uint32_t k
-    cdef char *s
-    cdef bytes seq
-    
-    seq = PyBytes_FromStringAndSize(NULL, end - start)
-    s   = <char*>seq
-    p   = pysam_bam_get_seq(src)
 
-    for k from start <= k < end:
-        # equivalent to seq_nt16_str[bam1_seqi(s, i)] (see bam.c)
-        # note: do not use string literal as it will be a python string
-        s[k-start] = seq_nt16_str[p[k//2] >> 4 * (1 - k%2) & 0xf]
-
-    return seq
-#
-# ---------------------------------------------------------------
-#
 cdef int8_t LEFT_CLIP  = 0x1
 cdef int8_t MID_INSERT = 0x2
 cdef int8_t RIGHT_CLIP = 0x4
@@ -140,10 +119,28 @@ cdef int parse_cigar(bam1_t *src,
 #
 # ---------------------------------------------------------------
 #
+cdef inline char* getSequenceInRange(bam1_t   *src,
+                                     uint32_t start,
+                                     uint32_t end):
+    '''return python string of the sequence in a bam1_t object.'''
+    cdef uint8_t *p
+    cdef uint32_t k
+    cdef char *s
+    cdef bytes seq
+    
+    seq = PyBytes_FromStringAndSize(NULL, end - start)
+    s   = <char*>seq
+    p   = pysam_bam_get_seq(src)
 
+    for k from start <= k < end:
+        # equivalent to seq_nt16_str[bam1_seqi(s, i)] (see bam.c)
+        # note: do not use string literal as it will be a python string
+        s[k-start] = seq_nt16_str[p[k//2] >> 4 * (1 - k%2) & 0xf]
 
-
-
+    return seq
+#
+# ---------------------------------------------------------------
+#
 cdef class InsertSegment:
     def __init__(self):
         # see bam_init1

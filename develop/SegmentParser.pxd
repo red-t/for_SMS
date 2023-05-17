@@ -19,13 +19,17 @@ cdef packed struct seg_dtype_struct:
     int32_t     nmatch
     uint8_t     loc_flag1
     uint8_t     loc_flag2
-
+#
+# ---------------------------------------------------------------
+#
 cdef int parse_cigar(bam1_t *src,
                      seg_dtype_struct[::1] segs,
                      int32_t N,
                      int64_t offset,
                      int32_t minl=*)
-
+#
+# ---------------------------------------------------------------
+#
 cdef class InsertSegment:
     """A class for insert/clip segment"""
     cdef bam1_t *_delegate
@@ -42,16 +46,17 @@ cdef class InsertSegment:
     cpdef double  get_tag_f(self, str tag)
     cpdef str     get_seq(self, int start=*, int end=*)
     cpdef tuple   trim(self, int tsize)
-
-
-
+#
+# ---------------------------------------------------------------
+#
 cdef InsertSegment makeInsertSegment(bam1_t *src,
                                      int32_t qstart,
                                      int32_t qend,
                                      int32_t rpos,
                                      int16_t stype)
-
-
+#
+# ---------------------------------------------------------------
+#
 cdef int parse_cigar1(bam1_t *src,
                      list tmp_segl,
                      int32_t minl=*)
