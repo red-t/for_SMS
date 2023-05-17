@@ -1,7 +1,7 @@
 # filename: ParallelTemplate.pyx
 
 from pysam import AlignmentFile
-from Cluster import build_cluster
+from Cluster import build_cluster, build_cluster1
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
@@ -59,7 +59,7 @@ cpdef dict build_cluster_parallel(str fpath,
     #         idx.append((stid, stid+nbatch))
 
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
-        futures = set([executor.submit(build_cluster, fpath,
+        futures = set([executor.submit(build_cluster1, fpath,
                                        nthreads, i,
                                        minl, maxdist) for i in range(nchroms)])
         # merge result from each process

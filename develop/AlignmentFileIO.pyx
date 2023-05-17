@@ -2,7 +2,7 @@ import os
 import numpy as np
 
 
-CUSTOM_DTYPE = np.dtype([
+SEG_DTYPE = np.dtype([
     ('flag',        np.uint16),
     ('mapq',        np.uint8),
     ('qst',         np.int32),
@@ -212,7 +212,7 @@ cdef class Iterator:
         '''cversion of iterator. retval>=0 if success.'''
         cdef int        retval
         cdef int64_t    offset
-        
+
         with nogil:
             offset = bgzf_tell(self.htsfile.fp.bgzf)
             retval = hts_itr_next(self.htsfile.fp.bgzf,
@@ -224,15 +224,16 @@ cdef class Iterator:
     
     def __next__(self):
         '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
-        cdef int32_t    n, retval
+        cdef int32_t    n, retval, M
         cdef int32_t    N = 0
         cdef int64_t    offset
         cdef list       tmp_segl = []
+        cdef seg_dtype_struct[::1] segs_view
 
-        self.segs = np.zeros(10000, dtype=CUSTOM_DTYPE)
-        template  = np.zeros(10000, dtype=CUSTOM_DTYPE)
-        cdef custom_dtype_struct[::1] segs_view = self.segs
-        cdef int32_t M = segs_view.shape[0] - 10
+        self.segs = np.zeros(10000, dtype=SEG_DTYPE)
+        template  = np.zeros(10000, dtype=SEG_DTYPE)
+        segs_view = self.segs
+        M = segs_view.shape[0] - 20
 
         while 1:
             retval = self.cnext()
@@ -241,17 +242,14 @@ cdef class Iterator:
                 n = self.b.core.n_cigar
                 if n==0:
                     continue
-
-                if N<M:
-                    retval = parse_cigar(self.b, segs_view, N, self.offset, self.minl)
-                    retval = parse_cigar1(self.b, tmp_segl, self.minl)
-                else:
-                    # extend the array
+                if N == M:
                     self.segs = np.concatenate((self.segs, template))
                     segs_view = self.segs
-                    retval = parse_cigar(self.b, segs_view, N, self.offset, self.minl)
-                    retval = parse_cigar1(self.b, tmp_segl, self.minl)
+                    M = segs_view.shape[0] - 20
 
+                retval = parse_cigar(self.b, segs_view, N, self.offset, self.minl)
+                retval = parse_cigar1(self.b, tmp_segl, self.minl)
+                    
                 if retval > 0:
                     # total number of extracted segments
                     N += retval
@@ -260,4 +258,5 @@ cdef class Iterator:
 
             self.segs = self.segs[:N,]
             SEG_DICT[self.tid] = tmp_segl
+            del template
             raise StopIteration

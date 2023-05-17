@@ -2,7 +2,7 @@ from htslib_external cimport *
 from pysam.libcutils cimport force_bytes
 from cpython cimport PyBytes_FromStringAndSize
 
-cdef packed struct custom_dtype_struct:
+cdef packed struct seg_dtype_struct:
     uint16_t    flag
     uint8_t     mapq
     int32_t     qst
@@ -21,7 +21,7 @@ cdef packed struct custom_dtype_struct:
     uint8_t     loc_flag2
 
 cdef int parse_cigar(bam1_t *src,
-                     custom_dtype_struct[::1] segs,
+                     seg_dtype_struct[::1] segs,
                      int32_t N,
                      int64_t offset,
                      int32_t minl=*)

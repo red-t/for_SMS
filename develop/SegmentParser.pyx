@@ -38,7 +38,7 @@ cdef inline bint is_del_or_skip(uint32_t op):
 # ---------------------------------------------------------------
 #
 cdef int parse_cigar(bam1_t *src,
-                     custom_dtype_struct[::1] segs,
+                     seg_dtype_struct[::1] segs,
                      int32_t N,
                      int64_t offset,
                      int32_t minl=50):
@@ -51,7 +51,7 @@ cdef int parse_cigar(bam1_t *src,
         src: bam1_t*
             pointer to a single alignment record in BAM file.
 
-        segs: custom_dtype_struct[::1]
+        segs: seg_dtype_struct[::1]
             typed memoryview of a structed numpy arrary, which will 
             be used to store features of extracted segments.
 
