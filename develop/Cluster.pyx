@@ -48,13 +48,13 @@ cdef object merge_segments(seg_dtype_struct[::1] segs,
     clts      = np.zeros(10000, dtype=CLUSTER_DTYPE)
     template  = np.zeros(10000, dtype=CLUSTER_DTYPE)
     clts_view = clts
-    M = clts_view.shape[0] - 10 
+    M = clts_view.shape[0] - 20 
     
     while i < segs.shape[0]:
-        if idx == M:
+        if idx > M:
             clts = np.concatenate((clts, template))
             clts_view = clts
-            M = clts_view.shape[0] - 10 
+            M = clts_view.shape[0] - 20
 
         # initialize the idx-th cluster with the first segment
         clts_view[idx].st     = segs[i].rpos - 1

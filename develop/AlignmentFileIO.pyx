@@ -238,7 +238,7 @@ cdef class Iterator:
                 n = self.b.core.n_cigar
                 if n==0:
                     continue
-                if N == M:
+                if N > M:
                     self.segs = np.concatenate((self.segs, template))
                     segs_view = self.segs
                     M = segs_view.shape[0] - 20
