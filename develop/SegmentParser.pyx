@@ -112,6 +112,7 @@ cdef int parse_cigar(bam1_t *src,
             segs[k].offset  = offset
             segs[k].refst   = src.core.pos
             segs[k].refed   = rpos
+            segs[k].lqseq   = qpos
             segs[k].nseg    = nseg
             segs[k].nmatch  = nmatch
     

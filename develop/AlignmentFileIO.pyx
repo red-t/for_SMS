@@ -8,6 +8,7 @@ SEG_DTYPE = np.dtype([
     ('qst',         np.int32),
     ('qed',         np.int32),
     ('rpos',        np.int32),
+    ('lqseq',       np.int32),
     ('sflag',       np.uint8),
     ('rflag',       np.uint8),
     ('offset',      np.int64),
@@ -99,7 +100,7 @@ cdef class BamFile:
                     raise IOError('unable to open index file `{}`'.format(
                         self.index_filename.decode(TEXT_ENCODING, ERROR_HANDLER)))
         # for writing
-        elif self.mode == b'wb':
+        elif (self.mode == b'wb') or (self.mode == b'wFz'):
             # copy header from template
             if template:
                 self.hdr = bam_hdr_dup(template.hdr)
