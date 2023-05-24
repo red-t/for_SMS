@@ -42,7 +42,7 @@ cdef class BamFile:
         
     def close(self):
         if self.htsfile:
-            hts_close(self.htsfile)
+            sam_close(self.htsfile)
             self.htsfile = NULL
         if self.index:
             hts_idx_destroy(self.index)
@@ -53,7 +53,7 @@ cdef class BamFile:
 
     def __dealloc__(self):
         if self.htsfile:
-            hts_close(self.htsfile)
+            sam_close(self.htsfile)
             self.htsfile = NULL
         if self.index:
             hts_idx_destroy(self.index)
@@ -118,7 +118,7 @@ cdef class BamFile:
 
         if isinstance(self.filename, bytes):
             with nogil:
-                htsfile = hts_open(self.filename, self.mode)
+                htsfile = sam_open(self.filename, self.mode)
                 if htsfile != NULL:
                     hts_set_threads(htsfile, threads)
                 return htsfile
@@ -202,7 +202,7 @@ cdef class Iterator:
     
     def __dealloc__(self):
         bam_destroy1(self.b)
-        hts_itr_destroy(self.iter)
+        sam_itr_destroy(self.iter)
     
     def __iter__(self):
         return self

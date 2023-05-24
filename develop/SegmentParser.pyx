@@ -131,7 +131,7 @@ cdef inline char* getSequenceInRange(bam1_t   *src,
     
     seq = PyBytes_FromStringAndSize(NULL, end - start)
     s   = <char*>seq
-    p   = pysam_bam_get_seq(src)
+    p   = bam_get_seq(src)
 
     for k from start <= k < end:
         # equivalent to seq_nt16_str[bam1_seqi(s, i)] (see bam.c)
@@ -175,10 +175,14 @@ cdef class InsertSegment:
     property qname:
         '''the query template name (None if not present)'''
         def __get__(self):
-            cdef bam1_t * src = self._delegate
+            cdef bam1_t* src = self._delegate
+            cdef char* s
+            # cdef str ret
             if src.core.l_qname == 0:
                 return None
-            return charptr_to_str(<char *>pysam_bam_get_qname(src))
+            s = bam_get_qname(src)
+            # return charptr_to_str(<char *>bam_get_qname(src))
+            return s.decode(TEXT_ENCODING, ERROR_HANDLER)
     
     property flag:
         '''properties flag'''
@@ -199,7 +203,7 @@ cdef class InsertSegment:
         '''mapping quality'''
         def __get__(self):
             cdef bam1_t * src = self._delegate
-            return pysam_get_qual(src)
+            return bam_get_qual(src)
     
     property q_len:
         '''
@@ -307,7 +311,7 @@ cdef class InsertSegment:
         '''Get query sequence in specified region'''
         cdef bam1_t *src = self._delegate
         cdef int lqseq   = src.core.l_qseq
-        cdef str s
+        cdef char* s
         
         if lqseq == 0:
             return None
@@ -316,8 +320,9 @@ cdef class InsertSegment:
         if end < 0:
             end = lqseq
 
-        s = charptr_to_str(getSequenceInRange(src, start, end))
-        return s
+        # s = charptr_to_str(getSequenceInRange(src, start, end))
+        s = getSequenceInRange(src, start, end)
+        return s.decode(TEXT_ENCODING, ERROR_HANDLER)
     
     cpdef tuple trim(self, int tsize):
         cdef int t_qstart, t_qend

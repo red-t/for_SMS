@@ -1,5 +1,4 @@
 from htslib_external cimport *
-from pysam.libcutils cimport force_bytes
 from cpython cimport PyBytes_FromStringAndSize
 
 cdef packed struct seg_dtype_struct:
