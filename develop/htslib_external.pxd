@@ -6,8 +6,11 @@ from libc.stdio cimport FILE, printf
 from cpython cimport PyBytes_Check
 from posix.types cimport off_t
 
-########################################################
-## global variables ##
+
+########################
+### Global Variables ###
+########################
+
 cdef int MAX_POS
 cdef str TEXT_ENCODING
 cdef str ERROR_HANDLER
@@ -17,7 +20,67 @@ cdef str ERROR_HANDLER
 # ---------------------------------------------------------------
 #
 cdef extern from "temp_util.h":
+    ######################
+    ### CIGAR resolver ###
+    ######################
+
+    # Get whether the CIGAR operation is clip/insert.
+    # @param  op CIGAR operation
+    # @return    1 if the CIGAR operation is clip/insert, 0 if not
+    int is_clip_or_insert(uint32_t op)
+
+    # Get whether the CIGAR operation is match/equal/diff.
+    # @param  op CIGAR operation
+    # @return    1 if the CIGAR operation is match/equal/diff, 0 if not
+    int is_match(uint32_t op)
+
+    # Get whether the CIGAR operation is del/skip.
+    # @param  op CIGAR operation
+    # @return    1 if the CIGAR operation is del/skip, 0 if not
+    int is_del_or_skip(uint32_t op)
+
+
+    #######################
+    ### Segment records ###
+    #######################
+
+    uint8_t LEFT_CLIP
+    uint8_t MID_INSERT
+    uint8_t RIGHT_CLIP
+    uint8_t DUAL_CLIP
+
+    # Get whether the alignment is dual-clip.
+    # @param rflag  rflag of the segment, representing type of the corresponding alignment
+    # @return       1 if the alignment is dual-clip, 0 if not
+    int aln_is_dclip(uint8_t rflag)
+
+    # Get whether the query is secondary alignment by flag.
+    # @param flag  bitwise flag of the query alignment
+    # @return      1 if query is secondary, 0 if not
+    int aln_is_second(uint16_t flag)
+
+    # Get whether the query is on the reverse strand by flag.
+    # @param flag  bitwise flag of the query alignment
+    # @return      1 if query is on the reverse strand, 0 if not
+    int aln_is_rev(uint16_t flag)
+
+    # Update overhang for mid-insert type segment
+    # @param overhang  original overhang of the segment
+    # @param nmatch    nummber of match bases of the corresponding alignment
+    # @return          Updated overhang, <= original overhang
+    int32_t update_overhang(int32_t overhang, int32_t nmatch)
+
+
+    #########################
+    ### Alignment records ###
+    #########################
+
+    # @abstract  Get whether the query is secondary alignment
+    # @param  b  pointer to an alignment
+    # @return    1 if query is secondary, 0 if not
     int bam_is_second(bam1_t *b)
+
+
 #
 # ---------------------------------------------------------------
 #
@@ -837,6 +900,8 @@ cdef extern from "htslib/sam.h" nogil:
          char **target_name
          char *text
          void *sdict
+    
+    ctypedef bam_hdr_t sam_hdr_t
 
     #****************************
     #*** CIGAR related macros ***
@@ -1007,6 +1072,7 @@ cdef extern from "htslib/sam.h" nogil:
     # bam_hdr_t *bam_hdr_read(BGZF *fp)
     # int bam_hdr_write(BGZF *fp, const bam_hdr_t *h)
     void bam_hdr_destroy(bam_hdr_t *h)
+    const char *sam_hdr_tid2name(const sam_hdr_t *h, int tid)
     # int bam_name2id(bam_hdr_t *h, const char *ref)
     bam_hdr_t* bam_hdr_dup(const bam_hdr_t *h0)
 

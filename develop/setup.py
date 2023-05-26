@@ -35,7 +35,7 @@ import pysam
 # 该路径与 /Users/hzr/opt/anaconda3/envs/pysam/include 一样，都包含更深一层的 htslib 子目录(其中包含 htslib 的一些头文件)
 # 前者是通过 conda 安装 htslib 生成的；后者是通过 conda 安装 pysam 生成的，它们的版本一样
 # 因此，这里直接通过 pysam.get_include() 获取 include_dirs 也是可以的，没必要重复。(当然，如果版本不同的话就不行了)
-incl_dirs = pysam.get_include()
+# incl_dirs = pysam.get_include()
 incl_dirs = ["/Users/hzr/opt/anaconda3/envs/pysam/include"]
 lib_dirs = ["/Users/hzr/opt/anaconda3/envs/pysam/lib"]
 
@@ -59,7 +59,7 @@ ext = [
               library_dirs = lib_dirs),
 
     Extension(name = "Cluster",
-              sources = ["Cluster.pyx"],
+              sources = ["Cluster.pyx", "AIList.c"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs),
