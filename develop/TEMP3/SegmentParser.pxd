@@ -1,4 +1,4 @@
-from htslib_external cimport *
+from .htslib_external cimport *
 from cpython cimport PyBytes_FromStringAndSize
 
 

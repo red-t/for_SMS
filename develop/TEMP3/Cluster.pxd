@@ -1,6 +1,6 @@
-from AlignmentFileIO cimport BamFile
-from SegmentParser cimport seg_dtype_struct
-from htslib_external cimport *
+from .AlignmentFileIO cimport BamFile
+from .SegmentParser cimport seg_dtype_struct
+from .htslib_external cimport *
 
 
 cdef packed struct cluster_dtype_struct:
@@ -30,7 +30,7 @@ cdef packed struct cluster_dtype_struct:
 ### AIList ###
 ###############
 
-cdef extern from "AIList.h":
+cdef extern from "src/AIList.h" nogil:
     ctypedef struct ctg_t:
         pass
 

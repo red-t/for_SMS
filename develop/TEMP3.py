@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import argparse
-from ParallelTemplate import build_cluster_parallel
+from TEMP3.ParallelTemplate import build_cluster_parallel
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Demo of argparse")

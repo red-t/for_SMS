@@ -1,5 +1,5 @@
-from htslib_external cimport *
-from SegmentParser cimport parse_cigar, seg_dtype_struct
+from .htslib_external cimport *
+from .SegmentParser cimport parse_cigar, seg_dtype_struct
 from libc.stdlib cimport malloc, calloc, realloc, free
 from libc.errno  cimport errno
 from libc.string cimport strerror

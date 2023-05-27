@@ -1,7 +1,7 @@
 # filename: ParallelTemplate.pyx
 
 from pysam import AlignmentFile
-from Cluster import build_cluster
+from .Cluster import build_cluster
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 

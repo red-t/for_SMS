@@ -19,7 +19,7 @@ cdef str ERROR_HANDLER
 #
 # ---------------------------------------------------------------
 #
-cdef extern from "temp_util.h":
+cdef extern from "src/temp_util.h" nogil:
     ######################
     ### CIGAR resolver ###
     ######################

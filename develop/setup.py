@@ -40,32 +40,32 @@ incl_dirs = ["/Users/hzr/opt/anaconda3/envs/pysam/include"]
 lib_dirs = ["/Users/hzr/opt/anaconda3/envs/pysam/lib"]
 
 ext = [
-    Extension(name = "htslib_external",
-              sources = ["htslib_external.pyx", "temp_util.c"],
+    Extension(name = "TEMP3.htslib_external",
+              sources = ["TEMP3/htslib_external.pyx", "TEMP3/src/temp_util.c"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs),
 
-    Extension(name = "SegmentParser",
-              sources = ["SegmentParser.pyx"],
+    Extension(name = "TEMP3.SegmentParser",
+              sources = ["TEMP3/SegmentParser.pyx"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs),
 
-    Extension(name = "AlignmentFileIO",
-              sources = ["AlignmentFileIO.pyx"],
+    Extension(name = "TEMP3.AlignmentFileIO",
+              sources = ["TEMP3/AlignmentFileIO.pyx"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs),
 
-    Extension(name = "Cluster",
-              sources = ["Cluster.pyx", "AIList.c"],
+    Extension(name = "TEMP3.Cluster",
+              sources = ["TEMP3/Cluster.pyx", "TEMP3/src/AIList.c"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs),
 
-    Extension(name = "ParallelTemplate",
-              sources = ["ParallelTemplate.pyx"],
+    Extension(name = "TEMP3.ParallelTemplate",
+              sources = ["TEMP3/ParallelTemplate.pyx"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs)
