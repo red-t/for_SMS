@@ -16,70 +16,6 @@ cdef str TEXT_ENCODING
 cdef str ERROR_HANDLER
 
 # cdef str charptr_to_str(const char* s)
-#
-# ---------------------------------------------------------------
-#
-cdef extern from "src/temp_util.h" nogil:
-    ######################
-    ### CIGAR resolver ###
-    ######################
-
-    # Get whether the CIGAR operation is clip/insert.
-    # @param  op CIGAR operation
-    # @return    1 if the CIGAR operation is clip/insert, 0 if not
-    int is_clip_or_insert(uint32_t op)
-
-    # Get whether the CIGAR operation is match/equal/diff.
-    # @param  op CIGAR operation
-    # @return    1 if the CIGAR operation is match/equal/diff, 0 if not
-    int is_match(uint32_t op)
-
-    # Get whether the CIGAR operation is del/skip.
-    # @param  op CIGAR operation
-    # @return    1 if the CIGAR operation is del/skip, 0 if not
-    int is_del_or_skip(uint32_t op)
-
-
-    #######################
-    ### Segment records ###
-    #######################
-
-    uint8_t LEFT_CLIP
-    uint8_t MID_INSERT
-    uint8_t RIGHT_CLIP
-    uint8_t DUAL_CLIP
-
-    # Get whether the alignment is dual-clip.
-    # @param rflag  rflag of the segment, representing type of the corresponding alignment
-    # @return       1 if the alignment is dual-clip, 0 if not
-    int aln_is_dclip(uint8_t rflag)
-
-    # Get whether the query is secondary alignment by flag.
-    # @param flag  bitwise flag of the query alignment
-    # @return      1 if query is secondary, 0 if not
-    int aln_is_second(uint16_t flag)
-
-    # Get whether the query is on the reverse strand by flag.
-    # @param flag  bitwise flag of the query alignment
-    # @return      1 if query is on the reverse strand, 0 if not
-    int aln_is_rev(uint16_t flag)
-
-    # Update overhang for mid-insert type segment
-    # @param overhang  original overhang of the segment
-    # @param nmatch    nummber of match bases of the corresponding alignment
-    # @return          Updated overhang, <= original overhang
-    int32_t update_overhang(int32_t overhang, int32_t nmatch)
-
-
-    #########################
-    ### Alignment records ###
-    #########################
-
-    # @abstract  Get whether the query is secondary alignment
-    # @param  b  pointer to an alignment
-    # @return    1 if query is secondary, 0 if not
-    int bam_is_second(bam1_t *b)
-
 
 #
 # ---------------------------------------------------------------
@@ -93,6 +29,7 @@ cdef extern from "htslib/kstring.h" nogil:
 #     int kputw(int c, kstring_t *s)
 #     int kputl(long c, kstring_t *s)
 #     int ksprintf(kstring_t *s, const char *fmt, ...)
+
 #
 # ---------------------------------------------------------------
 #

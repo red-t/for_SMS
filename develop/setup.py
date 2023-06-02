@@ -1,6 +1,5 @@
 from distutils.core import setup, Extension
 from Cython.Build import cythonize
-import pysam
 
 ## V1 ##
 # ext = [
@@ -41,7 +40,7 @@ lib_dirs = ["/Users/hzr/opt/anaconda3/envs/pysam/lib"]
 
 ext = [
     Extension(name = "TEMP3.htslib_external",
-              sources = ["TEMP3/htslib_external.pyx", "TEMP3/src/temp_util.c"],
+              sources = ["TEMP3/htslib_external.pyx"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs),

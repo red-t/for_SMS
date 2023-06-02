@@ -13,13 +13,14 @@
 #include <assert.h>
 //-------------------------------------------------------------------------------------
 #include "khash.h"
+#include "seg_utils.h"
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define MAXC 10							//max number of components
 //-------------------------------------------------------------------------------------
 typedef struct {
-    uint32_t start;      				// region start: 0-based
-    uint32_t end;    					// region end: not inclusive
+    int32_t start;      				// region start: 0-based
+    int32_t end;    					// region end: not inclusive
                                         // TO DO: should add a new feature value, representing the TE family
 } gdata_t;
 
@@ -27,7 +28,7 @@ typedef struct{
 	int64_t nr, mr;						// number of regions; max number
 	gdata_t *glist;						// list of regions
 	int nc, lenC[MAXC], idxC[MAXC];		// number of components; lengths of components; start indices of components 
-	uint32_t *maxE;						// list of maximum end (maxE)
+	int32_t *maxE;						// list of maximum end (maxE)
 } ctg_t;
 
 typedef struct {
@@ -47,7 +48,7 @@ void ailist_destroy(ailist_t *ail);
  * @param s   start of the interval
  * @param e   end of the interval
  */
-void ailist_add(ailist_t *ail, uint32_t s, uint32_t e);
+void ailist_add(ailist_t *ail, int32_t s, int32_t e);
 
 /// Add intervals from BED-like file.
 /*!
@@ -71,16 +72,16 @@ void ailist_construct(ailist_t *ail, int cLen);
  * @param qe    query end for searching index of the search space
  * @return      index of the first item satisfying .start<qe from right
  */
-uint32_t bSearch(gdata_t* As, uint32_t idxS, uint32_t idxE, uint32_t qe);
+int32_t bSearch(gdata_t* As, int32_t idxS, int32_t idxE, int32_t qe);
 
 /// Compute the minimum distance between query position to the nearest interval
 /*!
  * @param rpos  reference position used as query
  * @param flank flank size used for extending query
+ * @param n     number of intervals overlapped with [rpos-flank, rpos+flank)
  * @param d     minimum distance, will be computed when calling this function
- * @return      number of intervals overlapped with [rpos-flank, rpos+flank)
  */
-uint32_t query_dist_p(ailist_t *ail, uint32_t rpos, uint32_t flank, uint32_t *d);
+void query_dist_p(ailist_t *ail, int32_t rpos, int32_t flank, int32_t *n, int32_t *d);
 
 /// Compute the minimum distance between query interval to the nearest interval
 /*!
@@ -90,7 +91,15 @@ uint32_t query_dist_p(ailist_t *ail, uint32_t rpos, uint32_t flank, uint32_t *d)
  * @param d     minimum distance, will be computed when calling this function
  * @return      number of intervals overlapped with [st-flank, ed+flank)
  */
-uint32_t query_dist_c(ailist_t *ail, uint32_t st, uint32_t ed, uint32_t flank, uint32_t *d);
+int32_t query_dist_c(ailist_t *ail, int32_t st, int32_t ed, int32_t flank, int32_t *d);
+
+/// Compute alignment location flag
+/*!
+ * @param rep_ail	AIList of repeats
+ * @param gap_ail	AIList of gaps
+ * @param segs		address to the array of segments
+ */
+void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[]);
 
 
 /*********************

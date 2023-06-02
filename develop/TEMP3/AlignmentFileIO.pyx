@@ -18,8 +18,7 @@ SEG_DTYPE = np.dtype([
     ('nseg',        np.uint8),
     ('overhang',    np.int32),
     ('nmatch',      np.int32),
-    ('loc_flag1',   np.uint8),
-    ('loc_flag2',   np.uint8),
+    ('loc_flag',    np.uint8),
 ])
 #
 # ---------------------------------------------------------------

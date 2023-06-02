@@ -1,6 +1,3 @@
-# filename: ParallelTemplate.pyx
-
-from pysam import AlignmentFile
 from .Cluster import build_cluster
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -39,13 +36,14 @@ cpdef dict build_cluster_parallel(str fpath,
         result: dict
             dictionary of clusters, tid -> list_of_Cluster.
     '''
-    cdef set    futures
-    cdef list   idx
-    cdef dict   result={}, ret
-    cdef int    nchroms, i
+    cdef set     futures
+    cdef dict    result={}, ret
+    cdef int     nchroms, i
+    cdef BamFile bf
     
-    bf = AlignmentFile(fpath, "rb")
-    nchroms = bf.nreferences
+    # get number of target chromosomes
+    bf = BamFile(fpath, 1, "rb")
+    nchroms = bf.hdr.n_targets
     bf.close(); del bf
 
     with ProcessPoolExecutor(max_workers=nprocess) as executor:

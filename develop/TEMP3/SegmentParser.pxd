@@ -1,29 +1,74 @@
 from .htslib_external cimport *
 from cpython cimport PyBytes_FromStringAndSize
 
+cdef extern from "src/seg_utils.h" nogil:
+    ######################
+    ### CIGAR resolver ###
+    ######################
 
-######################
-### CIGAR resolver ###
-######################
+    # Get whether the CIGAR operation is clip/insert.
+    # @param  op CIGAR operation
+    # @return    1 if the CIGAR operation is clip/insert, 0 if not
+    int is_clip_or_insert(uint32_t op)
 
-cdef packed struct seg_dtype_struct:
-    uint16_t    flag
-    uint8_t     mapq
-    int32_t     qst
-    int32_t     qed
-    int32_t     rpos
-    int32_t     lqseq
-    uint8_t     sflag
-    uint8_t     rflag
-    int64_t     offset
-    int32_t     refst
-    int32_t     refed
-    uint8_t     ith
-    uint8_t     nseg
-    int32_t     overhang
-    int32_t     nmatch
-    uint8_t     loc_flag1
-    uint8_t     loc_flag2
+    # Get whether the CIGAR operation is match/equal/diff.
+    # @param  op CIGAR operation
+    # @return    1 if the CIGAR operation is match/equal/diff, 0 if not
+    int is_match(uint32_t op)
+
+    # Get whether the CIGAR operation is del/skip.
+    # @param  op CIGAR operation
+    # @return    1 if the CIGAR operation is del/skip, 0 if not
+    int is_del_or_skip(uint32_t op)
+
+
+    #######################
+    ### Segment records ###
+    #######################
+
+    uint8_t LEFT_CLIP
+    uint8_t MID_INSERT
+    uint8_t RIGHT_CLIP
+    uint8_t DUAL_CLIP
+
+    ctypedef packed struct seg_dtype_struct:
+        uint16_t    flag
+        uint8_t     mapq
+        int32_t     qst
+        int32_t     qed
+        int32_t     rpos
+        int32_t     lqseq
+        uint8_t     sflag
+        uint8_t     rflag
+        int64_t     offset
+        int32_t     refst
+        int32_t     refed
+        uint8_t     ith
+        uint8_t     nseg
+        int32_t     overhang
+        int32_t     nmatch
+        uint8_t     loc_flag
+
+    # # Get whether the alignment is dual-clip.
+    # # @param rflag  rflag of the segment, representing type of the corresponding alignment
+    # # @return       1 if the alignment is dual-clip, 0 if not
+    # int aln_is_dclip(uint8_t rflag)
+
+    # # Get whether the query is secondary alignment by flag.
+    # # @param flag  bitwise flag of the query alignment
+    # # @return      1 if query is secondary, 0 if not
+    # int aln_is_second(uint16_t flag)
+
+    # # Get whether the query is on the reverse strand by flag.
+    # # @param flag  bitwise flag of the query alignment
+    # # @return      1 if query is on the reverse strand, 0 if not
+    # int aln_is_rev(uint16_t flag)
+
+    # # Update overhang for mid-insert type segment
+    # # @param overhang  original overhang of the segment
+    # # @param nmatch    nummber of match bases of the corresponding alignment
+    # # @return          Updated overhang, <= original overhang
+    # int32_t update_overhang(int32_t overhang, int32_t nmatch)
 
 
 cdef int parse_cigar(bam1_t *src,

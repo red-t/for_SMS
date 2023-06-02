@@ -129,21 +129,25 @@ cpdef dict build_cluster(str fpath,
     wbf = BamFile(outpath, threads, wmode, rbf)
     segs = rbf.extract_seg(wbf, tid, minl)
 
-    # # test for AIList
-    # cdef int i
-    # cdef seg_dtype_struct[::1] segs_view = segs
-    # cdef bytes repfn = "dm3_rmsk.bed".encode(TEXT_ENCODING, ERROR_HANDLER)
-    # cdef const char *chrom = sam_hdr_tid2name(rbf.hdr, tid)
-    # cdef ailist_t *rep_ail = ailist_init()
-    # cdef uint32_t mdist
-    # readBED(rep_ail, repfn, chrom)
-    # ailist_construct(rep_ail, 20)
-    # print(segs_view.shape[0])
-    # for i in range(segs_view.shape[0]):
-    #     segs_view[i].loc_flag1 = query_dist_p(rep_ail, segs_view[i].refst, 50, &mdist)
-    #     segs_view[i].nmatch = mdist
+    ### test for AIList ###
+    cdef ssize_t i
+    cdef seg_dtype_struct[::1] segs_view = segs
+    cdef bytes repfn = "dm3_rmsk.bed".encode(TEXT_ENCODING, ERROR_HANDLER)
+    cdef bytes gapfn = "dm3_gap.bed".encode(TEXT_ENCODING, ERROR_HANDLER)
+    cdef const char *chrom = sam_hdr_tid2name(rbf.hdr, tid)
+    cdef ailist_t *rep_ail = ailist_init()
+    cdef ailist_t *gap_ail = ailist_init()
+
+    readBED(rep_ail, repfn, chrom)
+    readBED(gap_ail, gapfn, chrom)
+    ailist_construct(rep_ail, 20)
+    ailist_construct(gap_ail, 20)
+    for i in range(segs_view.shape[0]):
+        aln_loc_flag(rep_ail, gap_ail, &segs_view[i])
     
-    # ailist_destroy(rep_ail)
+    ailist_destroy(rep_ail)
+    ailist_destroy(gap_ail)
+    ### test for AIList ###
 
     # close file after I/O
     rbf.close(); del rbf

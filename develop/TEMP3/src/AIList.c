@@ -22,7 +22,7 @@ void ailist_destroy(ailist_t *ail)
 }
 
 
-void ailist_add(ailist_t *ail, uint32_t s, uint32_t e)
+void ailist_add(ailist_t *ail, int32_t s, int32_t e)
 {
 	if(s > e) return;
 	ctg_t *q = &ail->ctg[0];
@@ -79,7 +79,7 @@ void ailist_construct(ailist_t *ail, int cLen)
         while(iter<MAXC && lenT>minL){
             len = 0;
             for(t=0; t<lenT-cLen; t++){
-                uint32_t tt = L0[t].end;
+                int32_t tt = L0[t].end;
                 j=1;    j1=1;
                 while(j<cLen && j1<cLen1){
                     if(L0[j+t].end>=tt) j1++;
@@ -107,11 +107,11 @@ void ailist_construct(ailist_t *ail, int cLen)
         free(L2),free(L0);
     }
     //2. Augmentation
-    p->maxE = malloc(nr*sizeof(uint32_t));
+    p->maxE = malloc(nr*sizeof(int32_t));
     for(j=0; j<p->nc; j++){
         k0 = p->idxC[j];
         k  = k0 + p->lenC[j];
-        uint32_t tt = L1[k0].end;
+        int32_t tt = L1[k0].end;
         p->maxE[k0] = tt;
         for(t=k0+1; t<k; t++){
             if(L1[t].end > tt) tt = L1[t].end;
@@ -121,7 +121,7 @@ void ailist_construct(ailist_t *ail, int cLen)
 }
 
 
-uint32_t bSearch(gdata_t* As, uint32_t idxS, uint32_t idxE, uint32_t qe)
+int32_t bSearch(gdata_t* As, int32_t idxS, int32_t idxE, int32_t qe)
 {   //find tE: index of the first item satisfying .start<qe from right
     int tL=idxS, tR=idxE-1, tM, tE=-1;
     // if start of the rightmost region less than qe,
@@ -147,13 +147,13 @@ uint32_t bSearch(gdata_t* As, uint32_t idxS, uint32_t idxE, uint32_t qe)
 }
 
 
-uint32_t query_dist_p(ailist_t *ail, uint32_t rpos, uint32_t flank, uint32_t *d)
+void query_dist_p(ailist_t *ail, int32_t rpos, int32_t flank, int32_t *n, int32_t *d)
 {   
-    uint32_t nr = 0; // number of regions overlapped with query
-    uint32_t qs = (rpos<flank) ? 0 : rpos-flank; // query start of the extended rpos
-    uint32_t qe = rpos + flank; // query end of the extended rpos
-    int32_t  k, md;
-    int32_t  mdist = 2147483647;
+    int32_t nr = 0; // number of regions overlapped with query
+    int32_t qs = (rpos<flank) ? 0 : rpos-flank; // query start of the extended rpos
+    int32_t qe = rpos + flank; // query end of the extended rpos
+    int32_t k, md;
+    int32_t mdist = 0x7fffffff;
     ctg_t   *p = &ail->ctg[0]; // point to the first contig
     
     // k-th component catains p->lenC[k] regions
@@ -166,8 +166,8 @@ uint32_t query_dist_p(ailist_t *ail, uint32_t rpos, uint32_t flank, uint32_t *d)
             t = bSearch(p->glist, cs, ce, qe); 	// get index of the first item satisfying .start<qe from right
             while(t>=cs && p->maxE[t]>qs){      // search from t-th region to right
                 if(p->glist[t].end>qs){         // .start<qe & .end>qs, overlap
-                    md    = MIN(abs((int32_t)rpos - (int32_t)p->glist[t].start), \
-                                abs((int32_t)rpos - (int32_t)p->glist[t].end));
+                    md    = MIN(abs(rpos - p->glist[t].start), \
+                                abs(rpos - p->glist[t].end));
                     // TO DO: should get value of the overlapped
                     // and update it if mdist is updated
                 	mdist = MIN(mdist, md);     // calculate the shortest distance from the border
@@ -179,8 +179,8 @@ uint32_t query_dist_p(ailist_t *ail, uint32_t rpos, uint32_t flank, uint32_t *d)
         else{
             for(t=cs; t<ce; t++){
                 if(p->glist[t].start<qe && p->glist[t].end>qs){
-                	md    = MIN(abs((int32_t)rpos - (int32_t)p->glist[t].start), \
-                                abs((int32_t)rpos - (int32_t)p->glist[t].end));
+                	md    = MIN(abs(rpos - p->glist[t].start), \
+                                abs(rpos - p->glist[t].end));
                     // TO DO: should get value of the overlapped
                     // and update it if mdist is updated
                 	mdist = MIN(mdist, md);
@@ -189,18 +189,19 @@ uint32_t query_dist_p(ailist_t *ail, uint32_t rpos, uint32_t flank, uint32_t *d)
 			}
         }
     }
-    *d = mdist;
-    return nr;
+    *d = MIN(mdist, *d);
+    *n = *n + nr;
+    // return nr;
 }
 
 
-uint32_t query_dist_c(ailist_t *ail, uint32_t st, uint32_t ed, uint32_t flank, uint32_t *d)
+int32_t query_dist_c(ailist_t *ail, int32_t st, int32_t ed, int32_t flank, int32_t *d)
 {
-    uint32_t nr = 0;
-    uint32_t qs = (st<flank) ? 0 : st-flank; // query start of the extended st
-    uint32_t qe = ed + flank; // query end of the extended ed
-    int32_t  k, ldist, rdist;
-    int32_t  mdist = 2147483647;
+    int32_t nr = 0;
+    int32_t qs = (st<flank) ? 0 : st-flank; // query start of the extended st
+    int32_t qe = ed + flank; // query end of the extended ed
+    int32_t k, ldist, rdist;
+    int32_t mdist = 2147483647;
     ctg_t   *p = &ail->ctg[0];
 
     for(k=0; k<p->nc; k++){
@@ -240,4 +241,63 @@ uint32_t query_dist_c(ailist_t *ail, uint32_t st, uint32_t ed, uint32_t flank, u
     }
     *d = mdist;
     return nr;
+}
+
+
+void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[])
+{
+    int32_t n1 = 0, n2 = 0;
+    int32_t d1 = 0x7fffffff, d2 = 0x7fffffff;
+    uint8_t flag1, flag2;
+
+    // intersecting with repeats
+    query_dist_p(rep_ail, segs[0].refst, 50, &n1, &d1);
+    query_dist_p(rep_ail, segs[0].refed, 50, &n2, &d2);
+
+    // intersecting with gaps
+    query_dist_p(gap_ail, segs[0].refst, 50, &n1, &d1);
+    query_dist_p(gap_ail, segs[0].refed, 50, &n2, &d2);
+
+    // flag of refst
+    if (n1>0){
+        if (d1<50) {
+            // at boundary
+            flag1 = 1;
+        } else {
+            // inside repeats/gap
+            flag1 = 2;
+        }
+    } else {
+        // at normal
+        flag1 = 0;
+    }
+
+    // flag of refed
+    if (n2>0){
+        if (d2<50) {
+            // at boundary
+            flag2 = 1;
+        } else {
+            // inside repeats/gap
+            flag2 = 2;
+        }
+    } else {
+        // at normal
+        flag2 = 0;
+    }
+
+    // flag of the alignment
+    if (flag1==1 && flag2==1){ // both sides at repeat/gap boundary
+        segs[0].loc_flag = 4;
+    } else if (flag1==2 && flag2==2) { // both sides inside repeat/gap
+        segs[0].loc_flag = 2;
+    } else if (flag1==1 || flag2==1) { // one side at repeat/gap boundary
+        if (flag1==0 || flag2==0) { // the other side at normal region
+            segs[0].loc_flag = 8;
+        } else { // the other side inside repeat/gap
+            segs[0].loc_flag = 16;
+        }
+    } else { // at least one side at normal region
+        segs[0].loc_flag = 1;
+    }
 }

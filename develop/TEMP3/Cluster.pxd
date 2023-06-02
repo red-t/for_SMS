@@ -43,11 +43,6 @@ cdef extern from "src/AIList.h" nogil:
     # Free ailist data
     void ailist_destroy(ailist_t *ail)
 
-    # Add a interval into AIList
-    # @param s   start of the interval
-    # @param e   end of the interval
-    void ailist_add(ailist_t *ail, uint32_t s, uint32_t e)
-
     # Add intervals from BED-like file
     # @param fn   filename of the BED-like file
     # @param chr  name of the specified chromosome, only intervals
@@ -58,20 +53,11 @@ cdef extern from "src/AIList.h" nogil:
     # @param cLen minimum coverage length, default=20
     void ailist_construct(ailist_t *ail, int cLen)
 
-    # Compute the minimum distance between query position to the nearest interval
-    # @param rpos  reference position used as query
-    # @param flank flank size used for extending query
-    # @param d     minimum distance, will be computed when calling this function
-    # @return      number of intervals overlapped with [rpos-flank, rpos+flank)
-    uint32_t query_dist_p(ailist_t *ail, uint32_t rpos, uint32_t flank, uint32_t *d)
-
-    # Compute the minimum distance between query interval to the nearest interval
-    # @param st    start position of query interval
-    # @param ed    end position of query interval
-    # @param flank flank size used for extending query interval
-    # @param d     minimum distance, will be computed when calling this function
-    # @return      number of intervals overlapped with [st-flank, ed+flank)
-    uint32_t query_dist_c(ailist_t *ail, uint32_t st, uint32_t ed, uint32_t flank, uint32_t *d)
+    # Compute alignment location flag
+    # @param rep_ail	AIList of repeats
+    # @param gap_ail	AIList of gaps
+    # @param segs		address to the array of segments
+    void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct *)
 
 #
 # ---------------------------------------------------------------
