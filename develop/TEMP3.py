@@ -7,6 +7,10 @@ def parse_args():
 
     parser.add_argument('-b', '--bam', dest='fpath', type=str,
                                  help='path of input BAM file, mapped by minimap2 -Y', default='')
+    parser.add_argument('-r', '--rep', dest='rep_path', type=str,
+                                 help='path of repeats annotation file', default='')
+    parser.add_argument('-g', '--gap', dest='gap_path', type=str,
+                                 help='path of gap annotation file', default='')
     parser.add_argument('-o', '--out_path', dest='out_path', type=str,
                                  help='Path of the output', default='./')
     parser.add_argument('-p', '--nprocess', dest='nprocess', type=int,
@@ -28,6 +32,8 @@ if __name__ == '__main__':
 
     # build clusters in parallel
     tid_to_clusters = build_cluster_parallel(args.fpath,
+                                             args.rep_path,
+                                             args.gap_path,
                                              args.nprocess,
                                              args.nthreads,
                                              args.minl,

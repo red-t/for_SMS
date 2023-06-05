@@ -195,13 +195,13 @@ void query_dist_p(ailist_t *ail, int32_t rpos, int32_t flank, int32_t *n, int32_
 }
 
 
-int32_t query_dist_c(ailist_t *ail, int32_t st, int32_t ed, int32_t flank, int32_t *d)
+void query_dist_c(ailist_t *ail, int32_t st, int32_t ed, int32_t flank, int32_t *n, int32_t *d)
 {
     int32_t nr = 0;
     int32_t qs = (st<flank) ? 0 : st-flank; // query start of the extended st
     int32_t qe = ed + flank; // query end of the extended ed
     int32_t k, ldist, rdist;
-    int32_t mdist = 2147483647;
+    int32_t mdist = 0x7fffffff;
     ctg_t   *p = &ail->ctg[0];
 
     for(k=0; k<p->nc; k++){
@@ -239,8 +239,8 @@ int32_t query_dist_c(ailist_t *ail, int32_t st, int32_t ed, int32_t flank, int32
 			}
         }
     }
-    *d = mdist;
-    return nr;
+    *d = MIN(mdist, *d);
+    *n = *n + nr;
 }
 
 
@@ -299,5 +299,31 @@ void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[])
         }
     } else { // at least one side at normal region
         segs[0].loc_flag = 1;
+    }
+}
+
+
+void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clts[])
+{
+    int32_t n = 0, d = 0x7fffffff;
+
+    // intersecting with repeats
+    query_dist_c(rep_ail, clts[0].st, clts[0].ed, 50, &n, &d);
+
+    // intersecting with gaps
+    query_dist_c(gap_ail, clts[0].st, clts[0].ed, 50, &n, &d);
+
+    // flag of the cluster
+    if (n>0){
+        if (d<50) {
+            // at boundary
+            clts[0].cloc_flag = 2;
+        } else {
+            // inside repeats/gap
+            clts[0].cloc_flag = 4;
+        }
+    } else {
+        // at normal
+        clts[0].cloc_flag = 1;
     }
 }

@@ -37,12 +37,12 @@ cdef class BamFile:
     cdef    int       threads           # number of threads to use
 
     cdef    void      _open(self, BamFile template=*)
-    cdef    htsFile   *_open_htsfile(self) except? NULL
-    cpdef   object     extract_seg(self,
-                                   BamFile wbf,
-                                   int tid,
-                                   int minl=*)
-    cdef    void       write(self, bam1_t *src)
+    cdef    htsFile  *_open_htsfile(self) except? NULL
+    cdef    void      write(self, bam1_t *src)
+    # cpdef   object     extract_seg(self,
+    #                                BamFile wbf,
+    #                                int tid,
+    #                                int minl=*)
 
 
 cdef class Iterator:
@@ -57,6 +57,7 @@ cdef class Iterator:
     cdef hts_idx_t *index   # pointer to hts_idx_t structure
     cdef hts_itr_t *iter    # pointer to hts_itr_t structure, iterator from htslib
     cdef object     segs
+    cdef int        N
     cdef int64_t    offset
     cdef int32_t    minl
     cdef int        tid

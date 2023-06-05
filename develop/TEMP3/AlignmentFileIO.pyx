@@ -121,41 +121,6 @@ cdef class BamFile:
                 if htsfile != NULL:
                     hts_set_threads(htsfile, threads)
                 return htsfile
-
-    cpdef object extract_seg(self,
-                             BamFile wbf,
-                             int tid,
-                             int minl=50):
-        '''extract segments from chromosome tid
-        
-        Usage: extract_seg(0, 50) to extract segments with length >= 50
-            from chromosome 0.
-
-        Parameters
-        ----------
-        wbf: BamFile
-            BamFile object opened for writting.
-
-        tid: int
-            tid of the target chromosome.
-
-        minl: int
-            minimum length of the segment. segment with cigar_length < minl
-            will not be used to create a new InsertSegment.
-        
-        Returns
-        -------
-        segs: object
-		    strctured numpy array with `dtype=SEG_DTYPE`.
-        '''
-        cdef Iterator ite
-
-        ite = Iterator(self, wbf, tid, minl)
-        for i in ite:
-            continue
-
-        return ite.segs
-    
     cdef void write(self, bam1_t *src):
         '''write a single alignment to disk.
 
@@ -172,6 +137,40 @@ cdef class BamFile:
         if ret < 0:
             raise IOError(
             "sam_write1 failed with error code {}".format(ret))
+
+    # cpdef object extract_seg(self,
+    #                          BamFile wbf,
+    #                          int tid,
+    #                          int minl=50):
+    #     '''extract segments from chromosome tid
+        
+    #     Usage: extract_seg(0, 50) to extract segments with length >= 50
+    #         from chromosome 0.
+
+    #     Parameters
+    #     ----------
+    #     wbf: BamFile
+    #         BamFile object opened for writting.
+
+    #     tid: int
+    #         tid of the target chromosome.
+
+    #     minl: int
+    #         minimum length of the segment. segment with cigar_length < minl
+    #         will not be used to create a new InsertSegment.
+        
+    #     Returns
+    #     -------
+    #     segs: object
+	# 	    strctured numpy array with `dtype=SEG_DTYPE`.
+    #     '''
+    #     cdef Iterator ite
+
+    #     ite = Iterator(self, wbf, tid, minl)
+    #     for i in ite:
+    #         continue
+
+    #     return ite.segs
 #
 # ---------------------------------------------------------------
 #
@@ -250,6 +249,43 @@ cdef class Iterator:
                     self.wbf.write(self.b)
                 continue
 
-            self.segs = self.segs[:N,]
+            self.N = N
             del template
             raise StopIteration
+#
+# ---------------------------------------------------------------
+#
+# cdef object extract_seg(Iterator ite,
+#                         BamFile wbf,
+#                         int tid,
+#                         int minl=50):
+#         '''extract segments from chromosome tid
+        
+#         Usage: extract_seg(0, 50) to extract segments with length >= 50
+#             from chromosome 0.
+
+#         Parameters
+#         ----------
+#         rbf: BamFile
+#             BamFile object opened for reading.
+
+#         wbf: BamFile
+#             BamFile object opened for writting.
+
+#         tid: int
+#             tid of the target chromosome.
+
+#         minl: int
+#             minimum length of the segment. segment with cigar_length < minl
+#             will not be used to create a new InsertSegment.
+        
+#         Returns
+#         -------
+#         segs: object
+# 		    strctured numpy array with `dtype=SEG_DTYPE`.
+#         '''
+#         # ite = Iterator(rbf, wbf, tid, minl)
+#         for i in ite:
+#             continue
+
+#         return ite.segs

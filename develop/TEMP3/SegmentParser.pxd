@@ -49,27 +49,6 @@ cdef extern from "src/seg_utils.h" nogil:
         int32_t     nmatch
         uint8_t     loc_flag
 
-    # # Get whether the alignment is dual-clip.
-    # # @param rflag  rflag of the segment, representing type of the corresponding alignment
-    # # @return       1 if the alignment is dual-clip, 0 if not
-    # int aln_is_dclip(uint8_t rflag)
-
-    # # Get whether the query is secondary alignment by flag.
-    # # @param flag  bitwise flag of the query alignment
-    # # @return      1 if query is secondary, 0 if not
-    # int aln_is_second(uint16_t flag)
-
-    # # Get whether the query is on the reverse strand by flag.
-    # # @param flag  bitwise flag of the query alignment
-    # # @return      1 if query is on the reverse strand, 0 if not
-    # int aln_is_rev(uint16_t flag)
-
-    # # Update overhang for mid-insert type segment
-    # # @param overhang  original overhang of the segment
-    # # @param nmatch    nummber of match bases of the corresponding alignment
-    # # @return          Updated overhang, <= original overhang
-    # int32_t update_overhang(int32_t overhang, int32_t nmatch)
-
 
 cdef int parse_cigar(bam1_t *src,
                      seg_dtype_struct[::1] segs,

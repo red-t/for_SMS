@@ -14,6 +14,7 @@
 //-------------------------------------------------------------------------------------
 #include "khash.h"
 #include "seg_utils.h"
+#include "cluster_utils.h"
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define MAXC 10							//max number of components
@@ -40,8 +41,10 @@ typedef struct {
 /// Initialize ailist_t
 ailist_t *ailist_init(void);
 
+
 /// Free ailist data.
 void ailist_destroy(ailist_t *ail);
+
 
 /// Add a interval into AIList.
 /*!
@@ -49,6 +52,7 @@ void ailist_destroy(ailist_t *ail);
  * @param e   end of the interval
  */
 void ailist_add(ailist_t *ail, int32_t s, int32_t e);
+
 
 /// Add intervals from BED-like file.
 /*!
@@ -58,11 +62,13 @@ void ailist_add(ailist_t *ail, int32_t s, int32_t e);
  */
 void readBED(ailist_t *ail, const char* fn, const char* chr);
 
+
 /// Construct ailist: decomposition and augmentation.
 /*!
  * @param cLen minimum coverage length, default=20
  */
 void ailist_construct(ailist_t *ail, int cLen);
+
 
 /// Binary search
 /*!
@@ -74,6 +80,7 @@ void ailist_construct(ailist_t *ail, int cLen);
  */
 int32_t bSearch(gdata_t* As, int32_t idxS, int32_t idxE, int32_t qe);
 
+
 /// Compute the minimum distance between query position to the nearest interval
 /*!
  * @param rpos  reference position used as query
@@ -83,6 +90,7 @@ int32_t bSearch(gdata_t* As, int32_t idxS, int32_t idxE, int32_t qe);
  */
 void query_dist_p(ailist_t *ail, int32_t rpos, int32_t flank, int32_t *n, int32_t *d);
 
+
 /// Compute the minimum distance between query interval to the nearest interval
 /*!
  * @param st    start position of query interval
@@ -91,7 +99,8 @@ void query_dist_p(ailist_t *ail, int32_t rpos, int32_t flank, int32_t *n, int32_
  * @param d     minimum distance, will be computed when calling this function
  * @return      number of intervals overlapped with [st-flank, ed+flank)
  */
-int32_t query_dist_c(ailist_t *ail, int32_t st, int32_t ed, int32_t flank, int32_t *d);
+void query_dist_c(ailist_t *ail, int32_t st, int32_t ed, int32_t flank, int32_t *n, int32_t *d);
+
 
 /// Compute alignment location flag
 /*!
@@ -100,6 +109,15 @@ int32_t query_dist_c(ailist_t *ail, int32_t st, int32_t ed, int32_t flank, int32
  * @param segs		address to the array of segments
  */
 void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[]);
+
+
+/// Compute cluster location flag
+/*!
+ * @param rep_ail	AIList of repeats
+ * @param gap_ail	AIList of gaps
+ * @param clts		address to the array of clusters
+ */
+void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clts[]);
 
 
 /*********************

@@ -1,5 +1,6 @@
 from distutils.core import setup, Extension
 from Cython.Build import cythonize
+import numpy as np
 
 ## V1 ##
 # ext = [
@@ -35,7 +36,7 @@ from Cython.Build import cythonize
 # 前者是通过 conda 安装 htslib 生成的；后者是通过 conda 安装 pysam 生成的，它们的版本一样
 # 因此，这里直接通过 pysam.get_include() 获取 include_dirs 也是可以的，没必要重复。(当然，如果版本不同的话就不行了)
 # incl_dirs = pysam.get_include()
-incl_dirs = ["/Users/hzr/opt/anaconda3/envs/pysam/include"]
+incl_dirs = ["/Users/hzr/opt/anaconda3/envs/pysam/include", np.get_include()]
 lib_dirs = ["/Users/hzr/opt/anaconda3/envs/pysam/lib"]
 
 ext = [
@@ -58,7 +59,7 @@ ext = [
               library_dirs = lib_dirs),
 
     Extension(name = "TEMP3.Cluster",
-              sources = ["TEMP3/Cluster.pyx", "TEMP3/src/AIList.c"],
+              sources = ["TEMP3/Cluster.pyx", "TEMP3/src/AIList.c", "TEMP3/src/cluster_utils.c"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs),

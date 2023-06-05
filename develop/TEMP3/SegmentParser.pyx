@@ -37,7 +37,7 @@ cdef int parse_cigar(bam1_t *src,
         nseg: int8_t
             number of insert segments extracted from this alignment
     '''
-    cdef int8_t         ith         = 1
+    cdef int8_t         ith         = 0
     cdef int8_t         nseg        = 0
     cdef int8_t         aln_flag    = 0
     cdef int32_t        nmatch      = 0
@@ -50,7 +50,7 @@ cdef int parse_cigar(bam1_t *src,
     rpos    = src.core.pos
     cigar_p = bam_get_cigar(src)
     # traverse alignment's CIGAR
-    for k from 0 <= k < n:
+    for k in range(n):
         op = cigar_p[k] & BAM_CIGAR_MASK
         l  = cigar_p[k] >> BAM_CIGAR_SHIFT
         if is_match(op):
