@@ -10,9 +10,6 @@ CLUSTER_DTYPE = np.dtype([
     ('strand',      np.uint8),
     ('cloc_flag',   np.uint8),
     ('ntype',       np.uint8),
-    ('nL',          np.int16),
-    ('nM',          np.int16),
-    ('nR',          np.int16),
     ('entropy',     np.float32),
     ('bratio',      np.float32),
     ('sovh_frac',   np.float32),
@@ -40,26 +37,10 @@ cdef object extract_seg(Iterator ite):
 cdef compute_seg_feat(seg_dtype_struct[::1] segs,
                       ailist_t *rep_ail,
                       ailist_t *gap_ail):
-    cdef ssize_t i, j
+    cdef ssize_t i
 
     for i in range(segs.shape[0]):
-        # update overhang
-        if segs[i].sflag & LEFT_CLIP:
-            segs[i].overhang = segs[i].nmatch
-        elif segs[i].sflag & MID_INSERT:
-            segs[i].overhang = update_overhang(segs[i].overhang, segs[i].nmatch)
-
-        # compute alignment location flag
-        if segs[i].ith == 0:
-            aln_loc_flag(rep_ail, gap_ail, &segs[i])
-            if segs[i].nseg > 1:
-                for j in range(1, segs[i].nseg):
-                    segs[i+j].loc_flag = segs[i].loc_flag
-        
-        # TO DO
-        # 1. compute the "trimmed" start & end for each segment (need a C function)
-        # 2. read alignment with specified offset by seek (need a function)
-        # 3. modified & write alignment by bam_set_qname, bam_set1, sam_write1 (need a C function)
+        seg_feat(&segs[i], rep_ail, gap_ail)
 #
 # ---------------------------------------------------------------
 #
@@ -125,7 +106,7 @@ cdef object merge_segments(seg_dtype_struct[::1] segs,
 #
 # ---------------------------------------------------------------
 #
-cdef compute_clt_feat1(cluster_dtype_struct[::1] clts,
+cdef compute_clt_feat(cluster_dtype_struct[::1] clts,
                       seg_dtype_struct[::1] segs,
                       ailist_t *rep_ail,
                       ailist_t *gap_ail):
@@ -133,67 +114,7 @@ cdef compute_clt_feat1(cluster_dtype_struct[::1] clts,
         ssize_t i, j
     
     for i in range(clts.shape[0]):
-        # compute cluster location flag
-        clt_loc_flag(rep_ail, gap_ail, &clts[i])
-
-        for j in range(clts[i].st_idx, clts[i].ed_idx):
-            # different type of segments
-            if segs[j].sflag & LEFT_CLIP:
-                clts[i].nL += 1
-                clts[i].ntype |= LEFT_CLIP
-            elif segs[j].sflag & RIGHT_CLIP:
-                clts[i].nR += 1
-                clts[i].ntype |= RIGHT_CLIP
-            else:
-                clts[i].nM += 1
-                clts[i].ntype |= MID_INSERT
-            
-            # short overhang
-            if segs[j].overhang < 100:
-                clts[i].sovh_frac += 1
-            
-            # low mapq
-            if segs[j].mapq < 5:
-                clts[i].lmq_frac += 1
-            
-            # dual-clip
-            if (segs[j].rflag & DUAL_CLIP)==5:
-                clts[i].dclip_frac += 1
-            
-            # algnments with different loc_flag
-            if segs[j].loc_flag & 1:
-                clts[i].aln1_frac += 1
-            elif segs[j].loc_flag & 2:
-                clts[i].aln2_frac += 1
-            elif segs[j].loc_flag & 4:
-                clts[i].aln4_frac += 1
-            elif segs[j].loc_flag & 8:
-                clts[i].aln8_frac += 1
-            elif segs[j].loc_flag & 16:
-                clts[i].aln16_frac += 1
-            
-            # sum of mapq
-            clts[i].avg_mapq += segs[j].mapq
-
-        clt_ntype(&clts[i]) # number of segment types
-        clt_entropy(&clts[i]) # compute entropy
-        clt_bratio(&clts[i]) # compute bratio
-        clt_sovh(&clts[i]) # compute short overhang fraction
-        clt_lmq(&clts[i]) # compute low mapq fraction
-        clt_dclip(&clts[i]) # compute dual-clip fraction
-        clt_dffloc(&clts[i]) # compute fraction of alignment with different loc_flag
-        clt_avgmapq(&clts[i]) # compute average mapqs
-
-
-# cdef compute_clt_feat(cluster_dtype_struct[::1] clts,
-#                       seg_dtype_struct[::1] segs,
-#                       ailist_t *rep_ail,
-#                       ailist_t *gap_ail):
-#     cdef:
-#         ssize_t i, j
-    
-#     for i in range(clts.shape[0]):
-#         clt_feat(&clts[i], &segs[0], rep_ail, gap_ail)
+        clt_feat(&clts[i], &segs[0], rep_ail, gap_ail)
 #
 # ---------------------------------------------------------------
 #
@@ -240,7 +161,7 @@ cpdef dict build_cluster(str fpath,
     ite  = Iterator(rbf, wbf, tid, minl)
     segs = extract_seg(ite)
 
-    ### 2. compute features for segments ###
+    ### 2. compute features for each segment ###
     cdef:
         bytes repfn = rep_path.encode()
         bytes gapfn = gap_path.encode()
@@ -272,9 +193,9 @@ cpdef dict build_cluster(str fpath,
     segs.sort(order='rpos')
     clts = merge_segments(segs, maxdist)
 
-    # compute features for each cluster
+    ### 4. compute features for each cluster ###
     cdef cluster_dtype_struct[::1] clts_view = clts
-    compute_clt_feat1(clts_view, segs_view, rep_ail, gap_ail)
+    compute_clt_feat(clts_view, segs_view, rep_ail, gap_ail)
 
     # free AIList
     ailist_destroy(rep_ail)

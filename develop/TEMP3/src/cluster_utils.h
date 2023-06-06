@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <math.h>
 #include "seg_utils.h"
-// #include "AIList.h"
+#include "AIList.h"
 //-------------------------------------------------------------------------------------
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
@@ -49,9 +49,6 @@ typedef struct {
     uint8_t     strand;
     uint8_t     cloc_flag;
     uint8_t     ntype;
-    int16_t     nL;
-    int16_t     nM;
-    int16_t     nR;
     float       entropy;
     float       bratio;
     float       sovh_frac;
@@ -66,83 +63,39 @@ typedef struct {
 } __attribute__((packed)) cluster_dtype_struct;
 
 
-/// Compute number of segment types.
+/// Compute cluster location flag
 /*!
- * @param clts  address to the array of clusters
+ * @param rep_ail	AIList of repeats
+ * @param gap_ail	AIList of gaps
+ * @param clts		address to the cluster record
  */
-inline void clt_ntype(cluster_dtype_struct clts[]) {
-    clts[0].ntype = (clts[0].ntype&1) + ((clts[0].ntype&2)>>1) + ((clts[0].ntype&4)>>2);
-}
+void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clts[]);
 
 
 /// Compute entropy based on segment types.
 /*!
- * @param clts  address to the array of clusters
+ * @param nL    number of left-clip segments
+ * @param nM    number of mid-insert segments
+ * @param nR    number of right-clip segments
+ * @param nseg  number of total segments in the cluster
  */
-void clt_entropy(cluster_dtype_struct clts[]);
-
-
-/// Compute balance ratio based on number of lef/right-clip segments.
-/*!
- * @param clts  address to the array of clusters
- */
-inline void clt_bratio(cluster_dtype_struct clts[]) {
-    clts[0].bratio = (MIN(clts[0].nL, clts[0].nR) + 0.01) / (MAX(clts[0].nL, clts[0].nR) + 0.01);
-}
-
-
-/// Compute short overhang fraction.
-/*!
- * @param clts  address to the array of clusters
- */
-inline void clt_sovh(cluster_dtype_struct clts[]) {
-    clts[0].sovh_frac = clts[0].sovh_frac / clts[0].nseg;
-}
-
-
-/// Compute low mapq fraction.
-/*!
- * @param clts  address to the array of clusters
- */
-inline void clt_lmq(cluster_dtype_struct clts[]) {
-    clts[0].lmq_frac = clts[0].lmq_frac / clts[0].nseg;
-}
-
-
-/// Compute dual-clip alignment fraction.
-/*!
- * @param clts  address to the array of clusters
- */
-inline void clt_dclip(cluster_dtype_struct clts[]) {
-    clts[0].dclip_frac = clts[0].dclip_frac / clts[0].nseg;
-}
+float clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg);
 
 
 /// Compute fraction of alignment with different loc_flag.
 /*!
- * @param clts  address to the array of clusters
+ * @param clts  address to the cluster record
  */
 void clt_dffloc(cluster_dtype_struct clts[]);
 
 
-/// Compute average mapq.
+/// Compute features of a cluster record.
 /*!
- * @param clts  address to the array of clusters
+ * @param clts      address to the cluster record
+ * @param segs      address to the arrary of segments
+ * @param repail    AIList of repeats
+ * @param gapail    AIList of gaps
  */
-inline void clt_avgmapq(cluster_dtype_struct clts[]) {
-    clts[0].avg_mapq = clts[0].avg_mapq / clts[0].nseg;
-}
-
-
-// /// Compute cluster location flag
-// /*!
-//  * @param rep_ail	AIList of repeats
-//  * @param gap_ail	AIList of gaps
-//  * @param clts		address to the array of clusters
-//  */
-// void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clts[]);
-
-
-// void clt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
+void clt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
 
 #endif // CLUSTER_UTILS_H

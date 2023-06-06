@@ -15,9 +15,6 @@ cdef extern from "src/cluster_utils.h" nogil:
         uint8_t     strand
         uint8_t     cloc_flag
         uint8_t     ntype
-        int16_t     nL
-        int16_t     nM
-        int16_t     nR
         float       entropy
         float       bratio
         float       sovh_frac
@@ -29,40 +26,13 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       aln8_frac
         float       aln16_frac
         float       avg_mapq
-    
-    # Compute number of segment types.
-    # @param clts  address to the array of clusters
-    void clt_ntype(cluster_dtype_struct *)
 
-    # Compute entropy based on segment types.
-    # @param clts  address to the array of clusters
-    void clt_entropy(cluster_dtype_struct *)
-
-    # Compute balance ratio based on segment types.
-    # @param clts  address to the array of clusters
-    void clt_bratio(cluster_dtype_struct *)
-
-    # Compute short overhang fraction.
-    # @param clts  address to the array of clusters
-    void clt_sovh(cluster_dtype_struct *)
-
-    # Compute low mapq fraction.
-    # @param clts  address to the array of clusters
-    void clt_lmq(cluster_dtype_struct *)
-
-    # Compute dual-clip alignment fraction.
-    # @param clts  address to the array of clusters
-    void clt_dclip(cluster_dtype_struct *)
-
-    # Compute fraction of alignment with different loc_flag.
-    # @param clts  address to the array of clusters
-    void clt_dffloc(cluster_dtype_struct *)
-
-    # Compute average mapq.
-    # @param clts  address to the array of clusters
-    void clt_avgmapq(cluster_dtype_struct *)
-
-    # void clt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
+    # Compute features of a cluster record
+    # @param clts		address to the cluster record
+    # @param segs       address to the arrary of segments
+    # @param rep_ail	AIList of repeats
+    # @param gap_ail    AIList of gaps
+    void clt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
 #
 # ---------------------------------------------------------------
 #
@@ -91,11 +61,11 @@ cdef extern from "src/seg_utils.h" nogil:
     # @return      1 if query is on the reverse strand, 0 if not
     int aln_is_rev(uint16_t flag)
 
-    # Update overhang for mid-insert type segment
-    # @param overhang  original overhang of the segment
-    # @param nmatch    nummber of match bases of the corresponding alignment
-    # @return          Updated overhang, <= original overhang
-    int32_t update_overhang(int32_t overhang, int32_t nmatch)
+    # Compute features of a segment record
+    # @param segs		address to the segment record
+    # @param rep_ail	AIList of repeats
+    # @param gap_ail	AIList of gaps
+    void seg_feat(seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
 #
 # ---------------------------------------------------------------
 #
@@ -124,19 +94,6 @@ cdef extern from "src/AIList.h" nogil:
     # Construct ailist: decomposition and augmentation
     # @param cLen minimum coverage length, default=20
     void ailist_construct(ailist_t *ail, int cLen)
-
-    # Compute alignment location flag
-    # @param rep_ail	AIList of repeats
-    # @param gap_ail	AIList of gaps
-    # @param segs		address to the array of segments
-    void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct *)
-
-    # Compute cluster location flag
-    # @param rep_ail	AIList of repeats
-    # @param gap_ail	AIList of gaps
-    # @param clts		address to the array of clusters
-    void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct *)
-
 #
 # ---------------------------------------------------------------
 #

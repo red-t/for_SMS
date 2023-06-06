@@ -39,12 +39,9 @@ cdef class BamFile:
     cdef    void      _open(self, BamFile template=*)
     cdef    htsFile  *_open_htsfile(self) except? NULL
     cdef    void      write(self, bam1_t *src)
-    # cpdef   object     extract_seg(self,
-    #                                BamFile wbf,
-    #                                int tid,
-    #                                int minl=*)
-
-
+#
+# ---------------------------------------------------------------
+#
 cdef class Iterator:
     """IteratorSingle(BamFile bamfile, int tid)
 

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "htslib/sam.h"
+#include "AIList.h"
 
 /**********************
  *** CIGAR resolver ***
@@ -17,6 +18,7 @@ inline int is_clip_or_insert(uint32_t op) {
     return op == BAM_CSOFT_CLIP || op == BAM_CINS;
 }
 
+
 /// Get whether the CIGAR operation is match/equal/diff.
 /*!
  * @param op   CIGAR operation
@@ -25,6 +27,7 @@ inline int is_clip_or_insert(uint32_t op) {
 inline int is_match(uint32_t op) {
     return op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF;
 }
+
 
 /// Get whether the CIGAR operation is del/skip.
 /*!
@@ -91,6 +94,7 @@ typedef struct {
     uint8_t     loc_flag;
 } __attribute__((packed)) seg_dtype_struct;
 
+
 /// Get whether the alignment is dual-clip.
 /*!
  * @param rflag     rflag of the segment, representing type of the corresponding alignment
@@ -99,6 +103,7 @@ typedef struct {
 inline int aln_is_dclip(uint8_t rflag) {
     return (rflag & DUAL_CLIP) == 5;
 }
+
 
 /// Get whether the query is secondary alignment by flag.
 /*!
@@ -109,6 +114,7 @@ inline int aln_is_second(uint16_t flag) {
     return (flag & BAM_FSECONDARY) != 0;
 }
 
+
 /// Get whether the query is on the reverse strand by flag.
 /*!
  * @param flag  bitwise flag of the query alignment
@@ -117,6 +123,7 @@ inline int aln_is_second(uint16_t flag) {
 inline int aln_is_rev(uint16_t flag) {
     return (flag & BAM_FREVERSE) != 0;
 }
+
 
 /// Update overhang for mid-insert type segment
 /*!
@@ -127,6 +134,24 @@ inline int aln_is_rev(uint16_t flag) {
 inline int32_t update_overhang(int32_t overhang, int32_t nmatch) {
     return (nmatch - overhang) < overhang ? (nmatch - overhang) : overhang;
 }
+
+
+/// Compute alignment location flag
+/*!
+ * @param rep_ail	AIList of repeats
+ * @param gap_ail	AIList of gaps
+ * @param segs		address to the segment record
+ */
+void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[]);
+
+
+/// Compute features of a segment record
+/*!
+ * @param segs		address to the segment record
+ * @param rep_ail	AIList of repeats
+ * @param gap_ail	AIList of gaps
+ */
+void seg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
 
 
 /*************************

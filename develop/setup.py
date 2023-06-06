@@ -59,7 +59,7 @@ ext = [
               library_dirs = lib_dirs),
 
     Extension(name = "TEMP3.Cluster",
-              sources = ["TEMP3/Cluster.pyx", "TEMP3/src/AIList.c", "TEMP3/src/cluster_utils.c"],
+              sources = ["TEMP3/Cluster.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs),
