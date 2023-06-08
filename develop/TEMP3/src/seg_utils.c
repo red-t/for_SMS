@@ -119,7 +119,7 @@ int sam_realloc_bam_data1(bam1_t *b, size_t desired)
         if ((new_data = malloc(new_m_data)) != NULL) {
             if (b->l_data > 0)
                 memcpy(new_data, b->data,
-                       b->l_data < (int)b->m_data ? b->l_data : b->m_data);
+                       b->l_data < (int)b->m_data ? b->l_data : (int)b->m_data);
             bam_set_mempolicy1(b, bam_get_mempolicy1(b) & (~BAM_USER_OWNS_DATA));
         }
     }

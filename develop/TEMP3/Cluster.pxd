@@ -110,8 +110,8 @@ cdef extern from "src/AIList.h" nogil:
 #
 # ---------------------------------------------------------------
 #
-cdef object merge_segments(seg_dtype_struct[::1] segs,
-                                            int maxdist)
+cdef object merge_seg(seg_dtype_struct[::1] segs,
+                      int maxdist)
 #
 # ---------------------------------------------------------------
 #
