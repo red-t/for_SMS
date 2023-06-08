@@ -2,6 +2,8 @@
 #define SEG_UTILS_H
 
 #include <stdint.h>
+#include <string.h>
+#include <stdio.h>
 #include "htslib/sam.h"
 #include "AIList.h"
 
@@ -110,8 +112,8 @@ inline int aln_is_dclip(uint8_t rflag) {
  * @param flag  bitwise flag of the query alignment
  * @return      1 if query is secondary, 0 if not
  */
-inline int aln_is_second(uint16_t flag) {
-    return (flag & BAM_FSECONDARY) != 0;
+inline int aln_not_second(uint16_t flag) {
+    return (flag & BAM_FSECONDARY) == 0;
 }
 
 
@@ -165,5 +167,42 @@ void seg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
  */
 #define bam_is_second(b) (((b)->core.flag & BAM_FSECONDARY) != 0)
 
+/// Set alignment record memory policy
+/**
+   @param b       Alignment record
+   @param policy  Desired policy
+*/
+static inline void bam_set_mempolicy1(bam1_t *b, uint32_t policy) {
+    b->mempolicy = policy;
+}
+
+/// Get alignment record memory policy
+/** @param b    Alignment record
+
+    See bam_set_mempolicy()
+ */
+static inline uint32_t bam_get_mempolicy1(bam1_t *b) {
+    return b->mempolicy;
+}
+
+/// bam1_t data (re)allocation
+int sam_realloc_bam_data1(bam1_t *b, size_t desired);
+
+static inline int realloc_bam_data1(bam1_t *b, size_t desired)
+{
+    if (desired <= b->m_data) return 0;
+    return sam_realloc_bam_data1(b, desired);
+}
+
+/// copy sequence from source alignment to destination alignment
+/**
+   @param src   source alignment record     
+   @param dest  destination alignment record
+   @param idx   index of the segment in the arrary, will be used as qname of dest
+   @param qst   query start, will copy sequence from src from qst
+   @param qed   query end
+   @return      dest data length if success, -1 if failed
+*/
+int bam_trim1(bam1_t *src, bam1_t *dest, int32_t idx, int32_t qst, int32_t qed);
 
 #endif // SEG_UTILS_H

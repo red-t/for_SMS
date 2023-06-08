@@ -44,8 +44,32 @@ cdef compute_seg_feat(seg_dtype_struct[::1] segs,
 #
 # ---------------------------------------------------------------
 #
-cdef object merge_segments(seg_dtype_struct[::1] segs,
-                                            int maxdist):
+cdef trim_seg(int tid,
+              int threads,
+              BamFile rbf,
+              Iterator ite,
+              seg_dtype_struct[::1] segs):
+    cdef:
+        str outpath = "tmp.all_supp_reads.{}.fa".format(tid)
+        BamFile wbf = BamFile(outpath, threads, "wF", rbf)
+        bam1_t *dest = bam_init1()
+        int i, retval
+    
+    for i in range(segs.shape[0]):
+        if aln_not_second(segs[i].flag):
+            retval = ite.cnext_offt(segs[i].offset)
+            if retval < 0:
+                raise StopIteration
+            # trim alignment by bam_trim1, and write out
+            bam_trim1(ite.b, dest, i, segs[i].qst, segs[i].qed)
+            wbf.write(dest)
+    
+    bam_destroy1(dest); wbf.close(); del wbf
+#
+# ---------------------------------------------------------------
+#
+cdef object merge_seg(seg_dtype_struct[::1] segs,
+                      int maxdist):
     '''merge overlapped segments into cluster
     
     Parameters:
@@ -115,6 +139,9 @@ cdef compute_clt_feat(cluster_dtype_struct[::1] clts,
     
     for i in range(clts.shape[0]):
         clt_feat(&clts[i], &segs[0], rep_ail, gap_ail)
+    
+    # TO DO:
+    # 1. refine clt_feat to compute clt features related to TE alignments
 #
 # ---------------------------------------------------------------
 #
@@ -150,18 +177,20 @@ cpdef dict build_cluster(str fpath,
         clts: object
             strctured numpy array with `dtype=CLUSTER_DTYPE`.
     '''
+    ##############################################
     ### 1. parse alignments & extract segments ###
+    ##############################################
     cdef:
         object  segs
-        BamFile rbf, wbf
-        str     outpath = "tmp.all_supp_reads.{}.bam".format(tid)
-
-    rbf  = BamFile(fpath, threads, "rb")
-    wbf  = BamFile(outpath, threads, "wb", rbf)
-    ite  = Iterator(rbf, wbf, tid, minl)
+        BamFile rbf = BamFile(fpath, threads, "rb")
+    
+    # extract segments
+    ite  = Iterator(rbf, tid, minl)
     segs = extract_seg(ite)
 
+    ############################################
     ### 2. compute features for each segment ###
+    ############################################
     cdef:
         bytes repfn = rep_path.encode()
         bytes gapfn = gap_path.encode()
@@ -171,35 +200,39 @@ cpdef dict build_cluster(str fpath,
         seg_dtype_struct[::1] segs_view = segs
 
     # construct AIList
-    readBED(rep_ail, repfn, chrom)
-    readBED(gap_ail, gapfn, chrom)
-    ailist_construct(rep_ail, 20)
-    ailist_construct(gap_ail, 20)
+    readBED(rep_ail, repfn, chrom); ailist_construct(rep_ail, 20)
+    readBED(gap_ail, gapfn, chrom); ailist_construct(gap_ail, 20)
 
     # compute features for each segment
     compute_seg_feat(segs_view, rep_ail, gap_ail)
 
-    # close file after I/O
-    rbf.close(); del rbf
-    wbf.close(); del wbf
-    del ite
+    # trimmed & write out segment sequence
+    segs.sort(order='rpos')
+    trim_seg(tid, threads, rbf, ite, segs_view)
+    rbf.close(); del rbf; del ite
+
+    # TO DO:
+    # 1. write a function that map the segment sqeunces to TE CSS (by calling minimap2)
+    # 2. write a function to read TE alignments & compute new features for segments
     
+    ############################
     ### 3. construct cluster ###
+    ############################
     cdef:
         object clts
         dict   CLUSTER_DICT = {}
 
     # merge segments into cluster
-    segs.sort(order='rpos')
-    clts = merge_segments(segs, maxdist)
+    clts = merge_seg(segs, maxdist)
 
+    ############################################
     ### 4. compute features for each cluster ###
+    ############################################
     cdef cluster_dtype_struct[::1] clts_view = clts
     compute_clt_feat(clts_view, segs_view, rep_ail, gap_ail)
 
     # free AIList
-    ailist_destroy(rep_ail)
-    ailist_destroy(gap_ail)
+    ailist_destroy(rep_ail); ailist_destroy(gap_ail)
 
     CLUSTER_DICT[tid] = (clts, segs)
     return CLUSTER_DICT

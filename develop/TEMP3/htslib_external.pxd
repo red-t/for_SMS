@@ -941,6 +941,7 @@ cdef extern from "htslib/sam.h" nogil:
         uint32_t m_data
         uint8_t *data
         uint64_t id
+        uint32_t mempolicy
 
     # @abstract  Get whether the query is on the reverse strand
     # @param  b  pointer to an alignment
@@ -1015,7 +1016,7 @@ cdef extern from "htslib/sam.h" nogil:
 
     bam1_t *bam_init1()
     void bam_destroy1(bam1_t *b)
-    # int bam_read1(BGZF *fp, bam1_t *b)
+    int bam_read1(BGZF *fp, bam1_t *b)
     # int bam_write1(BGZF *fp, const bam1_t *b)
     # bam1_t *bam_copy1(bam1_t *bdst, const bam1_t *bsrc)
     bam1_t *bam_dup1(const bam1_t *bsrc)

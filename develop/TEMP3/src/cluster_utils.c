@@ -12,15 +12,12 @@ void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clt
 
     // flag of the cluster
     if (n>0){
-        if (d<50) {
-            // at boundary
+        if (d<50) { // at boundary
             clts[0].cloc_flag = 2;
-        } else {
-            // inside repeats/gap
+        } else { // inside repeats/gap
             clts[0].cloc_flag = 4;
         }
-    } else {
-        // at normal
+    } else { // at normal
         clts[0].cloc_flag = 1;
     }
 }
@@ -54,43 +51,55 @@ void clt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *re
     for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
     {
         // different type of segments
-        if (segs[j].sflag & LEFT_CLIP) {
+        switch (segs[j].sflag)
+        {
+        case LEFT_CLIP:
             nL += 1;
             ntype |= LEFT_CLIP;
-        } else if (segs[j].sflag & RIGHT_CLIP) {
+            break;
+        case RIGHT_CLIP:
             nR += 1;
             ntype |= RIGHT_CLIP;
-        } else {
+            break;
+        case MID_INSERT:
             nM += 1;
             ntype |= MID_INSERT;
+            break;
+
+        default:
+            break;
         }
         
         // short overhang
-        if (segs[j].overhang < 100) {
-            clts[0].sovh_frac += 1;
-        }
+        if (segs[j].overhang < 100) clts[0].sovh_frac += 1;
         
         // low mapq
-        if (segs[j].mapq < 5) {
-            clts[0].lmq_frac += 1;
-        }
+        if (segs[j].mapq < 5) clts[0].lmq_frac += 1;
 
         // dual-clip
-        if ((segs[j].rflag & DUAL_CLIP)==5) {
-            clts[0].dclip_frac += 1;
-        }
+        if ((segs[j].rflag & DUAL_CLIP)==5) clts[0].dclip_frac += 1;
 
-        // algnments with different loc_flag
-        if (segs[j].loc_flag & 1) {
+        // segments with different loc_flag
+        switch (segs[j].loc_flag)
+        {
+        case 1:
             clts[0].aln1_frac += 1;
-        } else if (segs[j].loc_flag & 2) {
+            break;
+        case 2:
             clts[0].aln2_frac += 1;
-        } else if (segs[j].loc_flag & 4) {
+            break;
+        case 4:
             clts[0].aln4_frac += 1;
-        } else if (segs[j].loc_flag & 8) {
+            break;
+        case 8:
             clts[0].aln8_frac += 1;
-        } else {
+            break;
+        case 16:
             clts[0].aln16_frac += 1;
+            break;
+        
+        default:
+            break;
         }
         
         // sum of mapq

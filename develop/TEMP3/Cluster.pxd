@@ -53,8 +53,8 @@ cdef extern from "src/seg_utils.h" nogil:
 
     # Get whether the query is secondary alignment by flag.
     # @param flag  bitwise flag of the query alignment
-    # @return      1 if query is secondary, 0 if not
-    int aln_is_second(uint16_t flag)
+    # @return      0 if query is secondary, 1 if not
+    int aln_not_second(uint16_t flag)
 
     # Get whether the query is on the reverse strand by flag.
     # @param flag  bitwise flag of the query alignment
@@ -66,6 +66,19 @@ cdef extern from "src/seg_utils.h" nogil:
     # @param rep_ail	AIList of repeats
     # @param gap_ail	AIList of gaps
     void seg_feat(seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
+
+    #########################
+    ### Alignment records ###
+    #########################
+
+    # Compute features of a segment record
+    # @param src   source alignment record     
+    # @param dest  destination alignment record
+    # @param idx   index of the segment in the arrary, will be used as qname of dest
+    # @param qst   query start, will copy sequence from src from qst
+    # @param qed   query end
+    # @return      dest data length if success, -1 if failed
+    int bam_trim1(bam1_t *src, bam1_t *dest, int32_t idx, int32_t qst, int32_t qed)
 #
 # ---------------------------------------------------------------
 #

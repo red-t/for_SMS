@@ -99,7 +99,7 @@ cdef class BamFile:
                     raise IOError('unable to open index file `{}`'.format(
                         self.index_filename.decode(TEXT_ENCODING, ERROR_HANDLER)))
         # for writing
-        elif (self.mode == b'wb') or (self.mode == b'wFz'):
+        elif (self.mode == b'wb') or (self.mode == b'wF'):
             # copy header from template
             if template:
                 self.hdr = bam_hdr_dup(template.hdr)
@@ -107,8 +107,9 @@ cdef class BamFile:
                 raise ValueError("not enough information to construct header. Please provide template")
             
             # write header to htsfile
-            with nogil:
-                sam_hdr_write(self.htsfile, self.hdr)
+            if self.mode == b'wb':
+                with nogil:
+                    sam_hdr_write(self.htsfile, self.hdr)
     
     cdef htsFile *_open_htsfile(self) except? NULL:
         '''open file in 'rb/wb' mode, return htsFile object if success.'''
@@ -121,7 +122,7 @@ cdef class BamFile:
                 if htsfile != NULL:
                     hts_set_threads(htsfile, threads)
                 return htsfile
-                
+
     cdef void write(self, bam1_t *src):
         '''write a single alignment to disk.
 
@@ -136,8 +137,7 @@ cdef class BamFile:
         with nogil:
             ret = sam_write1(self.htsfile, self.hdr, src)
         if ret < 0:
-            raise IOError(
-            "sam_write1 failed with error code {}".format(ret))
+            raise IOError("sam_write1 failed with error code {}".format(ret))
 #
 # ---------------------------------------------------------------
 #
@@ -149,14 +149,12 @@ cdef class Iterator:
 
     def __init__(self,
                  BamFile bamfile,
-                 BamFile wbf,
                  int tid,
                  int minl):
 
         self.bamfile = bamfile
         self.htsfile = bamfile.htsfile
         self.index   = bamfile.index
-        self.wbf     = wbf
         self.tid     = tid
         self.minl    = minl
         with nogil:
@@ -171,6 +169,17 @@ cdef class Iterator:
     
     def __iter__(self):
         return self
+    
+    cdef int cnext_offt(self, int64_t offset):
+        '''read a alignment record with specified offset'''
+        cdef int retval
+
+        with nogil:
+            bgzf_seek(self.htsfile.fp.bgzf, offset, SEEK_SET)
+            retval = bam_read1(self.htsfile.fp.bgzf,
+                               self.b)
+        
+        return retval
 
     cdef int cnext(self):
         '''cversion of iterator. retval>=0 if success.'''
@@ -187,7 +196,7 @@ cdef class Iterator:
         return retval
     
     def __next__(self):
-        '''fetch a record and parse it's CIGAR, store results in SEG_DICT'''
+        '''read alignment records and parse CIGAR'''
         cdef int32_t    n, retval, M
         cdef int32_t    N = 0
         cdef seg_dtype_struct[::1] segs_view
@@ -210,10 +219,7 @@ cdef class Iterator:
                     M = segs_view.shape[0] - 20
 
                 retval = parse_cigar(self.b, segs_view, N, self.offset, self.minl)
-                if retval > 0:
-                    # total number of extracted segments
-                    N += retval
-                    self.wbf.write(self.b)
+                N += retval
                 continue
 
             self.N = N

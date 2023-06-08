@@ -48,7 +48,6 @@ cdef class Iterator:
     A class for iterating over mapped reads in single chromosome.
     """
     cdef BamFile    bamfile
-    cdef BamFile    wbf
     cdef bam1_t    *b       # pointer to a record in BAM file, changes when calling `cnext`
     cdef htsFile   *htsfile # pointer to htsFile structure
     cdef hts_idx_t *index   # pointer to hts_idx_t structure
@@ -59,4 +58,5 @@ cdef class Iterator:
     cdef int32_t    minl
     cdef int        tid
 
+    cdef int cnext_offt(self, int64_t offset)
     cdef int cnext(self)
