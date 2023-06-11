@@ -56,8 +56,6 @@ do
     echo -e "[ BUILD TEMPLATE GENOME FROM ${NAME} FINISH. ]"
 done
 
-rm *bcf*
-
 # /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa
 # /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/
 

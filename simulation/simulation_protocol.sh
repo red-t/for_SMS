@@ -245,7 +245,7 @@ done
 
 
 ### Build Population Genome & Generate 50X NGS, 3GS data ###
-conda activate python27
+conda activate python2
 for((i=0; i<$contigs_count; i++))
 do
     if [ -f ${contigs[$i]}/${contigs[$i]}.0.pgd ]; then
@@ -278,9 +278,9 @@ do
 done
 
 
-cat */*_pacbio.fasta > line_28_pacbio.fasta && samtools faidx line_28_pacbio.fasta
-cat */*_1.fastq > line_28_1.fastq
-cat */*_2.fastq > line_28_2.fastq
+cat */*_pacbio.fasta > TGS.fasta && samtools faidx TGS.fasta
+cat */*_1.fastq > NGS_1.fastq
+cat */*_2.fastq > NGS_2.fastq
 rm */*fast*
 
 

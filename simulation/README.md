@@ -6,8 +6,10 @@ Based on **reference genome** and **polymorphisms resources** (from large popula
 
 Make sure you have the paths of the executable program `VISOR` and `bcftools` in your environment variable `PATH`:
 ```
-# 我的 VISOR 和 bcftools 是通过 conda 安装的，就在 base 环境的 bin 当中
-export PATH=$PATH:/data/tusers/zhongrenhu/Software/anaconda3/bin/
+# VISOR and bcftools can be installed by conda
+conda create -n VISOR
+conda install VISOR -c conda-forge
+conda install bcftools -c conda-forge
 ```
 
 #### For Human:
@@ -50,11 +52,11 @@ Make sure you have the path of the executable program `samtools` in your environ
 
 You have to edit 2 lines in script `simulation_protocol.sh` to enable activating conda enviroment with **python 2.7** (if you want to run this script)
 ```
-# line 172:
+# line 193:
 source /data/tusers/zhongrenhu/Software/anaconda3/etc/profile.d/conda.sh --> source path_of_your_anaconda/etc/profile.d/conda.sh
 
-# line 227:
-conda activate python27 --> conda activate name_of_python27_conda_env
+# line 248:
+conda activate python2 --> conda activate name_of_python27_conda_env
 ```
 
 Then, run script `simulation_protocol.sh`:
