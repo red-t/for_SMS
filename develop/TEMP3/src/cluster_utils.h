@@ -13,7 +13,7 @@
  ***********************/
 
 /*! @typedef
- @abstract Structure for segment extracted from CIGAR.
+ @abstract Structure cluster merged from segments.
  @field  st         0-based start on reference, included
  @field  ed         0-based end on reference, excluded
  @field  st_idx     0-based start index on array of segments, included
@@ -25,14 +25,11 @@
                         2: at repeat/gap boundary
                         4: inside repeat/gap
  @field  ntype      number of segment types in this cluster
- @field  nL         number of left-clip segments in this cluster, TO BE REMOVED
- @field  nM         number of mid-insert segments in this cluster, TO BE REMOVED
- @field  nR         number of right-clip segments in this cluster, TO BE REMOVED
  @field  entropy    entropy computed based on fraction of different segment types
  @field  bratio     balance ratio computed based on number of lef/right-clip segments
  @field  sovh_frac  fraction of segments with short overhang (<100bp)
  @field  lmq_frac   fraction of segments with low mapq (<5)
- @field  dclip_frac fraction of segments with short overhang (<100bp)
+ @field  dclip_frac fraction of "dual-clip" alignments
  @field  aln1_frac  fraction of segments with loc_flag=1
  @field  aln2_frac  fraction of segments with loc_flag=2
  @field  aln4_frac  fraction of segments with loc_flag=4

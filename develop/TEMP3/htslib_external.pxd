@@ -690,7 +690,7 @@ cdef extern from "htslib/hts.h" nogil:
     # const char *hts_parse_reg(const char *str, int *beg, int *end)
 
     # hts_itr_t *hts_itr_query(const hts_idx_t *idx, int tid, int beg, int end, hts_readrec_func *readrec)
-    void hts_itr_destroy(hts_itr_t *iter)
+    # void hts_itr_destroy(hts_itr_t *iter)
 
     # ctypedef int (*hts_name2id_f)(void*, const char*)
     # ctypedef const char *(*hts_id2name_f)(void*, int)
@@ -821,6 +821,8 @@ cdef extern from "htslib/sam.h" nogil:
     #*** SAM/BAM header ***
     #**********************
 
+    ctypedef struct sam_hrecs_t
+
     # @abstract Structure for the alignment header.
     # @field n_targets   number of reference sequences
     # @field l_text      length of the plain text in the header
@@ -829,7 +831,7 @@ cdef extern from "htslib/sam.h" nogil:
     # @field text        plain text
     # @field sdict       header dictionary
 
-    ctypedef struct bam_hdr_t:
+    ctypedef struct sam_hdr_t:
          int32_t n_targets, ignore_sam_err
          uint32_t l_text
          uint32_t *target_len
@@ -837,8 +839,10 @@ cdef extern from "htslib/sam.h" nogil:
          char **target_name
          char *text
          void *sdict
+         sam_hrecs_t *hrecs
+         uint32_t ref_count
     
-    ctypedef bam_hdr_t sam_hdr_t
+    ctypedef sam_hdr_t bam_hdr_t
 
     #****************************
     #*** CIGAR related macros ***
@@ -896,62 +900,65 @@ cdef extern from "htslib/sam.h" nogil:
     #*************************
 
     # @abstract Structure for core alignment information.
-    # @field  tid     chromosome ID, defined by bam_hdr_t
     # @field  pos     0-based leftmost coordinate
+    # @field  tid     chromosome ID, defined by sam_hdr_t
     # @field  bin     bin calculated by bam_reg2bin()
     # @field  qual    mapping quality
-    # @field  l_qname length of the query name
+    # @field  l_extranul length of extra NULs between qname & cigar (for alignment)
     # @field  flag    bitwise flag
+    # @field  l_qname length of the query name
     # @field  n_cigar number of CIGAR operations
     # @field  l_qseq  length of the query sequence (read)
-    # @field  mtid    chromosome ID of next read in template, defined by bam_hdr_t
+    # @field  mtid    chromosome ID of next read in template, defined by sam_hdr_t
     # @field  mpos    0-based leftmost coordinate of next read in template
-
+    # @field  isize   observed template length ("insert size")
     ctypedef struct bam1_core_t:
-        int32_t tid
-        int32_t pos
-        uint16_t bin
-        uint8_t qual
-        uint8_t l_qname
-        uint16_t flag
-        uint8_t unused1
-        uint8_t l_extranul
-        uint32_t n_cigar
-        int32_t l_qseq
-        int32_t mtid
-        int32_t mpos
-        int32_t isize
+        int32_t     pos
+        int32_t     tid
+        uint16_t    bin
+        uint8_t     qual
+        uint8_t     l_extranul
+        uint16_t    flag
+        uint8_t     l_qname
+        uint32_t    n_cigar
+        int32_t     l_qseq
+        int32_t     mtid
+        int32_t     mpos
+        int32_t     isize
 
     # @abstract Structure for one alignment.
     # @field  core       core information about the alignment
+    # @field  id
+    # @field  data       all variable-length data, concatenated; structure: qname-cigar-seq-qual-aux
     # @field  l_data     current length of bam1_t::data
     # @field  m_data     maximum length of bam1_t::data
-    # @field  data       all variable-length data, concatenated; structure: qname-cigar-seq-qual-aux
+    # @field  mempolicy  memory handling policy, see bam_set_mempolicy()
     #
     # @discussion Notes:
-    #
-    # 1. qname is zero tailing and core.l_qname includes the tailing '\0'.
-    # 2. l_qseq is calculated from the total length of an alignment block
-    # on reading or from CIGAR.
-    # 3. cigar data is encoded 4 bytes per CIGAR operation.
-    # 4. seq is nybble-encoded according to seq_nt16_table.
+    # 1. The data blob should be accessed using bam_get_qname, bam_get_cigar,
+    #    bam_get_seq, bam_get_qual and bam_get_aux macros.  These returns pointers
+    #    to the start of each type of data.
+    # 2. qname is terminated by one to four NULs, so that the following
+    #    cigar data is 32-bit aligned; core.l_qname includes these trailing NULs,
+    #    while core.l_extranul counts the excess NULs (so 0 <= l_extranul <= 3).
+    # 3. Cigar data is encoded 4 bytes per CIGAR operation.
+    #    See the bam_cigar_* macros for manipulation.
+    # 4. seq is nibble-encoded according to bam_nt16_table.
+    #    See the bam_seqi macro for retrieving individual bases.
+    # 5. Per base qualities are stored in the Phred scale with no +33 offset.
+    #    Ie as per the BAM specification and not the SAM ASCII printable method.
     ctypedef struct bam1_t:
         bam1_core_t core
-        int l_data
-        uint32_t m_data
-        uint8_t *data
-        uint64_t id
-        uint32_t mempolicy
+        uint64_t    id
+        uint8_t     *data
+        int         l_data
+        uint32_t    m_data
+        uint32_t    mempolicy
 
     # @abstract  Get whether the query is on the reverse strand
     # @param  b  pointer to an alignment
     # @return    boolean true if query is on the reverse strand
     int bam_is_rev(bam1_t *b)
-
-    # @abstract  Get whether the query's mate is on the reverse strand
-    # @param  b  pointer to an alignment
-    # @return    boolean true if query's mate on the reverse strand
-    int bam_is_mrev(bam1_t *b)
 
     # @abstract  Get the name of the query
     # @param  b  pointer to an alignment
@@ -982,16 +989,6 @@ cdef extern from "htslib/sam.h" nogil:
     # @return    pointer to quality string
     uint8_t *bam_get_qual(bam1_t *b)
 
-    # @abstract  Get auxiliary data
-    # @param  b  pointer to an alignment
-    # @return    pointer to the concatenated auxiliary data
-    uint8_t *bam_get_aux(bam1_t *b)
-
-    # @abstract  Get length of auxiliary data
-    # @param  b  pointer to an alignment
-    # @return    length of the concatenated auxiliary data
-    int bam_get_l_aux(bam1_t *b)
-
     # @abstract  Get a base on read
     # @param  s  Query sequence returned by bam1_seq()
     # @param  i  The i-th position, 0-based
@@ -1006,59 +1003,37 @@ cdef extern from "htslib/sam.h" nogil:
     #*** BAM I/O ***
     #***************
 
-    # bam_hdr_t *bam_hdr_init()
-    # bam_hdr_t *bam_hdr_read(BGZF *fp)
-    # int bam_hdr_write(BGZF *fp, const bam_hdr_t *h)
-    void bam_hdr_destroy(bam_hdr_t *h)
-    const char *sam_hdr_tid2name(const sam_hdr_t *h, int tid)
-    # int bam_name2id(bam_hdr_t *h, const char *ref)
-    bam_hdr_t* bam_hdr_dup(const bam_hdr_t *h0)
+    ## /* Header */ ##
+    # sam_hdr_t *sam_hdr_init(void)
+    # sam_hdr_t *bam_hdr_read(BGZF *fp)
 
+    void sam_hdr_destroy(sam_hdr_t *h)
+    sam_hdr_t* sam_hdr_dup(const sam_hdr_t *h0)
+    ctypedef htsFile samFile
+    sam_hdr_t *sam_hdr_read(samFile *fp)
+    int sam_hdr_write(samFile *fp, const sam_hdr_t *h)
+
+    # int sam_hdr_nref(const sam_hdr_t *h)
+    # int sam_hdr_name2tid(sam_hdr_t *h, const char *ref)
+
+    const char *sam_hdr_tid2name(const sam_hdr_t *h, int tid)
+    int sam_hdr_tid2len(const sam_hdr_t *h, int tid)
+
+    ## /* Alignment */ ##
     bam1_t *bam_init1()
     void bam_destroy1(bam1_t *b)
     int bam_read1(BGZF *fp, bam1_t *b)
-    # int bam_write1(BGZF *fp, const bam1_t *b)
-    # bam1_t *bam_copy1(bam1_t *bdst, const bam1_t *bsrc)
-    bam1_t *bam_dup1(const bam1_t *bsrc)
 
+    # bam1_t *bam_copy1(bam1_t *bdst, const bam1_t *bsrc)
+    # bam1_t *bam_dup1(const bam1_t *bsrc)
     # int bam_cigar2qlen(int n_cigar, const uint32_t *cigar)
     # int bam_cigar2rlen(int n_cigar, const uint32_t *cigar)
-
-    # # @abstract Calculate the rightmost base position of an alignment on the
-    # # reference genome.
-
-    # # @param  b  pointer to an alignment
-    # # @return    the coordinate of the first base after the alignment, 0-based
-
-    # # @discussion For a mapped read, this is just b->core.pos + bam_cigar2rlen.
-    # # For an unmapped read (either according to its flags or if it has no cigar
-    # # string), we return b->core.pos + 1 by convention.
-    # int32_t bam_endpos(const bam1_t *b)
-
-    # int   bam_str2flag(const char *str)  # returns negative value on error
-    # char *bam_flag2str(int flag)         # The string must be freed by the user
+    # int bam_endpos(const bam1_t *b)
+    # int bam_set_qname(bam1_t *b, const char *qname)
 
     #*************************
     #*** BAM/CRAM indexing ***
     #*************************
-
-    # # These BAM iterator functions work only on BAM files.  To work with either
-    # # BAM or CRAM files use the sam_index_load() & sam_itr_*() functions.
-    # void bam_itr_destroy(hts_itr_t *iter)
-    # hts_itr_t *bam_itr_queryi(const hts_idx_t *idx, int tid, int beg, int end)
-    # hts_itr_t *bam_itr_querys(const hts_idx_t *idx, bam_hdr_t *hdr, const char *region)
-    # int bam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r)
-
-    # # Load/build .csi or .bai BAM index file.  Does not work with CRAM.
-    # # It is recommended to use the sam_index_* functions below instead.
-    # hts_idx_t *bam_index_load(const char *fn)
-    # int bam_index_build(const char *fn, int min_shift)
-
-    # # Load a BAM (.csi or .bai) or CRAM (.crai) index file
-    # # @param fp  File handle of the data file whose index is being opened
-    # # @param fn  BAM/CRAM/etc filename to search alongside for the index file
-    # # @return  The index, or NULL if an error occurred.
-    # hts_idx_t *sam_index_load(htsFile *fp, const char *fn)
 
     # Load a specific BAM (.csi or .bai) or CRAM (.crai) index file
     # @param fp     File handle of the data file whose index is being opened
@@ -1066,237 +1041,62 @@ cdef extern from "htslib/sam.h" nogil:
     # @param fnidx  Index filename, or NULL to search alongside @a fn
     # @return  The index, or NULL if an error occurred.
     hts_idx_t *sam_index_load2(htsFile *fp, const char *fn, const char *fnidx)
-
-    # # Generate and save an index file
-    # # @param fn        Input BAM/etc filename, to which .csi/etc will be added
-    # # @param min_shift Positive to generate CSI, or 0 to generate BAI
-    # # @return  0 if successful, or negative if an error occurred (usually -1; or
-    # #         -2: opening fn failed; -3: format not indexable)
-    # int sam_index_build(const char *fn, int min_shift)
-
-    # # Generate and save an index to a specific file
-    # # @param fn        Input BAM/CRAM/etc filename
-    # # @param fnidx     Output filename, or NULL to add .bai/.csi/etc to @a fn
-    # # @param min_shift Positive to generate CSI, or 0 to generate BAI
-    # # @return  0 if successful, or negative if an error occurred.
-    # int sam_index_build2(const char *fn, const char *fnidx, int min_shift)
-
+    
+    # Free a SAM iterator
+    # @param iter   Iterator to free
     void sam_itr_destroy(hts_itr_t *iter)
+
+    # Create a BAM/CRAM iterator
     hts_itr_t *sam_itr_queryi(const hts_idx_t *idx, int tid, int beg, int end)
-    hts_itr_t *sam_itr_querys(const hts_idx_t *idx, bam_hdr_t *hdr, const char *region)
-    int sam_itr_next(htsFile *htsfp, hts_itr_t *itr, void *r)
+
+    # # Get the next read from a BAM/CRAM multi-iterator
+    # int sam_itr_multi_next(htsFile *htsfp, hts_itr_t *itr, bam1_t *r)
 
     #***************
     #*** SAM I/O ***
     #***************
 
     htsFile *sam_open(const char *fn, const char *mode)
-    # htsFile *sam_open_format(const char *fn, const char *mode, const htsFormat *fmt)
     int sam_close(htsFile *fp)
 
-    # int sam_open_mode(char *mode, const char *fn, const char *format)
+    # sam_read1 - Read a record from a file
+    # @param fp   Pointer to the source file
+    # @param h    Pointer to the header previously read (fully or partially)
+    # @param b    Pointer to the record placeholder
+    # @return >= 0 on successfully reading a new record, -1 on end of stream, < -1 on error
+    int sam_read1(htsFile *fp, sam_hdr_t *h, bam1_t *b)
 
-    # # A version of sam_open_mode that can handle ,key=value options.
-    # # The format string is allocated and returned, to be freed by the caller.
-    # # Prefix should be "r" or "w",
-    # char *sam_open_mode_opts(const char *fn, const char *mode, const char *format)
-
-    # bam_hdr_t *sam_hdr_parse(int l_text, const char *text)
-    bam_hdr_t *sam_hdr_read(htsFile *fp)
-    int sam_hdr_write(htsFile *fp, const bam_hdr_t *h)
-
-    int sam_parse1(kstring_t *s, bam_hdr_t *h, bam1_t *b)
-    int sam_format1(const bam_hdr_t *h, const bam1_t *b, kstring_t *str)
-    int sam_read1(htsFile *fp, bam_hdr_t *h, bam1_t *b)
-    int sam_write1(htsFile *fp, const bam_hdr_t *h, const bam1_t *b)
+    # sam_write1 - Write a record to a file
+    # @param fp    Pointer to the destination file
+    # @param h     Pointer to the header structure previously read
+    # @param b     Pointer to the record to be written
+    # @return >= 0 on successfully writing the record, -1 on error
+    int sam_write1(samFile *fp, const sam_hdr_t *h, const bam1_t *b)
 
     #*************************************
     #*** Manipulating auxiliary fields ***
     #*************************************
 
-    uint8_t *bam_aux_get(const bam1_t *b, const char *tag)
+    # Return a pointer to an aux record
+    # @param b   Pointer to the bam record
+    # @param tag Desired aux tag
+    # @return Pointer to the tag data, or NULL if tag is not present or on error
+    # If the tag is not present, this function returns NULL and sets errno to
+    # ENOENT.  If the bam record's aux data is corrupt (either a tag has an
+    # invalid type, or the last record is incomplete) then errno is set to
+    # EINVAL and NULL is returned.
+    uint8_t *bam_aux_get(const bam1_t *b, const char tag[2])
+
+    # Get an integer aux value
+    # @param s Pointer to the tag data, as returned by bam_aux_get()
+    # @return The value, or 0 if the tag was not an integer type
+    # If the tag is not an integer type, errno is set to EINVAL.  This function
+    # will not return the value of floating-point tags.
     int64_t  bam_aux2i(const uint8_t *s)
+
+    # Get an integer aux value
+    # @param s Pointer to the tag data, as returned by bam_aux_get()
+    # @return The value, or 0 if the tag was not an integer type
+    # If the tag is not an numeric type, errno is set to EINVAL.  The value of
+    # integer flags will be returned cast to a double.
     double   bam_aux2f(const uint8_t *s)
-    # char     bam_aux2A(const uint8_t *s)
-    # char    *bam_aux2Z(const uint8_t *s)
-
-    # void bam_aux_append(bam1_t *b, const char *tag, char type, int len, uint8_t *data)
-    # int bam_aux_del(bam1_t *b, uint8_t *s)
-
-    # #**************************
-    # #*** Pileup and Mpileup ***
-    # #**************************
-
-    # #  @abstract Generic pileup 'client data'.
-    # #  @discussion The pileup iterator allows setting a constructor and
-    # #  destructor function, which will be called every time a sequence is
-    # #  fetched and discarded.  This permits caching of per-sequence data in
-    # #  a tidy manner during the pileup process.  This union is the cached
-    # #  data to be manipulated by the "client" (the caller of pileup).
-    # # 
-    # union bam_pileup_cd:
-    #     void *p
-    #     int64_t i
-    #     double f
-
-    # # @abstract Structure for one alignment covering the pileup position.
-    # # @field  b          pointer to the alignment
-    # # @field  qpos       position of the read base at the pileup site, 0-based
-    # # @field  indel      indel length; 0 for no indel, positive for ins and negative for del
-    # # @field  level      the level of the read in the "viewer" mode
-    # # @field  is_del     1 iff the base on the padded read is a deletion
-    # # @field  is_head    ???
-    # # @field  is_tail    ???
-    # # @field  is_refskip ???
-    # # @field  aux        ???
-    # #
-    # # @discussion See also bam_plbuf_push() and bam_lplbuf_push(). The
-    # # difference between the two functions is that the former does not
-    # # set bam_pileup1_t::level, while the later does. Level helps the
-    # # implementation of alignment viewers, but calculating this has some
-    # # overhead.
-    # #
-    # # is_del, is_head, etc are a bit field, declaring as below should
-    # # work as expected, see
-    # # https://groups.google.com/forum/#!msg/cython-users/24tD1kwRY7A/pmoPuSmanM0J
-
-    # ctypedef struct bam_pileup1_t:
-    #     bam1_t *b
-    #     int32_t qpos
-    #     int indel, level
-    #     uint32_t is_del
-    #     uint32_t is_head
-    #     uint32_t is_tail
-    #     uint32_t is_refskip
-    #     uint32_t aux
-    #     bam_pileup_cd cd
-
-    # ctypedef int (*bam_plp_auto_f)(void *data, bam1_t *b)
-    # ctypedef int (*bam_test_f)()
-
-    # ctypedef struct __bam_plp_t
-    # ctypedef __bam_plp_t *bam_plp_t
-
-    # ctypedef struct __bam_mplp_t
-    # ctypedef __bam_mplp_t *bam_mplp_t
-
-    # # bam_plp_init() - sets an iterator over multiple
-    # # @func:      see mplp_func in bam_plcmd.c in samtools for an example. Expected return
-    # #             status: 0 on success, -1 on end, < -1 on non-recoverable errors
-    # # @data:      user data to pass to @func
-    # bam_plp_t bam_plp_init(bam_plp_auto_f func, void *data)
-    # void bam_plp_destroy(bam_plp_t iter)
-    # int bam_plp_push(bam_plp_t iter, const bam1_t *b)
-    # const bam_pileup1_t *bam_plp_next(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp)
-    # const bam_pileup1_t *bam_plp_auto(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp)
-    # void bam_plp_set_maxcnt(bam_plp_t iter, int maxcnt)
-    # void bam_plp_reset(bam_plp_t iter)
-
-    # bam_mplp_t bam_mplp_init(int n, bam_plp_auto_f func, void **data)
-
-    # # bam_mplp_init_overlaps() - if called, mpileup will detect overlapping
-    # # read pairs and for each base pair set the base quality of the
-    # # lower-quality base to zero, thus effectively discarding it from
-    # # calling. If the two bases are identical, the quality of the other base
-    # # is increased to the sum of their qualities (capped at 200), otherwise
-    # # it is multiplied by 0.8.
-    # void bam_mplp_init_overlaps(bam_mplp_t iter)
-    # void bam_mplp_destroy(bam_mplp_t iter)
-    # void bam_mplp_set_maxcnt(bam_mplp_t iter, int maxcnt)
-    # int bam_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp)
-    # void bam_mplp_reset(bam_mplp_t iter)
-    # void bam_mplp_constructor(bam_mplp_t iter,
-    #       		      int (*func)(void *data, const bam1_t *b, bam_pileup_cd *cd))
-    # void bam_mplp_destructor(bam_mplp_t iter,
-	# 		     int (*func)(void *data, const bam1_t *b, bam_pileup_cd *cd))
-    
-    # # Added by AH
-    # # ctypedef bam_pileup1_t * const_bam_pileup1_t_ptr "const bam_pileup1_t *"
-
-
-
-
-    # # // ---------------------------
-    # # // Base modification retrieval
-
-    # # /*! @typedef
-    # #  @abstract Holds a single base modification.
-    # #  @field modified_base     The short base code (m, h, etc) or -ChEBI (negative)
-    # #  @field canonical_base    The canonical base referred to in the MM tag.
-    # #                           One of A, C, G, T or N.  Note this may not be the
-    # #                           explicit base recorded in the SEQ column (esp. if N).
-    # #  @field strand            0 or 1, indicating + or - strand from MM tag.
-    # #  @field qual              Quality code (256*probability), or -1 if unknown
-
-    # #  @discussion
-    # #  Note this doesn't hold any location data or information on which other
-    # #  modifications may be possible at this site.
-    # ctypedef struct hts_base_mod:
-    #     int modified_base
-    #     int canonical_base
-    #     int strand
-    #     int qual
-
-    # # /// Allocates an hts_base_mode_state.
-    # # /**
-    # # * @return An hts_base_mode_state pointer on success,
-    # # *         NULL on failure.
-    # # *
-    # # * This just allocates the memory.  The initialisation of the contents is
-    # # * done using bam_parse_basemod.  Successive calls may be made to that
-    # # * without the need to free and allocate a new state.
-    # # *
-    # # * The state be destroyed using the hts_base_mode_state_free function.
-    # # */
-    # ctypedef struct hts_base_mod_state 
-    # hts_base_mod_state *hts_base_mod_state_alloc()
-
-
-    # # /// Destroys an  hts_base_mode_state.
-    # # /**
-    # # * @param state    The base modification state pointer.
-    # # *
-    # # * The should have previously been created by hts_base_mode_state_alloc.
-    # # */
-    # void hts_base_mod_state_free(hts_base_mod_state *state)
-
-    # # /// Parses the Mm and Ml tags out of a bam record.
-    # # /**
-    # # * @param b        BAM alignment record
-    # # * @param state    The base modification state pointer.
-    # # * @return 0 on success,
-    # # *         -1 on failure.
-    # # *
-    # # * This fills out the contents of the modification state, resetting the
-    # # * iterator location to the first sequence base.
-    # # */
-    # int bam_parse_basemod(const bam1_t *b, hts_base_mod_state *state)
-
-    # # /// Finds the next location containing base modifications and returns them
-    # # /**
-    # # * @param b        BAM alignment record
-    # # * @param state    The base modification state pointer.
-    # # * @param mods     A supplied array for returning base modifications
-    # # * @param n_mods   The size of the mods array
-    # # * @return The number of modifications found on success,
-    # # *         0 if no more modifications are present,
-    # # *         -1 on failure.
-    # # *
-    # # * Unlike bam_mods_at_next_pos this skips ahead to the next site
-    # # * with modifications.
-    # # *
-    # # * If more than n_mods modifications are found, the total found is returned.
-    # # * Note this means the caller needs to check whether this is higher than
-    # # * n_mods.
-    # # */
-
-    # int bam_next_basemod(const bam1_t *b, hts_base_mod_state *state,hts_base_mod *mods, int n_mods, int *pos)
-
-    # # ***********************************
-    # # * BAQ calculation and realignment *
-    # # ***********************************/
-    # int sam_cap_mapq(bam1_t *b, const char *ref, int ref_len, int thres)
-    # int sam_prob_realn(bam1_t *b, const char *ref, int ref_len, int flag)
-#
-# ---------------------------------------------------------------
-#

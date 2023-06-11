@@ -47,7 +47,7 @@ cdef class BamFile:
             hts_idx_destroy(self.index)
             self.index = NULL
         if self.hdr:
-            bam_hdr_destroy(self.hdr)
+            sam_hdr_destroy(self.hdr)
             self.hdr = NULL
 
     def __dealloc__(self):
@@ -58,7 +58,7 @@ cdef class BamFile:
             hts_idx_destroy(self.index)
             self.index = NULL
         if self.hdr:
-            bam_hdr_destroy(self.hdr)
+            sam_hdr_destroy(self.hdr)
             self.hdr = NULL
 
     def __enter__(self):
@@ -102,7 +102,7 @@ cdef class BamFile:
         elif (self.mode == b'wb') or (self.mode == b'wF'):
             # copy header from template
             if template:
-                self.hdr = bam_hdr_dup(template.hdr)
+                self.hdr = sam_hdr_dup(template.hdr)
             else:
                 raise ValueError("not enough information to construct header. Please provide template")
             
