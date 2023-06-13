@@ -41,7 +41,7 @@ void clt_dffloc(cluster_dtype_struct clts[]) {
 }
 
 
-void clt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail) {
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail) {
     // compute cluster location flag
     clt_loc_flag(rep_ail, gap_ail, clts);
 

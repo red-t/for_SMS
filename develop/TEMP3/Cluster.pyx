@@ -2,6 +2,25 @@ import numpy as np
 from subprocess import Popen, DEVNULL
 
 
+SEG_DTYPE = np.dtype([
+    ('flag',        np.uint16),
+    ('mapq',        np.uint8),
+    ('qst',         np.int32),
+    ('qed',         np.int32),
+    ('rpos',        np.int32),
+    ('lqseq',       np.int32),
+    ('sflag',       np.uint8),
+    ('rflag',       np.uint8),
+    ('offset',      np.int64),
+    ('refst',       np.int32),
+    ('refed',       np.int32),
+    ('ith',         np.uint8),
+    ('nseg',        np.uint8),
+    ('overhang',    np.int32),
+    ('nmatch',      np.int32),
+    ('loc_flag',    np.uint8),
+])
+
 CLUSTER_DTYPE = np.dtype([
     ('st',          np.int32),
     ('ed',          np.int32),
@@ -26,22 +45,43 @@ CLUSTER_DTYPE = np.dtype([
 #
 # ---------------------------------------------------------------
 #
-cdef object extract_seg(Iterator ite):
-    cdef ssize_t i
-    for i in ite:
-        continue
+cdef object extract_seg(Iterator ite, int minl):
+    cdef:
+        int32_t     n, retval, M, N=0
+        seg_dtype_struct[::1]   segs_view
 
-    return ite.segs[:ite.N,]
+    segs = np.zeros(10000, dtype=SEG_DTYPE)
+    template  = np.zeros(10000, dtype=SEG_DTYPE)
+    segs_view = segs
+    M = segs_view.shape[0] - 20
+    
+    while 1:
+        retval = ite.cnext()
+        if retval > 0:
+            n = ite.b.core.n_cigar
+            if n == 0:
+                continue
+            if N > M:
+                segs = np.concatenate((segs, template))
+                segs_view = segs
+                M = segs_view.shape[0] - 20
+
+            retval = parse_cigar(ite.b, segs_view, N, ite.offset, minl)
+            N += retval
+            continue
+
+        del template
+        return segs[:N,]
 #
 # ---------------------------------------------------------------
 #
-cdef compute_seg_feat(seg_dtype_struct[::1] segs,
-                      ailist_t *rep_ail,
-                      ailist_t *gap_ail):
+cdef seg_feat(seg_dtype_struct[::1] segs,
+              ailist_t *rep_ail,
+              ailist_t *gap_ail):
     cdef ssize_t i
 
     for i in range(segs.shape[0]):
-        seg_feat(&segs[i], rep_ail, gap_ail)
+        cseg_feat(&segs[i], rep_ail, gap_ail)
 #
 # ---------------------------------------------------------------
 #
@@ -153,18 +193,18 @@ cdef object merge_seg(seg_dtype_struct[::1] segs,
 #
 # ---------------------------------------------------------------
 #
-cdef compute_clt_feat(cluster_dtype_struct[::1] clts,
-                      seg_dtype_struct[::1] segs,
-                      ailist_t *rep_ail,
-                      ailist_t *gap_ail):
+cdef clt_feat(cluster_dtype_struct[::1] clts,
+              seg_dtype_struct[::1] segs,
+              ailist_t *rep_ail,
+              ailist_t *gap_ail):
     cdef:
         ssize_t i, j
     
     for i in range(clts.shape[0]):
-        clt_feat(&clts[i], &segs[0], rep_ail, gap_ail)
+        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail)
     
     # TO DO:
-    # 1. refine clt_feat to compute clt features related to TE alignments
+    # 1. refine cclt_feat to compute clt features related to TE alignments
 #
 # ---------------------------------------------------------------
 #
@@ -210,8 +250,8 @@ cpdef dict build_cluster(str fpath,
         BamFile rbf = BamFile(fpath, threads, "rb")
     
     # extract segments
-    ite  = Iterator(rbf, tid, minl)
-    segs = extract_seg(ite)
+    ite  = Iterator(rbf, tid)
+    segs = extract_seg(ite, minl)
 
     ############################################
     ### 2. compute features for each segment ###
@@ -229,7 +269,7 @@ cpdef dict build_cluster(str fpath,
     readBED(gap_ail, gapfn, chrom); ailist_construct(gap_ail, 20)
 
     # compute features for each segment
-    compute_seg_feat(segs_view, rep_ail, gap_ail)
+    seg_feat(segs_view, rep_ail, gap_ail)
 
     # trimmed & write out segment sequence
     segs.sort(order='rpos')
@@ -256,7 +296,7 @@ cpdef dict build_cluster(str fpath,
     ### 4. compute features for each cluster ###
     ############################################
     cdef cluster_dtype_struct[::1] clts_view = clts
-    compute_clt_feat(clts_view, segs_view, rep_ail, gap_ail)
+    clt_feat(clts_view, segs_view, rep_ail, gap_ail)
 
     # free AIList
     ailist_destroy(rep_ail); ailist_destroy(gap_ail)

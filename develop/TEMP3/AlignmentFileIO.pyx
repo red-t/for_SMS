@@ -1,25 +1,6 @@
 import os
 import numpy as np
 
-
-SEG_DTYPE = np.dtype([
-    ('flag',        np.uint16),
-    ('mapq',        np.uint8),
-    ('qst',         np.int32),
-    ('qed',         np.int32),
-    ('rpos',        np.int32),
-    ('lqseq',       np.int32),
-    ('sflag',       np.uint8),
-    ('rflag',       np.uint8),
-    ('offset',      np.int64),
-    ('refst',       np.int32),
-    ('refed',       np.int32),
-    ('ith',         np.uint8),
-    ('nseg',        np.uint8),
-    ('overhang',    np.int32),
-    ('nmatch',      np.int32),
-    ('loc_flag',    np.uint8),
-])
 #
 # ---------------------------------------------------------------
 #
@@ -149,14 +130,12 @@ cdef class Iterator:
 
     def __init__(self,
                  BamFile bamfile,
-                 int tid,
-                 int minl):
+                 int tid):
 
         self.bamfile = bamfile
         self.htsfile = bamfile.htsfile
         self.index   = bamfile.index
         self.tid     = tid
-        self.minl    = minl
         with nogil:
             self.iter = sam_itr_queryi(self.index,
                                        tid,
@@ -194,34 +173,3 @@ cdef class Iterator:
                                   self.htsfile)
         self.offset = offset
         return retval
-    
-    def __next__(self):
-        '''read alignment records and parse CIGAR'''
-        cdef int32_t    n, retval, M
-        cdef int32_t    N = 0
-        cdef seg_dtype_struct[::1] segs_view
-
-        self.segs = np.zeros(10000, dtype=SEG_DTYPE)
-        template  = np.zeros(10000, dtype=SEG_DTYPE)
-        segs_view = self.segs
-        M = segs_view.shape[0] - 20
-
-        while 1:
-            retval = self.cnext()
-            # If current iterator is not exhausted, parse the alignment
-            if retval > 0:
-                n = self.b.core.n_cigar
-                if n==0:
-                    continue
-                if N > M:
-                    self.segs = np.concatenate((self.segs, template))
-                    segs_view = self.segs
-                    M = segs_view.shape[0] - 20
-
-                retval = parse_cigar(self.b, segs_view, N, self.offset, self.minl)
-                N += retval
-                continue
-
-            self.N = N
-            del template
-            raise StopIteration

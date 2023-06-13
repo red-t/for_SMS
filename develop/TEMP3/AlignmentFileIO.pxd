@@ -1,5 +1,4 @@
 from .htslib_external cimport *
-from .SegmentParser cimport parse_cigar, seg_dtype_struct
 from libc.stdlib cimport malloc, calloc, realloc, free
 from libc.errno  cimport errno
 from libc.string cimport strerror
@@ -52,10 +51,7 @@ cdef class Iterator:
     cdef htsFile   *htsfile # pointer to htsFile structure
     cdef hts_idx_t *index   # pointer to hts_idx_t structure
     cdef hts_itr_t *iter    # pointer to hts_itr_t structure, iterator from htslib
-    cdef object     segs
-    cdef int        N
     cdef int64_t    offset
-    cdef int32_t    minl
     cdef int        tid
 
     cdef int cnext_offt(self, int64_t offset)

@@ -96,6 +96,6 @@ void clt_dffloc(cluster_dtype_struct clts[]);
  * @param repail    AIList of repeats
  * @param gapail    AIList of gaps
  */
-void clt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
 
 #endif // CLUSTER_UTILS_H

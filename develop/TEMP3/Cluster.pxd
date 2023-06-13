@@ -1,5 +1,5 @@
 from .AlignmentFileIO cimport BamFile, Iterator
-from .SegmentParser cimport seg_dtype_struct
+from .SegmentParser cimport parse_cigar, seg_dtype_struct
 from .htslib_external cimport *
 
 cdef extern from "src/cluster_utils.h" nogil:
@@ -32,7 +32,7 @@ cdef extern from "src/cluster_utils.h" nogil:
     # @param segs       address to the arrary of segments
     # @param rep_ail	AIList of repeats
     # @param gap_ail    AIList of gaps
-    void clt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
+    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
 #
 # ---------------------------------------------------------------
 #
@@ -65,7 +65,7 @@ cdef extern from "src/seg_utils.h" nogil:
     # @param segs		address to the segment record
     # @param rep_ail	AIList of repeats
     # @param gap_ail	AIList of gaps
-    void seg_feat(seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
+    void cseg_feat(seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
 
     #########################
     ### Alignment records ###

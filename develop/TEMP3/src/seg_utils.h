@@ -153,7 +153,7 @@ void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[])
  * @param rep_ail	AIList of repeats
  * @param gap_ail	AIList of gaps
  */
-void seg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
+void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
 
 
 /*************************

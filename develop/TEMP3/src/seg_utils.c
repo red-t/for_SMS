@@ -72,7 +72,7 @@ void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[])
 }
 
 
-void seg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail) {
+void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail) {
     // update overhang
     if (segs[0].sflag & LEFT_CLIP) {
         segs[0].overhang = segs[0].nmatch;
