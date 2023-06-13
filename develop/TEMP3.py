@@ -11,6 +11,10 @@ def parse_args():
                                  help='path of repeats annotation file', default='')
     parser.add_argument('-g', '--gap', dest='gap_path', type=str,
                                  help='path of gap annotation file', default='')
+    parser.add_argument('-T', '--teref', dest='teref', type=str,
+                                 help='path of reference transposon (fa/mmi)', default='')
+    parser.add_argument('-x', '--preset', dest='preset', type=str,
+                                 help='minimap2 preset', default='map-pb')
     parser.add_argument('-o', '--out_path', dest='out_path', type=str,
                                  help='Path of the output', default='./')
     parser.add_argument('-p', '--nprocess', dest='nprocess', type=int,
@@ -34,9 +38,24 @@ if __name__ == '__main__':
     tid_to_clusters = build_cluster_parallel(args.fpath,
                                              args.rep_path,
                                              args.gap_path,
+                                             args.teref,
+                                             args.preset,
                                              args.nprocess,
                                              args.nthreads,
                                              args.minl,
                                              args.maxdist)
     
     # next
+    print("当前版本构建的 clusters 总数:")
+    n = 0
+    for i in range(len(tid_to_clusters)):
+        n += tid_to_clusters[i][0].shape[0]
+
+    print(n, "\n")
+
+    print("当前版本构建的 segments 总数:")
+    m = 0
+    for i in range(len(tid_to_clusters)):
+        m += tid_to_clusters[i][1].shape[0]
+    
+    print(m)

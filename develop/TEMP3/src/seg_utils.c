@@ -155,7 +155,7 @@ int bam_trim1(bam1_t *src, bam1_t *dest, int32_t idx, int32_t qst, int32_t qed)
 
     // set qname
     uint8_t *cp = dest->data;
-    strncpy((char *)cp, (const char*)qname, l_qname);
+    memcpy(cp, qname, l_qname);
     int i;
     for (i = 0; i < qname_nuls; i++) {
         cp[l_qname + i] = '\0';

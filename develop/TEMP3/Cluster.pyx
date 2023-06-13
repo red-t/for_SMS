@@ -1,4 +1,5 @@
 import numpy as np
+from subprocess import Popen, DEVNULL
 
 
 CLUSTER_DTYPE = np.dtype([
@@ -65,6 +66,28 @@ cdef trim_seg(int tid,
             wbf.write(dest)
     
     bam_destroy1(dest); wbf.close(); del wbf
+#
+# ---------------------------------------------------------------
+#
+cdef align_mm2(int tid,
+               int threads,
+               str ref,
+               str preset):
+    cdef:
+        int retval
+        str cmd_mm2 = "minimap2 -t {} -aYx {} {} tmp.all_supp_reads.{}.fa | samtools view -@ {} -bhS - | " \
+                      "samtools sort -@ {} -o tmp.all_supp_reads.{}.bam -".format(threads, preset, ref, tid, threads, threads, tid)
+        str cmd_idx = "samtools index -@ {} tmp.all_supp_reads.{}.bam".format(threads, tid)
+
+    proc = Popen([cmd_mm2], stderr=DEVNULL, shell=True, executable='/bin/bash')
+    retval = proc.wait()
+    if retval != 0:
+        raise Exception("Error: minimap2 failed for tid: {}".format(tid))
+    
+    proc = Popen([cmd_idx], stderr=DEVNULL, shell=True, executable='/bin/bash')
+    retval = proc.wait()
+    if retval != 0:
+        raise Exception("Error: samtools index failed for tid: {}".format(tid))
 #
 # ---------------------------------------------------------------
 #
@@ -148,6 +171,8 @@ cdef compute_clt_feat(cluster_dtype_struct[::1] clts,
 cpdef dict build_cluster(str fpath,
                          str rep_path,
                          str gap_path,
+                         str teref,
+                         str preset,
                          int threads,
                          int tid,
                          int minl,
@@ -214,6 +239,8 @@ cpdef dict build_cluster(str fpath,
     # TO DO:
     # 1. write a function that map the segment sqeunces to TE CSS (by calling minimap2)
     # 2. write a function to read TE alignments & compute new features for segments
+    # align segment sequences to TE CSS
+    align_mm2(tid, threads, teref, preset)
     
     ############################
     ### 3. construct cluster ###

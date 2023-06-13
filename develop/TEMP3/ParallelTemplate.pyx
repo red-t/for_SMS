@@ -5,6 +5,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 cpdef dict build_cluster_parallel(str fpath,
                                   str rep_path,
                                   str gap_path,
+                                  str teref,
+                                  str preset,
                                   int nprocess,
                                   int nthreads,
                                   int minl,
@@ -49,8 +51,8 @@ cpdef dict build_cluster_parallel(str fpath,
     bf.close(); del bf
 
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
-        futures = set([executor.submit(build_cluster, fpath, rep_path, gap_path, nthreads,
-                                       i, minl, maxdist) for i in range(nchroms)])
+        futures = set([executor.submit(build_cluster, fpath, rep_path, gap_path, teref, preset,
+                                       nthreads, i, minl, maxdist) for i in range(nchroms)])
         # merge result from each process
         for future in as_completed(futures):
             ret = future.result()
