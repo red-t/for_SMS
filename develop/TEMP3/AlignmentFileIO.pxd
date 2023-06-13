@@ -29,7 +29,7 @@ cdef class BamFile:
     """
     cdef    htsFile   *htsfile          # pointer to htsFile structure
     cdef    hts_idx_t *index            # pointer to hts_idx_t structure
-    cdef    bam_hdr_t *hdr              # pointer to bam_hdr_t structure
+    cdef    sam_hdr_t *hdr              # pointer to sam_hdr_t structure
     cdef    char      *filename         # filename as supplied by user
     cdef    char      *index_filename   # filename of index
     cdef    char      *mode             # opening mode
