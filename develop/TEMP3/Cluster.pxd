@@ -1,5 +1,4 @@
 from .AlignmentFileIO cimport BamFile, Iterator
-from .SegmentParser cimport parse_cigar, seg_dtype_struct
 from .htslib_external cimport *
 
 cdef extern from "src/cluster_utils.h" nogil:
@@ -46,6 +45,38 @@ cdef extern from "src/seg_utils.h" nogil:
     uint8_t RIGHT_CLIP
     uint8_t DUAL_CLIP
 
+    ctypedef packed struct seg_dtype_struct:
+        uint16_t    flag
+        uint8_t     mapq
+        int32_t     qst
+        int32_t     qed
+        int32_t     rpos
+        int32_t     lqseq
+        uint8_t     sflag
+        uint8_t     rflag
+        int64_t     offset
+        int32_t     refst
+        int32_t     refed
+        uint8_t     ith
+        uint8_t     nseg
+        int32_t     overhang
+        int32_t     nmatch
+        uint8_t     loc_flag
+
+    ctypedef packed struct tealn_dtype_struct:
+        int32_t idx
+        int32_t AS
+        int32_t qst
+        int32_t qed
+        int16_t flag
+    
+    # parse alignment's CIGAR and extract segments.
+    # @param bam    Alignment record
+    # @param segs   address to the segments arrary record
+    # @param offset offset of the alignments in BAM file
+    # @param minl   minimum length of segment
+    int parse_cigar(bam1_t *bam, seg_dtype_struct *, int64_t offset, int minl)
+
     # Get whether the alignment is dual-clip.
     # @param rflag  rflag of the segment, representing type of the corresponding alignment
     # @return       1 if the alignment is dual-clip, 0 if not
@@ -53,8 +84,8 @@ cdef extern from "src/seg_utils.h" nogil:
 
     # Get whether the query is secondary alignment by flag.
     # @param flag  bitwise flag of the query alignment
-    # @return      0 if query is secondary, 1 if not
-    int aln_not_second(uint16_t flag)
+    # @return      1 if query is secondary, 0 if not
+    int aln_is_second(uint16_t flag)
 
     # Get whether the query is on the reverse strand by flag.
     # @param flag  bitwise flag of the query alignment
@@ -71,6 +102,11 @@ cdef extern from "src/seg_utils.h" nogil:
     ### Alignment records ###
     #########################
 
+    # Get whether the query is secondary or unmapped
+    # @param  b  pointer to an alignment
+    # @return    1 if query is secondary or unmapped, 0 if not
+    int bam_filtered(bam1_t *b)
+
     # Compute features of a segment record
     # @param src   source alignment record     
     # @param dest  destination alignment record
@@ -79,6 +115,11 @@ cdef extern from "src/seg_utils.h" nogil:
     # @param qed   query end
     # @return      dest data length if success, -1 if failed
     int bam_trim1(bam1_t *src, bam1_t *dest, int32_t idx, int32_t qst, int32_t qed)
+
+    # parse transposon alignment and record record information with array
+    # @param bam    Alignment record
+    # @param tealns address to the arrary record
+    void parse_tealns(bam1_t *bam, tealn_dtype_struct *)
 #
 # ---------------------------------------------------------------
 #

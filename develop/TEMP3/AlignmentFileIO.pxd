@@ -54,5 +54,6 @@ cdef class Iterator:
     cdef int64_t    offset
     cdef int        tid
 
-    cdef int cnext_offt(self, int64_t offset)
-    cdef int cnext(self)
+    cdef int cnext1(self)
+    cdef int cnext2(self)
+    cdef int cnext3(self, int64_t offset)

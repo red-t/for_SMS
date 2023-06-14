@@ -21,6 +21,16 @@ SEG_DTYPE = np.dtype([
     ('loc_flag',    np.uint8),
 ])
 
+
+TEALN_DTYPE = np.dtype([
+    ('idx',     np.int32),
+    ('AS',      np.int32),
+    ('qst',     np.int32),
+    ('qed',     np.int32),
+    ('flag',    np.int16),
+])
+
+
 CLUSTER_DTYPE = np.dtype([
     ('st',          np.int32),
     ('ed',          np.int32),
@@ -47,7 +57,7 @@ CLUSTER_DTYPE = np.dtype([
 #
 cdef object extract_seg(Iterator ite, int minl):
     cdef:
-        int32_t     n, retval, M, N=0
+        int32_t     retval, M, N=0
         seg_dtype_struct[::1]   segs_view
 
     segs = np.zeros(10000, dtype=SEG_DTYPE)
@@ -56,22 +66,21 @@ cdef object extract_seg(Iterator ite, int minl):
     M = segs_view.shape[0] - 20
     
     while 1:
-        retval = ite.cnext()
+        retval = ite.cnext1()
         if retval > 0:
-            n = ite.b.core.n_cigar
-            if n == 0:
+            if ite.b.core.n_cigar == 0:
                 continue
             if N > M:
                 segs = np.concatenate((segs, template))
                 segs_view = segs
                 M = segs_view.shape[0] - 20
 
-            retval = parse_cigar(ite.b, segs_view, N, ite.offset, minl)
+            retval = parse_cigar(ite.b, &segs_view[N], ite.offset, minl)
             N += retval
             continue
 
         del template
-        return segs[:N,]
+        return segs[:N]
 #
 # ---------------------------------------------------------------
 #
@@ -97,13 +106,14 @@ cdef trim_seg(int tid,
         int i, retval
     
     for i in range(segs.shape[0]):
-        if aln_not_second(segs[i].flag):
-            retval = ite.cnext_offt(segs[i].offset)
-            if retval < 0:
-                raise StopIteration
-            # trim alignment by bam_trim1, and write out
-            bam_trim1(ite.b, dest, i, segs[i].qst, segs[i].qed)
-            wbf.write(dest)
+        if aln_is_second(segs[i].flag):
+            continue
+        retval = ite.cnext3(segs[i].offset)
+        if retval < 0:
+            raise StopIteration
+        # trim alignment by bam_trim1, and write out
+        bam_trim1(ite.b, dest, i, segs[i].qst, segs[i].qed)
+        wbf.write(dest)
     
     bam_destroy1(dest); wbf.close(); del wbf
 #
@@ -115,19 +125,58 @@ cdef align_mm2(int tid,
                str preset):
     cdef:
         int retval
-        str cmd_mm2 = "minimap2 -t {} -aYx {} {} tmp.all_supp_reads.{}.fa | samtools view -@ {} -bhS - | " \
-                      "samtools sort -@ {} -o tmp.all_supp_reads.{}.bam -".format(threads, preset, ref, tid, threads, threads, tid)
-        str cmd_idx = "samtools index -@ {} tmp.all_supp_reads.{}.bam".format(threads, tid)
+        str cmd_mm2 = "minimap2 -t {} -aYx {} {} tmp.all_supp_reads.{}.fa | " \
+                      "samtools view -@ {} -bhS -o tmp.all_supp_reads.{}.bam -".format(threads, preset, ref, tid, threads, tid)
 
     proc = Popen([cmd_mm2], stderr=DEVNULL, shell=True, executable='/bin/bash')
     retval = proc.wait()
     if retval != 0:
         raise Exception("Error: minimap2 failed for tid: {}".format(tid))
+#
+# ---------------------------------------------------------------
+#
+cdef object extract_tealn(Iterator ite):
+    cdef:
+        int32_t     retval, M, N=0
+        tealn_dtype_struct[::1]   tealns_view
+
+    tealns = np.zeros(10000, dtype=TEALN_DTYPE)
+    template  = np.zeros(10000, dtype=TEALN_DTYPE)
+    tealns_view = tealns
+    M = tealns_view.shape[0] - 20
     
-    proc = Popen([cmd_idx], stderr=DEVNULL, shell=True, executable='/bin/bash')
-    retval = proc.wait()
-    if retval != 0:
-        raise Exception("Error: samtools index failed for tid: {}".format(tid))
+    while 1:
+        retval = ite.cnext2()
+        if retval > 0:
+            if bam_filtered(ite.b):
+                continue
+            if N > M:
+                tealns = np.concatenate((tealns, template))
+                tealns_view = tealns
+                M = tealns_view.shape[0] - 20
+
+            parse_tealns(ite.b, &tealns_view[N])
+            N += 1
+            continue
+
+        del template
+        return tealns[:N]
+#
+# ---------------------------------------------------------------
+#
+cdef object seg_feat_te(seg_dtype_struct[::1] segs, int tid, int threads):
+    cdef:
+        BamFile  rbf = BamFile("tmp.all_supp_reads.{}.bam".format(tid), threads, "rb")
+        Iterator ite = Iterator(rbf)
+        object   alns
+        tealn_dtype_struct[::1] tealns_view
+    
+    alns = extract_tealn(ite)
+    alns.sort(order=['idx', 'qst'])
+    tealns_view = alns
+
+    del ite; rbf.close(); del rbf
+    return alns
 #
 # ---------------------------------------------------------------
 #
@@ -246,11 +295,11 @@ cpdef dict build_cluster(str fpath,
     ### 1. parse alignments & extract segments ###
     ##############################################
     cdef:
-        object  segs
-        BamFile rbf = BamFile(fpath, threads, "rb")
+        object   segs
+        BamFile  rbf = BamFile(fpath, threads, "rb")
+        Iterator ite = Iterator(rbf, tid)
     
     # extract segments
-    ite  = Iterator(rbf, tid)
     segs = extract_seg(ite, minl)
 
     ############################################
@@ -281,6 +330,7 @@ cpdef dict build_cluster(str fpath,
     # 2. write a function to read TE alignments & compute new features for segments
     # align segment sequences to TE CSS
     align_mm2(tid, threads, teref, preset)
+    alns = seg_feat_te(segs_view, tid, threads)
     
     ############################
     ### 3. construct cluster ###
@@ -301,5 +351,5 @@ cpdef dict build_cluster(str fpath,
     # free AIList
     ailist_destroy(rep_ail); ailist_destroy(gap_ail)
 
-    CLUSTER_DICT[tid] = (clts, segs)
+    CLUSTER_DICT[tid] = (clts, segs, alns)
     return CLUSTER_DICT

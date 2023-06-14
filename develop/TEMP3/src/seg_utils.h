@@ -97,6 +97,25 @@ typedef struct {
 } __attribute__((packed)) seg_dtype_struct;
 
 
+typedef struct {
+    int32_t idx;
+    int32_t AS;
+    int32_t qst;
+    int32_t qed;
+    int16_t flag;
+} __attribute__((packed)) tealn_dtype_struct;
+
+
+/// parse alignment's CIGAR and extract segments.
+/*!
+ * @param bam		Alignment record
+ * @param segs      address to the segments arrary record
+ * @param offset    offset of the alignments in BAM file
+ * @param minl      minimum length of segment
+ */
+int parse_cigar(bam1_t *bam, seg_dtype_struct segs[], int64_t offset, int minl);
+
+
 /// Get whether the alignment is dual-clip.
 /*!
  * @param rflag     rflag of the segment, representing type of the corresponding alignment
@@ -112,8 +131,8 @@ inline int aln_is_dclip(uint8_t rflag) {
  * @param flag  bitwise flag of the query alignment
  * @return      1 if query is secondary, 0 if not
  */
-inline int aln_not_second(uint16_t flag) {
-    return (flag & BAM_FSECONDARY) == 0;
+inline int aln_is_second(uint16_t flag) {
+    return (flag & BAM_FSECONDARY) != 0;
 }
 
 
@@ -167,6 +186,13 @@ void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
  */
 #define bam_is_second(b) (((b)->core.flag & BAM_FSECONDARY) != 0)
 
+/// Get whether the query is secondary or unmapped
+/*!
+ @param  b  pointer to an alignment
+ @return    1 if query is secondary or unmapped, 0 if not
+ */
+#define bam_filtered(b) (((b)->core.flag & BAM_FSECONDARY) != 0 || ((b)->core.flag & BAM_FUNMAP) != 0)
+
 /// Set alignment record memory policy
 /**
    @param b       Alignment record
@@ -204,5 +230,13 @@ static inline int realloc_bam_data1(bam1_t *b, size_t desired)
    @return      dest data length if success, -1 if failed
 */
 int bam_trim1(bam1_t *src, bam1_t *dest, int32_t idx, int32_t qst, int32_t qed);
+
+
+/// parse transposon alignment and record record information with array
+/*!
+ * @param bam		Alignment record
+ * @param tealns	address to the te alignments arrary record
+ */
+void parse_tealns(bam1_t *bam, tealn_dtype_struct tealns[]);
 
 #endif // SEG_UTILS_H

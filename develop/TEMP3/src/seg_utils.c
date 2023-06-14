@@ -5,6 +5,99 @@
  *** Segment records ***
  ***********************/
 
+int parse_cigar(bam1_t *bam, seg_dtype_struct segs[], int64_t offset, int minl)
+{   
+    uint32_t *cigar = bam_get_cigar(bam);
+    uint8_t  idx = 0;
+    uint8_t  rflag = 0;
+    int nmatch = 0;
+    int qpos = 0;
+    int rpos = bam->core.pos;
+    int n = bam->core.n_cigar;
+    int m = n-1;
+
+    // traverse alignment's CIGAR
+    for (int i = 0; i < n; i++)
+    {   int len = bam_cigar_oplen(cigar[i]);
+        switch (bam_cigar_op(cigar[i]))
+        {
+        // match
+        case BAM_CMATCH:
+        case BAM_CEQUAL:
+        case BAM_CDIFF:
+            qpos += len;
+            rpos += len;
+            nmatch += len;
+            break;
+        // clip or insert
+        case BAM_CSOFT_CLIP:
+        case BAM_CINS:
+            if (len >= minl)
+            {
+                if (i == 0)
+                {
+                    segs[idx].qst   = qpos;
+                    segs[idx].qed   = qpos + len;
+                    segs[idx].rpos  = rpos;
+                    segs[idx].sflag = LEFT_CLIP;
+                    segs[idx].ith   = idx;
+                    segs[idx].overhang = nmatch;
+                    rflag |= LEFT_CLIP;
+                } else if (i == m)
+                {
+                    segs[idx].qst   = qpos;
+                    segs[idx].qed   = qpos + len;
+                    segs[idx].rpos  = rpos;
+                    segs[idx].sflag = RIGHT_CLIP;
+                    segs[idx].ith   = idx;
+                    segs[idx].overhang = nmatch;
+                    rflag |= RIGHT_CLIP;
+                } else
+                {
+                    segs[idx].qst   = qpos;
+                    segs[idx].qed   = qpos + len;
+                    segs[idx].rpos  = rpos;
+                    segs[idx].sflag = MID_INSERT;
+                    segs[idx].ith   = idx;
+                    segs[idx].overhang = nmatch;
+                    rflag |= MID_INSERT;
+                }
+                idx += 1;
+            }
+            qpos += len;
+            break;
+        // del or skip
+        case BAM_CDEL:
+        case BAM_CREF_SKIP:
+            rpos += len;
+            break;
+        // defalut
+        default:
+            break;
+        }
+    }
+    
+    // the same attributes of all segments
+    if (idx > 0)
+    {
+        for (uint8_t i = 0; i < idx; i++)
+        {
+            segs[i].flag    = bam->core.flag;
+            segs[i].mapq    = bam->core.qual;
+            segs[i].rflag   = rflag;
+            segs[i].offset  = offset;
+            segs[i].refst   = bam->core.pos;
+            segs[i].refed   = rpos;
+            segs[i].lqseq   = qpos;
+            segs[i].nseg    = idx;
+            segs[i].nmatch  = nmatch;
+        }
+    }
+
+    return (int)idx;
+}
+
+
 void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[])
 {
     int32_t n1 = 0, n2 = 0;
@@ -72,7 +165,8 @@ void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[])
 }
 
 
-void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail) {
+void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail)
+{
     // update overhang
     if (segs[0].sflag & LEFT_CLIP) {
         segs[0].overhang = segs[0].nmatch;
@@ -90,11 +184,6 @@ void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail) {
             }
         }
     }
-    
-    // TO DO
-    // 1. compute the "trimmed" start & end for each segment (need a C function)
-    // 2. read alignment with specified offset by seek (need a function)
-    // 3. modified & write alignment by bam_set_qname, bam_set1, sam_write1 (need a C function)
 }
 
 
@@ -183,4 +272,62 @@ int bam_trim1(bam1_t *src, bam1_t *dest, int32_t idx, int32_t qst, int32_t qed)
     }
 
     return (int)data_len;
+}
+
+
+void origion_qpos(int32_t *qst, int32_t *qed, bam1_t *bam)
+{
+    int32_t st, ed;
+    uint32_t *cigar = bam_get_cigar(bam);
+    int32_t n = bam->core.n_cigar;
+
+    if (bam_is_rev(bam))
+    { // bam record is reverse
+        if (bam_cigar_op(cigar[n-1]) == BAM_CSOFT_CLIP)
+        {
+            st = bam_cigar_oplen(cigar[n-1]);
+        } else
+        {
+            st = 0;
+        }
+
+        if (bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP)
+        {
+            ed = bam->core.l_qseq - bam_cigar_oplen(cigar[0]);
+        } else
+        {
+            ed = bam->core.l_qseq;
+        }
+    } else { // bam record is forward
+        if (bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP)
+        {
+            st = bam_cigar_oplen(cigar[0]);
+        } else
+        {
+            st = 0;
+        }
+
+        if (bam_cigar_op(cigar[n-1]) == BAM_CSOFT_CLIP)
+        {
+            ed = bam->core.l_qseq - bam_cigar_oplen(cigar[n-1]);
+        } else
+        {
+            ed = bam->core.l_qseq;
+        }
+    }
+
+    *qst = st;
+    *qed = ed;
+}
+
+
+void parse_tealns(bam1_t *bam, tealn_dtype_struct tealns[])
+{   int32_t qst, qed;
+
+    origion_qpos(&qst, &qed, bam);
+    tealns[0].idx = atoi(bam_get_qname(bam));
+    tealns[0].AS = bam_aux2i(bam_aux_get(bam, "AS"));
+    tealns[0].qst = qst;
+    tealns[0].qed = qed;
+    tealns[0].flag = bam->core.flag;
 }

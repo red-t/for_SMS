@@ -1,5 +1,4 @@
 import os
-import numpy as np
 
 #
 # ---------------------------------------------------------------
@@ -12,7 +11,7 @@ cdef class BamFile:
                   BamFile template = None):
         cdef bytes bfilepath    = os.fsencode(filepath)
         cdef bytes bidx         = os.fsencode(filepath+".bai")
-        cdef bytes bmode        = mode.encode(TEXT_ENCODING, ERROR_HANDLER)
+        cdef bytes bmode        = mode.encode()
 
         self.threads    = nthreads
         self.mode       = bmode
@@ -55,12 +54,9 @@ cdef class BamFile:
         self.htsfile = self._open_htsfile()
         if self.htsfile == NULL:
             if errno:
-                raise IOError(errno, "could not open alignment file `{}`: {}".format(
-                    self.filename.decode(TEXT_ENCODING, ERROR_HANDLER),
-                    strerror(errno)))
+                raise IOError(errno, "could not open alignment file `{}`: {}".format(self.filename.decode(), strerror(errno)))
             else:
-                raise ValueError("could not open alignment file `{}`".format(
-                    self.filename.decode(TEXT_ENCODING, ERROR_HANDLER)))
+                raise ValueError("could not open alignment file `{}`".format(self.filename.decode()))
 
         # for reading
         if self.mode == b'rb':
@@ -70,15 +66,15 @@ cdef class BamFile:
             if self.hdr == NULL:
                 raise ValueError("file does not have a valid header, is it BAM format?")
             
-            # open BAM index file to enable random access
-            with nogil:
-                self.index = sam_index_load2(self.htsfile, self.filename, self.index_filename)
-            if not self.index:
-                if errno:
-                    raise IOError(errno, strerror(errno))
-                else:
-                    raise IOError('unable to open index file `{}`'.format(
-                        self.index_filename.decode(TEXT_ENCODING, ERROR_HANDLER)))
+            # load index to enable randomly access
+            if os.path.exists(self.index_filename.decode()):
+                with nogil:
+                    self.index = sam_index_load2(self.htsfile, self.filename, self.index_filename)
+                if not self.index:
+                    if errno:
+                        raise IOError(errno, strerror(errno))
+                    else:
+                        raise IOError('unable to open index file `{}`'.format(self.index_filename.decode()))
         # for writing
         elif (self.mode == b'wb') or (self.mode == b'wF'):
             # copy header from template
@@ -87,13 +83,13 @@ cdef class BamFile:
             else:
                 raise ValueError("not enough information to construct header. Please provide template")
             
-            # write header to htsfile
+            # write header to BAM
             if self.mode == b'wb':
                 with nogil:
                     sam_hdr_write(self.htsfile, self.hdr)
     
     cdef htsFile *_open_htsfile(self) except? NULL:
-        '''open file in 'rb/wb' mode, return htsFile object if success.'''
+        '''open file in 'rb/wb/wF' mode, return htsFile object if success.'''
         cdef int32_t threads = self.threads
         cdef htsFile *htsfile
 
@@ -130,37 +126,31 @@ cdef class Iterator:
 
     def __init__(self,
                  BamFile bamfile,
-                 int tid):
+                 int tid = -1):
 
         self.bamfile = bamfile
         self.htsfile = bamfile.htsfile
-        self.index   = bamfile.index
-        self.tid     = tid
-        with nogil:
-            self.iter = sam_itr_queryi(self.index,
-                                       tid,
-                                       0,
-                                       MAX_POS)
+        self.tid = tid
+        if tid >= 0:
+            self.index = bamfile.index
+            with nogil:
+                self.iter = sam_itr_queryi(self.index,
+                                        tid,
+                                        0,
+                                        MAX_POS)
     
     def __dealloc__(self):
-        bam_destroy1(self.b)
-        sam_itr_destroy(self.iter)
+        if self.b:
+            bam_destroy1(self.b)
+            self.b = NULL
+        if self.iter:
+            sam_itr_destroy(self.iter)
+            self.iter = NULL
     
     def __iter__(self):
         return self
-    
-    cdef int cnext_offt(self, int64_t offset):
-        '''read a alignment record with specified offset'''
-        cdef int retval
 
-        with nogil:
-            bgzf_seek(self.htsfile.fp.bgzf, offset, SEEK_SET)
-            retval = bam_read1(self.htsfile.fp.bgzf,
-                               self.b)
-        
-        return retval
-
-    cdef int cnext(self):
+    cdef int cnext1(self):
         '''cversion of iterator. retval>=0 if success.'''
         cdef int        retval
         cdef int64_t    offset
@@ -172,4 +162,25 @@ cdef class Iterator:
                                   self.b,
                                   self.htsfile)
         self.offset = offset
+        return retval
+    
+    cdef int cnext2(self):
+        '''directly read a alignment record'''
+        cdef int retval
+
+        with nogil:
+            retval = bam_read1(self.htsfile.fp.bgzf,
+                               self.b)
+        
+        return retval
+
+    cdef int cnext3(self, int64_t offset):
+        '''read a alignment record with specified offset'''
+        cdef int retval
+
+        with nogil:
+            bgzf_seek(self.htsfile.fp.bgzf, offset, SEEK_SET)
+            retval = bam_read1(self.htsfile.fp.bgzf,
+                               self.b)
+        
         return retval
