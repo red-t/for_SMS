@@ -37,7 +37,6 @@ cdef extern from "src/seg_utils.h" nogil:
         int32_t     qst
         int32_t     qed
         int32_t     rpos
-        int32_t     lqseq
         uint8_t     sflag
         uint8_t     rflag
         int64_t     offset

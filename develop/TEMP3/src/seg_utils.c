@@ -76,7 +76,7 @@ int parse_cigar(bam1_t *bam, seg_dtype_struct segs[], int64_t offset, int minl)
             break;
         }
     }
-    
+
     // the same attributes of all segments
     if (idx > 0)
     {
@@ -88,7 +88,6 @@ int parse_cigar(bam1_t *bam, seg_dtype_struct segs[], int64_t offset, int minl)
             segs[i].offset  = offset;
             segs[i].refst   = bam->core.pos;
             segs[i].refed   = rpos;
-            segs[i].lqseq   = qpos;
             segs[i].nseg    = idx;
             segs[i].nmatch  = nmatch;
         }
@@ -187,6 +186,40 @@ void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail)
 }
 
 
+void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i)
+{
+    int idx = tealns[i].idx;
+
+    // compute mapped query length
+    if (segs[idx].nmap == 0)
+    {
+        segs[idx].lmap += tealns[i].qed - tealns[i].qst;
+    } else
+    { // i-th and (i-1)-th alignment come from the same segment
+        int j = i - 1;
+        if (tealns[i].qst < tealns[j].qed) { // i-th alignment overlap with (i-1)-th alignment
+            if (tealns[i].qed > tealns[j].qed) {
+                segs[idx].lmap += tealns[i].qed - tealns[j].qed;
+            } else { // i-th alignment covered by (i-1)-th alignment
+                tealns[i].qed = tealns[j].qed;
+                return;
+            }
+        }
+        else { // no overlap
+            segs[idx].lmap += tealns[i].qed - tealns[i].qst;
+        }
+    }
+
+    // compute average alignment score, nmap, consistency
+    segs[idx].sumAS += (float_t)tealns[i].AS/(tealns[i].qed - tealns[i].qst);
+    segs[idx].sumdiv += tealns[i].div;
+    segs[idx].nmap += 1;
+    if ((segs[idx].flag & BAM_FREVERSE) == (tealns[i].flag & BAM_FREVERSE)) {
+        segs[idx].cnst += 1;
+    } else {
+        segs[idx].cnst += (1 << 8);
+    }
+}
 
 /*************************
  *** Alignment records ***
@@ -329,5 +362,6 @@ void parse_tealns(bam1_t *bam, tealn_dtype_struct tealns[])
     tealns[0].AS = bam_aux2i(bam_aux_get(bam, "AS"));
     tealns[0].qst = qst;
     tealns[0].qed = qed;
+    tealns[0].div = bam_aux2f(bam_aux_get(bam, "de"));
     tealns[0].flag = bam->core.flag;
 }

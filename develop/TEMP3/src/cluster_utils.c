@@ -23,11 +23,11 @@ void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clt
 }
 
 
-float clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg) {
-    float entropy = 0;
-    if (nL > 0) entropy -= ((float)nL/nseg) * log2((float)nL/nseg);
-    if (nM > 0) entropy -= ((float)nM/nseg) * log2((float)nM/nseg);
-    if (nR > 0) entropy -= ((float)nR/nseg) * log2((float)nR/nseg);
+float_t clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg) {
+    float_t entropy = 0;
+    if (nL > 0) entropy -= ((float_t)nL/nseg) * log2((float_t)nL/nseg);
+    if (nM > 0) entropy -= ((float_t)nM/nseg) * log2((float_t)nM/nseg);
+    if (nR > 0) entropy -= ((float_t)nR/nseg) * log2((float_t)nR/nseg);
     return entropy;
 }
 

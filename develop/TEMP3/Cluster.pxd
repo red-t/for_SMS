@@ -32,6 +32,8 @@ cdef extern from "src/cluster_utils.h" nogil:
     # @param rep_ail	AIList of repeats
     # @param gap_ail    AIList of gaps
     void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
+
+    void cseg_feat_te(seg_dtype_struct *, tealn_dtype_struct *, int i)
 #
 # ---------------------------------------------------------------
 #
@@ -51,7 +53,6 @@ cdef extern from "src/seg_utils.h" nogil:
         int32_t     qst
         int32_t     qed
         int32_t     rpos
-        int32_t     lqseq
         uint8_t     sflag
         uint8_t     rflag
         int64_t     offset
@@ -62,12 +63,18 @@ cdef extern from "src/seg_utils.h" nogil:
         int32_t     overhang
         int32_t     nmatch
         uint8_t     loc_flag
+        uint8_t     nmap
+        int32_t     lmap
+        float       sumAS
+        float       sumdiv
+        uint16_t    cnst
 
     ctypedef packed struct tealn_dtype_struct:
         int32_t idx
         int32_t AS
         int32_t qst
         int32_t qed
+        float   div
         int16_t flag
     
     # parse alignment's CIGAR and extract segments.

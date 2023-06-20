@@ -46,17 +46,17 @@ typedef struct {
     uint8_t     strand;
     uint8_t     cloc_flag;
     uint8_t     ntype;
-    float       entropy;
-    float       bratio;
-    float       sovh_frac;
-    float       lmq_frac;
-    float       dclip_frac;
-    float       aln1_frac;
-    float       aln2_frac;
-    float       aln4_frac;
-    float       aln8_frac;
-    float       aln16_frac;
-    float       avg_mapq;
+    float_t     entropy;
+    float_t     bratio;
+    float_t     sovh_frac;
+    float_t     lmq_frac;
+    float_t     dclip_frac;
+    float_t     aln1_frac;
+    float_t     aln2_frac;
+    float_t     aln4_frac;
+    float_t     aln8_frac;
+    float_t     aln16_frac;
+    float_t     avg_mapq;
 } __attribute__((packed)) cluster_dtype_struct;
 
 
@@ -76,7 +76,7 @@ void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clt
  * @param nR    number of right-clip segments
  * @param nseg  number of total segments in the cluster
  */
-float clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg);
+float_t clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg);
 
 
 /// Compute fraction of alignment with different loc_flag.

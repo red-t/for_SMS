@@ -57,7 +57,6 @@ inline int is_del_or_skip(uint32_t op) {
  @field  qst        0-based start on query sequence, included
  @field  qed        0-based end on query sequence, excluded
  @field  pos        0-based position on reference, included
- @field  lqseq      length of the query sequence (read)
  @field  sflag      bitwise flag of the segment type
                         1: left clip
                         2: internal insert
@@ -76,6 +75,11 @@ inline int is_del_or_skip(uint32_t op) {
                         4:  both sides at repeat/gap boundary
                         8:  one side at repeat/gap boundary, the other at normal region
                         16: one side at repeat/gap boundary, the other inside repeat/gap
+ @field  nmap       number of alignments mapped to TE
+ @field  lmap       summary query length of the TE alignments
+ @field  sumAS      summary per base alignment score of the TE alignments
+ @field  sumdiv     summary per base divergence("de") of the TE alignments
+ @field  cnst       number of mathced bases of the alignment
  */
 typedef struct {
     uint16_t    flag;
@@ -83,7 +87,6 @@ typedef struct {
     int32_t     qst;
     int32_t     qed;
     int32_t     rpos;
-    int32_t     lqseq;
     uint8_t     sflag;
     uint8_t     rflag;
     int64_t     offset;
@@ -94,14 +97,29 @@ typedef struct {
     int32_t     overhang;
     int32_t     nmatch;
     uint8_t     loc_flag;
+    uint8_t     nmap;
+    int32_t     lmap;
+    float_t     sumAS;
+    float_t     sumdiv;
+    uint16_t    cnst;
 } __attribute__((packed)) seg_dtype_struct;
 
 
+/*! @typedef
+ @abstract Structure for TE alignment.
+ @field  idx    index of the source segment record
+ @field  AS     alignment score
+ @field  qst    query start (original orientation)
+ @field  qed    query end (original orientation)
+ @field  div    per base divergence ("de")
+ @field  flag   bitwise flag of the alignment
+ */
 typedef struct {
     int32_t idx;
     int32_t AS;
     int32_t qst;
     int32_t qed;
+    float_t div;
     int16_t flag;
 } __attribute__((packed)) tealn_dtype_struct;
 
@@ -173,6 +191,9 @@ void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[])
  * @param gap_ail	AIList of gaps
  */
 void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
+
+
+void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i);
 
 
 /*************************

@@ -8,7 +8,6 @@ SEG_DTYPE = np.dtype([
     ('qst',         np.int32),
     ('qed',         np.int32),
     ('rpos',        np.int32),
-    ('lqseq',       np.int32),
     ('sflag',       np.uint8),
     ('rflag',       np.uint8),
     ('offset',      np.int64),
@@ -19,6 +18,11 @@ SEG_DTYPE = np.dtype([
     ('overhang',    np.int32),
     ('nmatch',      np.int32),
     ('loc_flag',    np.uint8),
+    ('nmap',        np.uint8),
+    ('lmap',        np.int32),
+    ('sumAS',       np.float32),
+    ('sumdiv',      np.float32),
+    ('cnst',        np.uint16),
 ])
 
 
@@ -27,6 +31,7 @@ TEALN_DTYPE = np.dtype([
     ('AS',      np.int32),
     ('qst',     np.int32),
     ('qed',     np.int32),
+    ('div',     np.float32),
     ('flag',    np.int16),
 ])
 
@@ -168,15 +173,21 @@ cdef object seg_feat_te(seg_dtype_struct[::1] segs, int tid, int threads):
     cdef:
         BamFile  rbf = BamFile("tmp.all_supp_reads.{}.bam".format(tid), threads, "rb")
         Iterator ite = Iterator(rbf)
-        object   alns
+        object   tealns
         tealn_dtype_struct[::1] tealns_view
     
-    alns = extract_tealn(ite)
-    alns.sort(order=['idx', 'qst'])
-    tealns_view = alns
+    tealns = extract_tealn(ite)
+    tealns.sort(order=['idx', 'qst'])
+    tealns_view = tealns
+
+    cdef:
+        int i
+
+    for i in range(tealns_view.shape[0]):
+        cseg_feat_te(&segs[0], &tealns_view[0], i)
 
     del ite; rbf.close(); del rbf
-    return alns
+    return tealns
 #
 # ---------------------------------------------------------------
 #
