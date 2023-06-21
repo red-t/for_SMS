@@ -41,15 +41,18 @@ void clt_dffloc(cluster_dtype_struct clts[]) {
 }
 
 
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail) {
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, int minovh) {
     // compute cluster location flag
     clt_loc_flag(rep_ail, gap_ail, clts);
 
     // initilization
     uint8_t ntype=0;
-    int16_t nL=0, nM=0, nR=0;
+    int16_t nL=0, nM=0, nR=0, nseg=0;
     for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
     {
+        // ignore segment with short overhang
+        if (segs[j].overhang < minovh) continue;
+        
         // different type of segments
         switch (segs[j].sflag)
         {
@@ -104,9 +107,27 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
         
         // sum of mapq
         clts[0].avg_mapq += segs[j].mapq;
+        nseg += 1;
+
+        // features from TE alignment
+        if (aln_is_second(segs[j].flag)) continue;
+        if (segs[j].nmap > 0)
+        {
+            clts[0].avg_AS += segs[j].sumAS / segs[j].nmap;
+            clts[0].avg_qfrac += (float_t)segs[j].lmap / (segs[j].qed - segs[j].qst);
+            clts[0].avg_div += segs[j].sumdiv / segs[j].nmap;
+            // strand
+            if ((segs[j].cnst & 255) > (segs[j].cnst >> 8)) {
+                clts[0].strand += 1;
+            } else if ((segs[j].cnst & 255) < (segs[j].cnst >> 8)) {
+                clts[0].strand += 256;
+            }
+        }
+        clts[0].nmap += 1;
     }
 
     // features computation
+    clts[0].nseg        = nseg;
     clts[0].ntype       = (ntype&1) + ((ntype&2)>>1) + ((ntype&4)>>2);
     clts[0].entropy     = clt_entropy(nL, nM, nR, clts[0].nseg);
     clts[0].bratio      = (MIN(nL, nR) + 0.01) / (MAX(nL, nR) + 0.01);
@@ -115,4 +136,18 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
     clts[0].dclip_frac  = clts[0].dclip_frac / clts[0].nseg;
     clts[0].avg_mapq    = clts[0].avg_mapq / clts[0].nseg;
     clt_dffloc(clts);
+
+    // features from TE alignment
+    if (clts[0].nmap > 0)
+    {
+        clts[0].avg_AS      = clts[0].avg_AS / clts[0].nmap;
+        clts[0].avg_qfrac   = clts[0].avg_qfrac / clts[0].nmap;
+        clts[0].avg_div     = clts[0].avg_div / clts[0].nmap;
+        // strand
+        if ((clts[0].strand & 255) > (clts[0].strand >> 8)) {
+            clts[0].strand = 1;
+        } else if ((clts[0].strand & 255) < (clts[0].strand >> 8)) {
+            clts[0].strand = 2;
+        }
+    }
 }

@@ -42,7 +42,7 @@ CLUSTER_DTYPE = np.dtype([
     ('st_idx',      np.int32),
     ('ed_idx',      np.int32),
     ('nseg',        np.int16),
-    ('strand',      np.uint8),
+    ('strand',      np.uint16),
     ('cloc_flag',   np.uint8),
     ('ntype',       np.uint8),
     ('entropy',     np.float32),
@@ -56,6 +56,10 @@ CLUSTER_DTYPE = np.dtype([
     ('aln8_frac',   np.float32),
     ('aln16_frac',  np.float32),
     ('avg_mapq',    np.float32),
+    ('nmap',        np.int16),
+    ('avg_AS',      np.float32),
+    ('avg_qfrac',   np.float32),
+    ('avg_div',     np.float32),
 ])
 #
 # ---------------------------------------------------------------
@@ -192,7 +196,8 @@ cdef object seg_feat_te(seg_dtype_struct[::1] segs, int tid, int threads):
 # ---------------------------------------------------------------
 #
 cdef object merge_seg(seg_dtype_struct[::1] segs,
-                      int maxdist):
+                      int maxdist,
+                      int minovh=100):
     '''merge overlapped segments into cluster
     
     Parameters:
@@ -223,6 +228,11 @@ cdef object merge_seg(seg_dtype_struct[::1] segs,
             clts_view = clts
             M = clts_view.shape[0] - 20
 
+        # ignore segment with short overhang
+        if segs[i].overhang < minovh:
+            i += 1
+            continue
+
         # initialize the idx-th cluster with the first segment
         clts_view[idx].st     = segs[i].rpos - 1
         clts_view[idx].st_idx = i
@@ -231,6 +241,10 @@ cdef object merge_seg(seg_dtype_struct[::1] segs,
         # try to merge segments within maxdist iteratively
         j = i + 1
         while j < segs.shape[0]:
+            # ignore segment with short overhang
+            if segs[j].overhang < minovh:
+                j += 1
+                continue
             # next segment's rpos VS current cluster end
             if segs[j].rpos <= clts_view[idx].ed:
                 clts_view[idx].ed = segs[j].rpos + maxdist
@@ -242,7 +256,6 @@ cdef object merge_seg(seg_dtype_struct[::1] segs,
         # idx-th cluster contains segments in [i,j); nseg = j-i
         clts_view[idx].ed     = clts_view[idx].ed - maxdist
         clts_view[idx].ed_idx = j
-        clts_view[idx].nseg   = j - i
 
         # jump merged segments
         i = j
@@ -256,15 +269,13 @@ cdef object merge_seg(seg_dtype_struct[::1] segs,
 cdef clt_feat(cluster_dtype_struct[::1] clts,
               seg_dtype_struct[::1] segs,
               ailist_t *rep_ail,
-              ailist_t *gap_ail):
+              ailist_t *gap_ail,
+              int minovh=100):
     cdef:
         ssize_t i, j
     
     for i in range(clts.shape[0]):
-        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail)
-    
-    # TO DO:
-    # 1. refine cclt_feat to compute clt features related to TE alignments
+        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, minovh)
 #
 # ---------------------------------------------------------------
 #
@@ -336,11 +347,10 @@ cpdef dict build_cluster(str fpath,
     trim_seg(tid, threads, rbf, ite, segs_view)
     rbf.close(); del rbf; del ite
 
-    # TO DO:
-    # 1. write a function that map the segment sqeunces to TE CSS (by calling minimap2)
-    # 2. write a function to read TE alignments & compute new features for segments
     # align segment sequences to TE CSS
     align_mm2(tid, threads, teref, preset)
+
+    # compute features from TE alignments
     alns = seg_feat_te(segs_view, tid, threads)
     
     ############################
@@ -357,6 +367,8 @@ cpdef dict build_cluster(str fpath,
     ### 4. compute features for each cluster ###
     ############################################
     cdef cluster_dtype_struct[::1] clts_view = clts
+
+    # features computing
     clt_feat(clts_view, segs_view, rep_ail, gap_ail)
 
     # free AIList

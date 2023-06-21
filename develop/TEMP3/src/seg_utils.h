@@ -193,6 +193,12 @@ void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[])
 void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
 
 
+/// Compute features of a segment record from TE alignment
+/*!
+ * @param segs		address to the segment record
+ * @param tealns    address to the TE alignments array
+ * @param i         index of the used alignment record
+ */
 void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i);
 
 

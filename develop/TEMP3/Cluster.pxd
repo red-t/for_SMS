@@ -11,7 +11,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         int32_t     st_idx
         int32_t     ed_idx
         int16_t     nseg
-        uint8_t     strand
+        uint16_t    strand
         uint8_t     cloc_flag
         uint8_t     ntype
         float       entropy
@@ -25,15 +25,18 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       aln8_frac
         float       aln16_frac
         float       avg_mapq
+        int16_t     nmap
+        float       avg_AS
+        float       avg_qfrac
+        float       avg_div
 
     # Compute features of a cluster record
     # @param clts		address to the cluster record
     # @param segs       address to the arrary of segments
     # @param rep_ail	AIList of repeats
     # @param gap_ail    AIList of gaps
-    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
-
-    void cseg_feat_te(seg_dtype_struct *, tealn_dtype_struct *, int i)
+    # @param minovh     minimum length of segment overhang
+    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, int minovh)
 #
 # ---------------------------------------------------------------
 #
@@ -104,6 +107,12 @@ cdef extern from "src/seg_utils.h" nogil:
     # @param rep_ail	AIList of repeats
     # @param gap_ail	AIList of gaps
     void cseg_feat(seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail)
+
+    # Compute features of a segment record from TE alignment
+    # @param segs		address to the segment record
+    # @param tealns    address to the TE alignments array
+    # @param i         index of the used alignment record
+    void cseg_feat_te(seg_dtype_struct *, tealn_dtype_struct *, int i)
 
     #########################
     ### Alignment records ###
