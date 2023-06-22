@@ -41,7 +41,7 @@ void clt_dffloc(cluster_dtype_struct clts[]) {
 }
 
 
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, int minovh) {
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, int minovh) {
     // compute cluster location flag
     clt_loc_flag(rep_ail, gap_ail, clts);
 
@@ -122,6 +122,9 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
             } else if ((segs[j].cnst & 255) < (segs[j].cnst >> 8)) {
                 clts[0].strand += 256;
             }
+        } else
+        {
+            clts[0].avg_div += div;
         }
         clts[0].nmap += 1;
     }
@@ -142,12 +145,14 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
     {
         clts[0].avg_AS      = clts[0].avg_AS / clts[0].nmap;
         clts[0].avg_qfrac   = clts[0].avg_qfrac / clts[0].nmap;
-        clts[0].avg_div     = clts[0].avg_div / clts[0].nmap;
+        clts[0].avg_div     = (clts[0].avg_div / clts[0].nmap) / div;
         // strand
         if ((clts[0].strand & 255) > (clts[0].strand >> 8)) {
             clts[0].strand = 1;
         } else if ((clts[0].strand & 255) < (clts[0].strand >> 8)) {
             clts[0].strand = 2;
         }
+    } else {
+        clts[0].avg_div = 1;
     }
 }

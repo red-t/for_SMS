@@ -36,7 +36,7 @@ cdef extern from "src/cluster_utils.h" nogil:
     # @param rep_ail	AIList of repeats
     # @param gap_ail    AIList of gaps
     # @param minovh     minimum length of segment overhang
-    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, int minovh)
+    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, float div, int minovh)
 #
 # ---------------------------------------------------------------
 #
@@ -123,6 +123,8 @@ cdef extern from "src/seg_utils.h" nogil:
     # @return    1 if query is secondary or unmapped, 0 if not
     int bam_filtered(bam1_t *b)
 
+    float get_div(bam1_t *b)
+
     # Compute features of a segment record
     # @param src   source alignment record     
     # @param dest  destination alignment record
@@ -180,4 +182,5 @@ cpdef dict build_cluster(str fpath,
                          int threads,
                          int tid,
                          int minl,
-                         int maxdist)
+                         int maxdist,
+                         float div)

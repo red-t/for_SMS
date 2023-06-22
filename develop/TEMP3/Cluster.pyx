@@ -270,12 +270,13 @@ cdef clt_feat(cluster_dtype_struct[::1] clts,
               seg_dtype_struct[::1] segs,
               ailist_t *rep_ail,
               ailist_t *gap_ail,
+              float div,
               int minovh=100):
     cdef:
         ssize_t i, j
     
     for i in range(clts.shape[0]):
-        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, minovh)
+        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, div, minovh)
 #
 # ---------------------------------------------------------------
 #
@@ -287,7 +288,8 @@ cpdef dict build_cluster(str fpath,
                          int threads,
                          int tid,
                          int minl,
-                         int maxdist):
+                         int maxdist,
+                         float div):
     '''build cluster
     Parameters:
     -----------
@@ -369,7 +371,7 @@ cpdef dict build_cluster(str fpath,
     cdef cluster_dtype_struct[::1] clts_view = clts
 
     # features computing
-    clt_feat(clts_view, segs_view, rep_ail, gap_ail)
+    clt_feat(clts_view, segs_view, rep_ail, gap_ail, div)
 
     # free AIList
     ailist_destroy(rep_ail); ailist_destroy(gap_ail)

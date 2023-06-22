@@ -220,6 +220,8 @@ void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i);
  */
 #define bam_filtered(b) (((b)->core.flag & BAM_FSECONDARY) != 0 || ((b)->core.flag & BAM_FUNMAP) != 0)
 
+#define get_div(b) (bam_aux2f(bam_aux_get((b), "de")))
+
 /// Set alignment record memory policy
 /**
    @param b       Alignment record

@@ -104,6 +104,6 @@ void clt_dffloc(cluster_dtype_struct clts[]);
  * @param gapail    AIList of gaps
  * @param minovh    minimum length of segment overhang
  */
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, int minovh);
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, int minovh);
 
 #endif // CLUSTER_UTILS_H

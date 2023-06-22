@@ -2,6 +2,70 @@ from .Cluster import build_cluster
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
+cdef float background_div(int N,
+                          Iterator ite):
+    cdef:
+        int n=0, retval
+        float div=0
+    
+    while n < N:
+        retval = ite.cnext2()
+        if retval > 0:
+            if bam_filtered(ite.b):
+                continue
+            
+            div += get_div(ite.b)
+            n += 1
+            continue
+
+        div = div/n
+        return div
+    
+    div = div/n
+    return div
+
+
+cdef background_info(str fpath,
+                     int nthreads,
+                     int *nchroms,
+                     float *bdiv,
+                     float *coverage):
+    cdef:
+        BamFile rbf = BamFile(fpath, nthreads, "rb")
+        int i, tid=0
+        int maxlen = 0
+    
+    for i in range(rbf.hdr.n_targets):
+        if maxlen < sam_hdr_tid2len(rbf.hdr, i):
+            tid = i
+            maxlen = sam_hdr_tid2len(rbf.hdr, i)
+
+    cdef:
+        Iterator ite = Iterator(rbf, tid)
+        int64_t sumlen = 0
+        int n = 0, retval
+        float div = 0
+    
+    while 1:
+        retval = ite.cnext1()
+        if retval > 0:
+            if bam_filtered(ite.b):
+                continue
+            
+            div += get_div(ite.b)
+            sumlen += ite.b.core.l_qseq
+            n += 1
+            continue
+
+        nchroms[0] = rbf.hdr.n_targets
+        bdiv[0] = div/n
+        coverage[0] = sumlen/maxlen
+        del ite; rbf.close(); del rbf
+        return
+
+
+
+
 cpdef dict build_cluster_parallel(str fpath,
                                   str rep_path,
                                   str gap_path,
@@ -40,19 +104,23 @@ cpdef dict build_cluster_parallel(str fpath,
         result: dict
             dictionary of clusters, tid -> list_of_Cluster.
     '''
-    cdef set     futures
-    cdef dict    result={}, ret
-    cdef int     nchroms, i
-    cdef BamFile bf
+    cdef:
+        dict result={}, ret
+        set futures
+        int nchroms, i
+        float div
+        BamFile bf = BamFile(fpath, nthreads, "rb")
+        Iterator ite = Iterator(bf)
     
     # get number of target chromosomes
-    bf = BamFile(fpath, 1, "rb")
     nchroms = bf.hdr.n_targets
-    bf.close(); del bf
+    div = background_div(50000, ite)
+    print("background divergence: ", div)
+    del ite; bf.close(); del bf
 
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
         futures = set([executor.submit(build_cluster, fpath, rep_path, gap_path, teref, preset,
-                                       nthreads, i, minl, maxdist) for i in range(nchroms)])
+                                       nthreads, i, minl, maxdist, div) for i in range(nchroms)])
         # merge result from each process
         for future in as_completed(futures):
             ret = future.result()
