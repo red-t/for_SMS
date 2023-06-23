@@ -10,7 +10,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         int32_t     ed
         int32_t     st_idx
         int32_t     ed_idx
-        int16_t     nseg
+        float       nseg
         uint16_t    strand
         uint8_t     cloc_flag
         uint8_t     ntype
@@ -35,8 +35,10 @@ cdef extern from "src/cluster_utils.h" nogil:
     # @param segs       address to the arrary of segments
     # @param rep_ail	AIList of repeats
     # @param gap_ail    AIList of gaps
+    # @param div        estimated background divergence
+    # @param coverage   estimated background coverage
     # @param minovh     minimum length of segment overhang
-    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, float div, int minovh)
+    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, float div, float coverage, int minovh)
 #
 # ---------------------------------------------------------------
 #
@@ -183,4 +185,5 @@ cpdef dict build_cluster(str fpath,
                          int tid,
                          int minl,
                          int maxdist,
-                         float div)
+                         float div,
+                         float coverage)

@@ -18,7 +18,7 @@
  @field  ed         0-based end on reference, excluded
  @field  st_idx     0-based start index on array of segments, included
  @field  ed_idx     0-based end index on array of segments, excluded, TO BE REMOVED
- @field  nseg       number of segments in this cluster
+ @field  nseg       number of segments in this cluster (normalized by estimated background coverage)
  @field  strand     the orientation of this insertion
                         1: forward
                         2: reverse
@@ -41,14 +41,14 @@
  @field  nmap       number of segments mapped to TE (including unmaped)
  @field  avg_AS     average per base alignment score
  @field  avg_qfrac  average query aligned fraction
- @field  avg_div    average per base divergence('de')
+ @field  avg_div    average per base divergence (normalized by estimated background divergence)
  */
 typedef struct {
     int32_t     st;
     int32_t     ed;
     int32_t     st_idx;
     int32_t     ed_idx;
-    int16_t     nseg;
+    float_t     nseg;
     uint16_t    strand;
     uint8_t     cloc_flag;
     uint8_t     ntype;
@@ -92,8 +92,9 @@ float_t clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg);
 /// Compute fraction of alignment with different loc_flag.
 /*!
  * @param clts  address to the cluster record
+ * @param nseg  number of segments in the cluster
  */
-void clt_dffloc(cluster_dtype_struct clts[]);
+void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg);
 
 
 /// Compute features of a cluster record.
@@ -104,6 +105,6 @@ void clt_dffloc(cluster_dtype_struct clts[]);
  * @param gapail    AIList of gaps
  * @param minovh    minimum length of segment overhang
  */
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, int minovh);
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh);
 
 #endif // CLUSTER_UTILS_H

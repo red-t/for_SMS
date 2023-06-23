@@ -41,7 +41,7 @@ CLUSTER_DTYPE = np.dtype([
     ('ed',          np.int32),
     ('st_idx',      np.int32),
     ('ed_idx',      np.int32),
-    ('nseg',        np.int16),
+    ('nseg',        np.float32),
     ('strand',      np.uint16),
     ('cloc_flag',   np.uint8),
     ('ntype',       np.uint8),
@@ -271,12 +271,13 @@ cdef clt_feat(cluster_dtype_struct[::1] clts,
               ailist_t *rep_ail,
               ailist_t *gap_ail,
               float div,
+              float coverage,
               int minovh=100):
     cdef:
         ssize_t i, j
     
     for i in range(clts.shape[0]):
-        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, div, minovh)
+        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, div, coverage, minovh)
 #
 # ---------------------------------------------------------------
 #
@@ -289,7 +290,8 @@ cpdef dict build_cluster(str fpath,
                          int tid,
                          int minl,
                          int maxdist,
-                         float div):
+                         float div,
+                         float coverage):
     '''build cluster
     Parameters:
     -----------
@@ -371,7 +373,7 @@ cpdef dict build_cluster(str fpath,
     cdef cluster_dtype_struct[::1] clts_view = clts
 
     # features computing
-    clt_feat(clts_view, segs_view, rep_ail, gap_ail, div)
+    clt_feat(clts_view, segs_view, rep_ail, gap_ail, div, coverage)
 
     # free AIList
     ailist_destroy(rep_ail); ailist_destroy(gap_ail)

@@ -32,16 +32,16 @@ float_t clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg) {
 }
 
 
-void clt_dffloc(cluster_dtype_struct clts[]) {
-    if (clts[0].aln1_frac > 0) clts[0].aln1_frac = clts[0].aln1_frac / clts[0].nseg;
-    if (clts[0].aln2_frac > 0) clts[0].aln2_frac = clts[0].aln2_frac / clts[0].nseg;
-    if (clts[0].aln4_frac > 0) clts[0].aln4_frac = clts[0].aln4_frac / clts[0].nseg;
-    if (clts[0].aln8_frac > 0) clts[0].aln8_frac = clts[0].aln8_frac / clts[0].nseg;
-    if (clts[0].aln16_frac > 0) clts[0].aln16_frac = clts[0].aln16_frac / clts[0].nseg;
+void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg) {
+    if (clts[0].aln1_frac > 0) clts[0].aln1_frac = clts[0].aln1_frac / nseg;
+    if (clts[0].aln2_frac > 0) clts[0].aln2_frac = clts[0].aln2_frac / nseg;
+    if (clts[0].aln4_frac > 0) clts[0].aln4_frac = clts[0].aln4_frac / nseg;
+    if (clts[0].aln8_frac > 0) clts[0].aln8_frac = clts[0].aln8_frac / nseg;
+    if (clts[0].aln16_frac > 0) clts[0].aln16_frac = clts[0].aln16_frac / nseg;
 }
 
 
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, int minovh) {
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh) {
     // compute cluster location flag
     clt_loc_flag(rep_ail, gap_ail, clts);
 
@@ -130,15 +130,15 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
     }
 
     // features computation
-    clts[0].nseg        = nseg;
+    clts[0].nseg        = nseg / coverage;
     clts[0].ntype       = (ntype&1) + ((ntype&2)>>1) + ((ntype&4)>>2);
-    clts[0].entropy     = clt_entropy(nL, nM, nR, clts[0].nseg);
+    clts[0].entropy     = clt_entropy(nL, nM, nR, nseg);
     clts[0].bratio      = (MIN(nL, nR) + 0.01) / (MAX(nL, nR) + 0.01);
-    clts[0].sovh_frac   = clts[0].sovh_frac / clts[0].nseg;
-    clts[0].lmq_frac    = clts[0].lmq_frac / clts[0].nseg;
-    clts[0].dclip_frac  = clts[0].dclip_frac / clts[0].nseg;
-    clts[0].avg_mapq    = clts[0].avg_mapq / clts[0].nseg;
-    clt_dffloc(clts);
+    clts[0].sovh_frac   = clts[0].sovh_frac / nseg;
+    clts[0].lmq_frac    = clts[0].lmq_frac / nseg;
+    clts[0].dclip_frac  = clts[0].dclip_frac / nseg;
+    clts[0].avg_mapq    = clts[0].avg_mapq / nseg;
+    clt_dffloc(clts, nseg);
 
     // features from TE alignment
     if (clts[0].nmap > 0)

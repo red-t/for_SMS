@@ -2,29 +2,6 @@ from .Cluster import build_cluster
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
-cdef float background_div(int N,
-                          Iterator ite):
-    cdef:
-        int n=0, retval
-        float div=0
-    
-    while n < N:
-        retval = ite.cnext2()
-        if retval > 0:
-            if bam_filtered(ite.b):
-                continue
-            
-            div += get_div(ite.b)
-            n += 1
-            continue
-
-        div = div/n
-        return div
-    
-    div = div/n
-    return div
-
-
 cdef background_info(str fpath,
                      int nthreads,
                      int *nchroms,
@@ -32,9 +9,10 @@ cdef background_info(str fpath,
                      float *coverage):
     cdef:
         BamFile rbf = BamFile(fpath, nthreads, "rb")
-        int i, tid=0
+        int i, tid = 0
         int maxlen = 0
     
+    # get the longest chromosome
     for i in range(rbf.hdr.n_targets):
         if maxlen < sam_hdr_tid2len(rbf.hdr, i):
             tid = i
@@ -46,6 +24,7 @@ cdef background_info(str fpath,
         int n = 0, retval
         float div = 0
     
+    # estiamte background divergence & coverage
     while 1:
         retval = ite.cnext1()
         if retval > 0:
@@ -62,10 +41,9 @@ cdef background_info(str fpath,
         coverage[0] = sumlen/maxlen
         del ite; rbf.close(); del rbf
         return
-
-
-
-
+#
+# ---------------------------------------------------------------
+#
 cpdef dict build_cluster_parallel(str fpath,
                                   str rep_path,
                                   str gap_path,
@@ -107,20 +85,26 @@ cpdef dict build_cluster_parallel(str fpath,
     cdef:
         dict result={}, ret
         set futures
-        int nchroms, i
-        float div
-        BamFile bf = BamFile(fpath, nthreads, "rb")
-        Iterator ite = Iterator(bf)
-    
-    # get number of target chromosomes
-    nchroms = bf.hdr.n_targets
-    div = background_div(50000, ite)
-    print("background divergence: ", div)
-    del ite; bf.close(); del bf
+        int tid, nchroms
+        float div, coverage
+
+    # get background information
+    background_info(fpath, nprocess, &nchroms, &div, &coverage)
+    print("background divergence: {}\nestimated coverage: {}".format(div, coverage))
 
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
-        futures = set([executor.submit(build_cluster, fpath, rep_path, gap_path, teref, preset,
-                                       nthreads, i, minl, maxdist, div) for i in range(nchroms)])
+        futures = set([executor.submit(build_cluster,
+                                       fpath,
+                                       rep_path,
+                                       gap_path,
+                                       teref,
+                                       preset,
+                                       nthreads,
+                                       tid,
+                                       minl,
+                                       maxdist,
+                                       div,
+                                       coverage) for tid in range(nchroms)])
         # merge result from each process
         for future in as_completed(futures):
             ret = future.result()
