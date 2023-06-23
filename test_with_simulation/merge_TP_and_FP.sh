@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # extract header
-samtools view -H all_candidates_alignments.bam > header
+samtools view -H $1 > header
 
 
 # merge fp support alignment

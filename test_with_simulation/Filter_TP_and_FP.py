@@ -89,9 +89,9 @@ def tp_filter(segf, tp_dict, fp_dict, oid_id, idxreads, rbf):
     for l in open(segf, "r"):
         l     = l.split()
         chr   = l[0]
-        oid   = l[7]
-        rpos  = int(l[11])
-        qname = l[16]
+        oid   = l[1]
+        rpos  = int(l[2])
+        qname = l[3]
         
         # determine if candidate of segment overlaps with ground truth
         if oid in tp_dict:
@@ -153,9 +153,9 @@ def fp_filter(segf, fp_dict, idxreads, rbf):
     # fetch all support alignments of fp candidates
     for l in open(segf, "r"):
         l     = l.split()
-        oid   = l[7]
-        rpos  = int(l[11])
-        qname = l[16]
+        oid   = l[1]
+        rpos  = int(l[2])
+        qname = l[3]
         if oid in fp_dict:
             fp_dict[oid].add((qname, rpos))
 
