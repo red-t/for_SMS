@@ -10,8 +10,8 @@ do
     samtools view $bam >> tmp.sam
 done
 
-cat header tmp.sam | samtools view -b -o fp_merge.bam -
-samtools sort -o tmp.bam fp_merge.bam && mv tmp.bam fp_merge.bam && samtools index fp_merge.bam && rm tmp.sam
+cat header tmp.sam | samtools view -b -o merge_fp.bam -
+samtools sort -o tmp.bam merge_fp.bam && mv tmp.bam merge_fp.bam && samtools index merge_fp.bam && rm tmp.sam
 
 
 # merge true tp support alignment
@@ -20,8 +20,8 @@ do
     samtools view $bam >> tmp.sam
 done
 
-cat header tmp.sam | samtools view -b -o tp_t_merge.bam -
-samtools sort -o tmp.bam tp_t_merge.bam && mv tmp.bam tp_t_merge.bam && samtools index tp_t_merge.bam && rm tmp.sam
+cat header tmp.sam | samtools view -b -o merge_tp_t.bam -
+samtools sort -o tmp.bam merge_tp_t.bam && mv tmp.bam merge_tp_t.bam && samtools index merge_tp_t.bam && rm tmp.sam
 
 
 # merge false tp support alignment
@@ -30,8 +30,8 @@ do
     samtools view $bam >> tmp.sam
 done
 
-cat header tmp.sam | samtools view -b -o tp_f_merge.bam -
-samtools sort -o tmp.bam tp_f_merge.bam && mv tmp.bam tp_f_merge.bam && samtools index tp_f_merge.bam && rm tmp.sam
+cat header tmp.sam | samtools view -b -o merge_tp_f.bam -
+samtools sort -o tmp.bam merge_tp_f.bam && mv tmp.bam merge_tp_f.bam && samtools index merge_tp_f.bam && rm tmp.sam
 
 if [ -f 'TP_new.bed' ];then
     mv TP_new.bed TP.bed

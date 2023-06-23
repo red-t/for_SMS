@@ -323,7 +323,7 @@ def deep_filter(tp_dict, ins2hg, chr):
                 cmd_idx = ['mv tp_{}.bam tp_t_{}.bam && mv tp_{}.bam.bai tp_t_{}.bam.bai && rm tp_f_{}.bam'.format(oid, oid, oid, oid, oid)]
             elif m == 0:
                 print("all support alignments of {} is false".format(oid))
-                cmd_idx = ['mv tp_{}.bam tp_f_{}.bam && mv tp_{}.bam.bai tp_f_{}.bam.bai && rm tp_t_{}.bam'.format(oid, oid, oid, oid, oid)]
+                cmd_idx = ['mv tp_{}.bam fp_{}.bam && mv tp_{}.bam.bai fp_{}.bam.bai && rm tp_*_{}.bam'.format(oid, oid, oid, oid, oid)]
             else:
                 # print("there are both true & flase support alignments of {}".format(oid))
                 cmd_idx = ['rm tp_{}.bam && rm tp_{}.bam.bai && samtools index tp_t_{}.bam && samtools index tp_f_{}.bam'.format(oid, oid, oid, oid)]
