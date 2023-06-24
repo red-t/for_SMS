@@ -623,7 +623,7 @@ cdef extern from "htslib/hts.h" nogil:
     #     int *a
 
     ctypedef struct hts_itr_t:
-        pass
+        uint64_t curr_off
 
     # hts_idx_t *hts_idx_init(int n, int fmt, uint64_t offset0, int min_shift, int n_lvls)
     void hts_idx_destroy(hts_idx_t *idx)

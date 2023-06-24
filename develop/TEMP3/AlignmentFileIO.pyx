@@ -156,12 +156,11 @@ cdef class Iterator:
         cdef int64_t    offset
 
         with nogil:
-            offset = bgzf_tell(self.htsfile.fp.bgzf)
+            self.offset = self.iter.curr_off
             retval = hts_itr_next(self.htsfile.fp.bgzf,
                                   self.iter,
                                   self.b,
                                   self.htsfile)
-        self.offset = offset
         return retval
     
     cdef int cnext2(self):

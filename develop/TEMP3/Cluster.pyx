@@ -64,10 +64,13 @@ CLUSTER_DTYPE = np.dtype([
 #
 # ---------------------------------------------------------------
 #
-cdef object extract_seg(Iterator ite, int minl):
+cdef object extract_seg(BamFile rbf,
+                        int tid,
+                        int minl):
     cdef:
         int32_t     retval, M, N=0
         seg_dtype_struct[::1]   segs_view
+        Iterator ite = Iterator(rbf, tid)
 
     segs = np.zeros(10000, dtype=SEG_DTYPE)
     template  = np.zeros(10000, dtype=SEG_DTYPE)
@@ -88,7 +91,7 @@ cdef object extract_seg(Iterator ite, int minl):
             N += retval
             continue
 
-        del template
+        del template; del ite
         return segs[:N]
 #
 # ---------------------------------------------------------------
@@ -103,28 +106,35 @@ cdef seg_feat(seg_dtype_struct[::1] segs,
 #
 # ---------------------------------------------------------------
 #
-cdef trim_seg(int tid,
+cdef trim_seg(BamFile rbf,
+              int tid,
               int threads,
-              BamFile rbf,
-              Iterator ite,
               seg_dtype_struct[::1] segs):
     cdef:
         str outpath = "tmp.all_supp_reads.{}.fa".format(tid)
         BamFile wbf = BamFile(outpath, threads, "wF", rbf)
+        Iterator ite = Iterator(rbf, tid)
         bam1_t *dest = bam_init1()
         int i, retval
     
     for i in range(segs.shape[0]):
         if aln_is_second(segs[i].flag):
             continue
-        retval = ite.cnext3(segs[i].offset)
+        
+        if segs[i].offset != 0:
+            retval = ite.cnext3(segs[i].offset)
+        else:
+            del ite
+            ite = Iterator(rbf, tid)
+            retval = ite.cnext1()
+        
         if retval < 0:
             raise StopIteration
         # trim alignment by bam_trim1, and write out
         bam_trim1(ite.b, dest, i, segs[i].qst, segs[i].qed)
         wbf.write(dest)
     
-    bam_destroy1(dest); wbf.close(); del wbf
+    bam_destroy1(dest); wbf.close(); del wbf; del ite
 #
 # ---------------------------------------------------------------
 #
@@ -173,7 +183,9 @@ cdef object extract_tealn(Iterator ite):
 #
 # ---------------------------------------------------------------
 #
-cdef object seg_feat_te(seg_dtype_struct[::1] segs, int tid, int threads):
+cdef object seg_feat_te(seg_dtype_struct[::1] segs,
+                        int tid,
+                        int threads):
     cdef:
         BamFile  rbf = BamFile("tmp.all_supp_reads.{}.bam".format(tid), threads, "rb")
         Iterator ite = Iterator(rbf)
@@ -323,10 +335,9 @@ cpdef dict build_cluster(str fpath,
     cdef:
         object   segs
         BamFile  rbf = BamFile(fpath, threads, "rb")
-        Iterator ite = Iterator(rbf, tid)
     
     # extract segments
-    segs = extract_seg(ite, minl)
+    segs = extract_seg(rbf, tid, minl)
 
     ############################################
     ### 2. compute features for each segment ###
@@ -348,8 +359,8 @@ cpdef dict build_cluster(str fpath,
 
     # trimmed & write out segment sequence
     segs.sort(order='rpos')
-    trim_seg(tid, threads, rbf, ite, segs_view)
-    rbf.close(); del rbf; del ite
+    trim_seg(rbf, tid, threads, segs_view)
+    rbf.close(); del rbf
 
     # align segment sequences to TE CSS
     align_mm2(tid, threads, teref, preset)
