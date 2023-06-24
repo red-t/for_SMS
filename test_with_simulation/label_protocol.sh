@@ -134,4 +134,7 @@ ${PROG_PATH}/merge_TP_and_FP.sh tmp_all_candidates_alignments.bam
 
 ### Clean Up###
 rm fp_*bam* && rm tp_*bam*
-# rm tmp*fa* && rm tmp*bam*
+rm tmp*fa* && rm tmp*bam*
+rm tmp_all_candidates.bed
+rm tmp_all_clt.txt && rm tmp_all_seg.txt
+rm header
