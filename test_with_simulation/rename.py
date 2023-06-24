@@ -4,14 +4,15 @@ from subprocess import Popen, PIPE, STDOUT, DEVNULL
 # rename tp_f_oid.bam --> fp_oid.bam, with oids in nohup.out
 oids = set()
 for l in open("nohup.out", "r"):
-    oid      = l.split()[4]
-    # cmd      = ['mv tp_f_{}.bam fp_{}.bam && mv tp_f_{}.bam.bai fp_{}.bam.bai'.format(oid, oid, oid, oid)]
-    # idx_proc = Popen(cmd, stderr=DEVNULL, shell=True, executable='/bin/bash')
-    # exitcode = idx_proc.wait()
+    if l.startswith('all'):
+        oid      = l.split()[4]
+        # cmd      = ['mv tp_f_{}.bam fp_{}.bam && mv tp_f_{}.bam.bai fp_{}.bam.bai'.format(oid, oid, oid, oid)]
+        # idx_proc = Popen(cmd, stderr=DEVNULL, shell=True, executable='/bin/bash')
+        # exitcode = idx_proc.wait()
 
-    # if exitcode != 0:
-    #     raise Exception("Error: rename for {} failed".format(oid))
-    oids.add(oid)
+        # if exitcode != 0:
+        #     raise Exception("Error: rename for {} failed".format(oid))
+        oids.add(oid)
 
 
 # move record in TP.bed into FP.bed, with record's oid in nohup.out
