@@ -43,6 +43,7 @@ CLUSTER_DTYPE = np.dtype([
     ('ed_idx',      np.int32),
     ('nseg',        np.float32),
     ('strand',      np.uint16),
+    ('single',      np.uint8),
     ('cloc_flag',   np.uint8),
     ('ntype',       np.uint8),
     ('entropy',     np.float32),
@@ -278,7 +279,9 @@ cdef object merge_seg(seg_dtype_struct[::1] segs,
 #
 # ---------------------------------------------------------------
 #
-cdef clt_feat(cluster_dtype_struct[::1] clts,
+cdef clt_feat(BamFile rbf,
+              int tid,
+              cluster_dtype_struct[::1] clts,
               seg_dtype_struct[::1] segs,
               ailist_t *rep_ail,
               ailist_t *gap_ail,
@@ -286,10 +289,14 @@ cdef clt_feat(cluster_dtype_struct[::1] clts,
               float coverage,
               int minovh=100):
     cdef:
-        ssize_t i, j
+        ssize_t i
+        bam1_t *b1 = bam_init1()
+        bam1_t *b2 = bam_init1()
     
     for i in range(clts.shape[0]):
-        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, div, coverage, minovh)
+        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, div, coverage, minovh, tid, rbf.htsfile, rbf.index, b1, b2)
+    
+    bam_destroy1(b1); bam_destroy1(b2)
 #
 # ---------------------------------------------------------------
 #
@@ -360,7 +367,6 @@ cpdef dict build_cluster(str fpath,
     # trimmed & write out segment sequence
     segs.sort(order='rpos')
     trim_seg(rbf, tid, threads, segs_view)
-    rbf.close(); del rbf
 
     # align segment sequences to TE CSS
     align_mm2(tid, threads, teref, preset)
@@ -384,7 +390,8 @@ cpdef dict build_cluster(str fpath,
     cdef cluster_dtype_struct[::1] clts_view = clts
 
     # features computing
-    clt_feat(clts_view, segs_view, rep_ail, gap_ail, div, coverage)
+    clt_feat(rbf, tid, clts_view, segs_view, rep_ail, gap_ail, div, coverage)
+    rbf.close(); del rbf
 
     # free AIList
     ailist_destroy(rep_ail); ailist_destroy(gap_ail)

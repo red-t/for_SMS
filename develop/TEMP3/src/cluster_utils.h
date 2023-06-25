@@ -2,11 +2,15 @@
 #define CLUSTER_UTILS_H
 #include <stdint.h>
 #include <math.h>
+#include "htslib/bgzf.h"
+#include "htslib/hts.h"
+#include "htslib/sam.h"
 #include "seg_utils.h"
 #include "AIList.h"
 //-------------------------------------------------------------------------------------
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
+#define MAX_POS (1 << 31)
 //-------------------------------------------------------------------------------------
 /***********************
  *** Cluster records ***
@@ -50,6 +54,7 @@ typedef struct {
     int32_t     ed_idx;
     float_t     nseg;
     uint16_t    strand;
+    uint8_t     single;
     uint8_t     cloc_flag;
     uint8_t     ntype;
     float_t     entropy;
@@ -105,6 +110,6 @@ void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg);
  * @param gapail    AIList of gaps
  * @param minovh    minimum length of segment overhang
  */
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh);
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh, int tid, htsFile *htsfp, const hts_idx_t *idx, bam1_t *b1, bam1_t *b2);
 
 #endif // CLUSTER_UTILS_H

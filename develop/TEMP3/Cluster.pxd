@@ -12,6 +12,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         int32_t     ed_idx
         float       nseg
         uint16_t    strand
+        uint8_t     single
         uint8_t     cloc_flag
         uint8_t     ntype
         float       entropy
@@ -38,7 +39,12 @@ cdef extern from "src/cluster_utils.h" nogil:
     # @param div        estimated background divergence
     # @param coverage   estimated background coverage
     # @param minovh     minimum length of segment overhang
-    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, float div, float coverage, int minovh)
+    # @param tid        target id
+    # @param htsfp      pointer to the htsFile
+    # @param idx        pointer to the hts_idx_t
+    # @param b1         first bam1_t record
+    # @param b2         second bam1_t record
+    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, float div, float coverage, int minovh, int tid, htsFile *htsfp, const hts_idx_t *idx, bam1_t *b1, bam1_t *b2)
 #
 # ---------------------------------------------------------------
 #

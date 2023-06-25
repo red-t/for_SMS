@@ -41,7 +41,7 @@ void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg) {
 }
 
 
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh) {
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh, int tid, htsFile *htsfp, const hts_idx_t *idx, bam1_t *b1, bam1_t *b2) {
     // compute cluster location flag
     clt_loc_flag(rep_ail, gap_ail, clts);
 
@@ -127,6 +127,41 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
             clts[0].avg_div += div;
         }
         clts[0].nmap += 1;
+    }
+
+    // single support read
+    if (nseg == 1) {
+        clts[0].single = 1;
+    } else if (nseg == 2) {
+        int32_t retval, second = 0;
+        for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
+        {
+            if (segs[j].overhang < minovh) continue;
+            if (second) {
+                if (segs[j].offset) {
+                    retval = bgzf_seek(htsfp->fp.bgzf, segs[j].offset, SEEK_SET);
+                    retval = bam_read1(htsfp->fp.bgzf, b2);
+                } else {
+                    hts_itr_t *iter = sam_itr_queryi(idx, tid, 0, MAX_POS);
+                    retval = hts_itr_next(htsfp->fp.bgzf, iter, b2, htsfp);
+                    sam_itr_destroy(iter);
+                }
+            } else {
+                if (segs[j].offset) {
+                    retval = bgzf_seek(htsfp->fp.bgzf, segs[j].offset, SEEK_SET);
+                    retval = bam_read1(htsfp->fp.bgzf, b1);
+                } else {
+                    hts_itr_t *iter = sam_itr_queryi(idx, tid, 0, MAX_POS);
+                    retval = hts_itr_next(htsfp->fp.bgzf, iter, b1, htsfp);
+                    sam_itr_destroy(iter);
+                }
+                second = 1;
+            }
+        }
+
+        // both segments have the same qname
+        retval = strcmp(bam_get_qname(b1), bam_get_qname(b2));
+        if (retval == 0) clts[0].single = 1;
     }
 
     // features computation
