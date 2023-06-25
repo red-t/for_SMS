@@ -61,7 +61,7 @@ def classification(qbed, rbed):
         ite = tabix.fetch(chrom, start, end, parser=pysam.asTuple())
         while 1:
             try:
-                row = ite.next()
+                row = next(ite)
                 n  += 1
                 # oid <- [tchrom, tstart, tend, tid, nseg, tstrand, ostart, oend, oid, nconsist]
                 oid_id[l[3]]  = [row[0], row[1], row[2], row[3], l[4], row[5], l[1], l[2], l[3], 0]
