@@ -622,7 +622,13 @@ cdef extern from "htslib/hts.h" nogil:
     #     int n, m
     #     int *a
 
+    ctypedef struct hts_pair64_max_t:
+        uint64_t u, v
+        uint64_t max
+
     ctypedef struct hts_itr_t:
+        int n_off
+        hts_pair64_max_t *off
         uint64_t curr_off
 
     # hts_idx_t *hts_idx_init(int n, int fmt, uint64_t offset0, int min_shift, int n_lvls)

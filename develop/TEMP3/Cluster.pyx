@@ -122,16 +122,12 @@ cdef trim_seg(BamFile rbf,
         if aln_is_second(segs[i].flag):
             continue
         
-        if segs[i].offset != 0:
-            retval = ite.cnext3(segs[i].offset)
-        else:
-            del ite
-            ite = Iterator(rbf, tid)
-            retval = ite.cnext1()
-        
+        # read alignment with specified offset
+        retval = ite.cnext3(segs[i].offset)        
         if retval < 0:
             raise StopIteration
-        # trim alignment by bam_trim1, and write out
+
+        # trim alignment & write out
         bam_trim1(ite.b, dest, i, segs[i].qst, segs[i].qed)
         wbf.write(dest)
     

@@ -152,11 +152,17 @@ cdef class Iterator:
 
     cdef int cnext1(self):
         '''cversion of iterator. retval>=0 if success.'''
-        cdef int        retval
-        cdef int64_t    offset
+        cdef int retval
 
         with nogil:
-            self.offset = self.iter.curr_off
+            if self.iter.curr_off == 0:
+                if self.iter.n_off > 0:
+                    self.offset = self.iter.off[0].u
+                else:
+                    self.offset = self.iter.curr_off
+            else:
+                self.offset = self.iter.curr_off
+
             retval = hts_itr_next(self.htsfile.fp.bgzf,
                                   self.iter,
                                   self.b,
