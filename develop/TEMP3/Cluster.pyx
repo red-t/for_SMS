@@ -69,6 +69,7 @@ cdef object extract_seg(BamFile rbf,
     cdef:
         int32_t     retval, M, N=0
         seg_dtype_struct[::1]   segs_view
+        BamFile wbf = BamFile("tmp_candidates_alignments.{}.bam".format(tid), 5, "wb", rbf)
         Iterator ite = Iterator(rbf, tid)
 
     segs = np.zeros(10000, dtype=SEG_DTYPE)
@@ -92,9 +93,11 @@ cdef object extract_seg(BamFile rbf,
             # parse alignment & extract segments
             retval = parse_cigar(ite.b, &segs_view[N], ite.offset, minl)
             N += retval
+            if retval > 0:
+                wbf.write(ite.b)
             continue
 
-        del template; del ite
+        del template; wbf.close(); del wbf; del ite
         return segs[:N]
 #
 # ---------------------------------------------------------------
