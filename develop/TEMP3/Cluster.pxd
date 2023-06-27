@@ -17,7 +17,6 @@ cdef extern from "src/cluster_utils.h" nogil:
         uint8_t     ntype
         float       entropy
         float       bratio
-        float       sovh_frac
         float       lmq_frac
         float       dclip_frac
         float       aln1_frac
@@ -26,7 +25,6 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       aln8_frac
         float       aln16_frac
         float       avg_mapq
-        int16_t     nmap
         float       avg_AS
         float       avg_qfrac
         float       avg_div
@@ -44,7 +42,7 @@ cdef extern from "src/cluster_utils.h" nogil:
     # @param idx        pointer to the hts_idx_t
     # @param b1         first bam1_t record
     # @param b2         second bam1_t record
-    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, float div, float coverage, int minovh, int tid, htsFile *htsfp, const hts_idx_t *idx, bam1_t *b1, bam1_t *b2)
+    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, float div, float coverage, int minovh, int tid, htsFile *htsfp, bam1_t *b1, bam1_t *b2)
 #
 # ---------------------------------------------------------------
 #
@@ -131,6 +129,9 @@ cdef extern from "src/seg_utils.h" nogil:
     # @return    1 if query is secondary or unmapped, 0 if not
     int bam_filtered(bam1_t *b)
 
+    # Get "gap-compressed per-base divergence" of the alignment
+    # @param  b  pointer to an alignment
+    # @return    gap-compressed per-base divergence
     float get_div(bam1_t *b)
 
     # Compute features of a segment record

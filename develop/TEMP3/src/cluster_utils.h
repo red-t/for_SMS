@@ -25,6 +25,10 @@
  @field  strand     the orientation of this insertion
                         1: forward
                         2: reverse
+ @field  single     whether the cluster only have single support read
+                        0: multiple support reads
+                        1: single read & 1 alignment
+                        2: single read & 2 alignments
  @field  cloc_flag  bitwise flag of the cluster location
                         1: at normal region
                         2: at repeat/gap boundary
@@ -32,7 +36,6 @@
  @field  ntype      number of segment types in this cluster
  @field  entropy    entropy computed based on fraction of different segment types
  @field  bratio     balance ratio computed based on number of lef/right-clip segments
- @field  sovh_frac  fraction of segments with short overhang (<100bp)
  @field  lmq_frac   fraction of segments with low mapq (<5)
  @field  dclip_frac fraction of "dual-clip" alignments
  @field  aln1_frac  fraction of segments with loc_flag=1
@@ -41,7 +44,6 @@
  @field  aln8_frac  fraction of segments with loc_flag=8
  @field  aln16_frac fraction of segments with loc_flag=16
  @field  avg_mapq   average mapq of this cluster
- @field  nmap       number of segments mapped to TE (including unmaped)
  @field  avg_AS     average per base alignment score
  @field  avg_qfrac  average query aligned fraction
  @field  avg_div    average per base divergence (normalized by estimated background divergence)
@@ -58,7 +60,6 @@ typedef struct {
     uint8_t     ntype;
     float_t     entropy;
     float_t     bratio;
-    float_t     sovh_frac;
     float_t     lmq_frac;
     float_t     dclip_frac;
     float_t     aln1_frac;
@@ -67,7 +68,6 @@ typedef struct {
     float_t     aln8_frac;
     float_t     aln16_frac;
     float_t     avg_mapq;
-    int16_t     nmap;
     float_t     avg_AS;
     float_t     avg_qfrac;
     float_t     avg_div;
@@ -109,6 +109,6 @@ void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg);
  * @param gapail    AIList of gaps
  * @param minovh    minimum length of segment overhang
  */
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh, int tid, htsFile *htsfp, const hts_idx_t *idx, bam1_t *b1, bam1_t *b2);
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh, int tid, htsFile *htsfp, bam1_t *b1, bam1_t *b2);
 
 #endif // CLUSTER_UTILS_H

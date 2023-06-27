@@ -48,7 +48,6 @@ CLUSTER_DTYPE = np.dtype([
     ('ntype',       np.uint8),
     ('entropy',     np.float32),
     ('bratio',      np.float32),
-    ('sovh_frac',   np.float32),
     ('lmq_frac',    np.float32),
     ('dclip_frac',  np.float32),
     ('aln1_frac',   np.float32),
@@ -57,7 +56,6 @@ CLUSTER_DTYPE = np.dtype([
     ('aln8_frac',   np.float32),
     ('aln16_frac',  np.float32),
     ('avg_mapq',    np.float32),
-    ('nmap',        np.int16),
     ('avg_AS',      np.float32),
     ('avg_qfrac',   np.float32),
     ('avg_div',     np.float32),
@@ -81,13 +79,17 @@ cdef object extract_seg(BamFile rbf,
     while 1:
         retval = ite.cnext1()
         if retval > 0:
-            if ite.b.core.n_cigar == 0:
+            # ignore unmapped & secondary alignments
+            if bam_filtered(ite.b):
                 continue
+            
+            # expand arrary
             if N > M:
                 segs = np.concatenate((segs, template))
                 segs_view = segs
                 M = segs_view.shape[0] - 20
-
+            
+            # parse alignment & extract segments
             retval = parse_cigar(ite.b, &segs_view[N], ite.offset, minl)
             N += retval
             continue
@@ -119,11 +121,8 @@ cdef trim_seg(BamFile rbf,
         int i, retval
     
     for i in range(segs.shape[0]):
-        if aln_is_second(segs[i].flag):
-            continue
-        
         # read alignment with specified offset
-        retval = ite.cnext3(segs[i].offset)        
+        retval = ite.cnext3(segs[i].offset)
         if retval < 0:
             raise StopIteration
 
@@ -164,13 +163,17 @@ cdef object extract_tealn(Iterator ite):
     while 1:
         retval = ite.cnext2()
         if retval > 0:
+            # ignore unmapped & secondary alignments
             if bam_filtered(ite.b):
                 continue
+            
+            # expand arrary
             if N > M:
                 tealns = np.concatenate((tealns, template))
                 tealns_view = tealns
                 M = tealns_view.shape[0] - 20
 
+            # parse & record alignment
             parse_tealns(ite.b, &tealns_view[N])
             N += 1
             continue
@@ -232,6 +235,7 @@ cdef object merge_seg(seg_dtype_struct[::1] segs,
     M = clts_view.shape[0] - 20 
     
     while i < segs.shape[0]:
+        # expand the array
         if idx > M:
             clts = np.concatenate((clts, template))
             clts_view = clts
@@ -261,8 +265,7 @@ cdef object merge_seg(seg_dtype_struct[::1] segs,
             else:
                 break
         
-        # update cluster's ed, ed_idx, nseg with the last segment
-        # idx-th cluster contains segments in [i,j); nseg = j-i
+        # update cluster's ed, ed_idx, with the last segment
         clts_view[idx].ed     = clts_view[idx].ed - maxdist
         clts_view[idx].ed_idx = j
 
@@ -290,7 +293,7 @@ cdef clt_feat(BamFile rbf,
         bam1_t *b2 = bam_init1()
     
     for i in range(clts.shape[0]):
-        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, div, coverage, minovh, tid, rbf.htsfile, rbf.index, b1, b2)
+        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, div, coverage, minovh, tid, rbf.htsfile, b1, b2)
     
     bam_destroy1(b1); bam_destroy1(b2)
 #

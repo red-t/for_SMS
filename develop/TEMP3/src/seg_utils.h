@@ -220,6 +220,11 @@ void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i);
  */
 #define bam_filtered(b) (((b)->core.flag & BAM_FSECONDARY) != 0 || ((b)->core.flag & BAM_FUNMAP) != 0)
 
+/// Get "gap-compressed per-base divergence" of the alignment
+/*!
+ @param  b  pointer to an alignment
+ @return    gap-compressed per-base divergence
+ */
 #define get_div(b) (bam_aux2f(bam_aux_get((b), "de")))
 
 /// Set alignment record memory policy

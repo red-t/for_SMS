@@ -41,7 +41,7 @@ void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg) {
 }
 
 
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh, int tid, htsFile *htsfp, const hts_idx_t *idx, bam1_t *b1, bam1_t *b2) {
+void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh, int tid, htsFile *htsfp, bam1_t *b1, bam1_t *b2) {
     // compute cluster location flag
     clt_loc_flag(rep_ail, gap_ail, clts);
 
@@ -72,9 +72,6 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
         default:
             break;
         }
-        
-        // short overhang
-        if (segs[j].overhang < 100) clts[0].sovh_frac += 1;
         
         // low mapq
         if (segs[j].mapq < 5) clts[0].lmq_frac += 1;
@@ -110,7 +107,6 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
         nseg += 1;
 
         // features from TE alignment
-        if (aln_is_second(segs[j].flag)) continue;
         if (segs[j].nmap > 0)
         {
             clts[0].avg_AS += segs[j].sumAS / segs[j].nmap;
@@ -126,7 +122,6 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
         {
             clts[0].avg_div += div;
         }
-        clts[0].nmap += 1;
     }
 
     // single support read
@@ -164,25 +159,19 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
     clts[0].ntype       = (ntype&1) + ((ntype&2)>>1) + ((ntype&4)>>2);
     clts[0].entropy     = clt_entropy(nL, nM, nR, nseg);
     clts[0].bratio      = (MIN(nL, nR) + 0.01) / (MAX(nL, nR) + 0.01);
-    clts[0].sovh_frac   = clts[0].sovh_frac / nseg;
     clts[0].lmq_frac    = clts[0].lmq_frac / nseg;
     clts[0].dclip_frac  = clts[0].dclip_frac / nseg;
     clts[0].avg_mapq    = clts[0].avg_mapq / nseg;
     clt_dffloc(clts, nseg);
 
     // features from TE alignment
-    if (clts[0].nmap > 0)
-    {
-        clts[0].avg_AS      = clts[0].avg_AS / clts[0].nmap;
-        clts[0].avg_qfrac   = clts[0].avg_qfrac / clts[0].nmap;
-        clts[0].avg_div     = (clts[0].avg_div / clts[0].nmap) / div;
-        // strand
-        if ((clts[0].strand & 255) > (clts[0].strand >> 8)) {
-            clts[0].strand = 1;
-        } else if ((clts[0].strand & 255) < (clts[0].strand >> 8)) {
-            clts[0].strand = 2;
-        }
-    } else {
-        clts[0].avg_div = 1;
+    clts[0].avg_AS      = clts[0].avg_AS / nseg;
+    clts[0].avg_qfrac   = clts[0].avg_qfrac / nseg;
+    clts[0].avg_div     = (clts[0].avg_div / nseg) / div;
+    // strand
+    if ((clts[0].strand & 255) > (clts[0].strand >> 8)) {
+        clts[0].strand = 1;
+    } else if ((clts[0].strand & 255) < (clts[0].strand >> 8)) {
+        clts[0].strand = 2;
     }
 }

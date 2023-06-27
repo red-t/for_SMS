@@ -18,7 +18,8 @@ int parse_cigar(bam1_t *bam, seg_dtype_struct segs[], int64_t offset, int minl)
 
     // traverse alignment's CIGAR
     for (int i = 0; i < n; i++)
-    {   int len = bam_cigar_oplen(cigar[i]);
+    {
+        int len = bam_cigar_oplen(cigar[i]);
         switch (bam_cigar_op(cigar[i]))
         {
         // match
