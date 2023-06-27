@@ -299,6 +299,72 @@ cdef clt_feat(BamFile rbf,
 #
 # ---------------------------------------------------------------
 #
+cdef out_put(int tid,
+             BamFile rbf,
+             object clts,
+             seg_dtype_struct[::1] segs,
+             int minovh=200):
+    cdef:
+        Iterator ite = Iterator(rbf, tid)
+        bytes bchr = sam_hdr_tid2name(rbf.hdr, tid), bqname
+        str cid, chrom = bchr.decode()
+        list a
+        int i, j
+
+
+    clt_output = open('tmp_clt_{}.txt'.format(tid), 'w')
+    seg_output = open('tmp_seg_{}.txt'.format(tid), 'w')
+
+    for i in range(clts.shape[0]):
+        ### output clt ###
+        a = list(clts[i])
+
+        # strand
+        if a[5] == 1:
+            a.insert(2, '+')
+        elif a[5] == 2:
+            a.insert(2, '-')
+        else:
+            a.insert(2, '*')
+        
+        # normalized nseg
+        a.insert(2, a[5])
+
+        # cluster id
+        cid = str(tid) + '-' + str(i)
+        a.insert(2, cid)
+        
+        # chromosome
+        a.insert(0, chrom)
+
+        # write out clt
+        a = [str(x) for x in a]
+        clt_output.write('\t'.join(a) + '\n')
+
+        ### output seg ###
+        for j in range(clts[i]['st_idx'], clts[i]['ed_idx']):
+            if segs[j].overhang < minovh:
+                continue
+
+            # chromosome & cluster id
+            a = [chrom, cid]
+
+            # refst
+            a.append(str(segs[j].refst))
+
+            # qname
+            ite.cnext3(segs[j].offset)
+
+            bqname = bam_get_qname(ite.b)
+            a.append(bqname.decode())
+
+            # write out seg
+            seg_output.write('\t'.join(a) + '\n')
+    
+    clt_output.close(); seg_output.close(); del ite
+#
+# ---------------------------------------------------------------
+#
 cpdef dict build_cluster(str fpath,
                          str rep_path,
                          str gap_path,
@@ -390,6 +456,9 @@ cpdef dict build_cluster(str fpath,
 
     # features computing
     clt_feat(rbf, tid, clts_view, segs_view, rep_ail, gap_ail, div, coverage)
+
+    # output
+    out_put(tid, rbf, clts, segs_view)
     rbf.close(); del rbf
 
     # free AIList
