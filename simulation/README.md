@@ -27,6 +27,7 @@ HG02716_template_h1.fa.fai		# index of it
 HG02716_template_h2.fa			# simulated haplotype 2 template genome
 HG02716_template_h2.fa.fai		# index of it
 ```
+(后续可能只需要使用 female 的 haplotype 1 作为 template genome)
 
 #### For Fruitfly:
 Run script `build_template_genome_unphased.sh` to build template genome, for example, with dm3:
@@ -48,15 +49,12 @@ line_28_template.fa.fai    # the index of it
 
 Based on the **"template genome"** build at step1, here we will build **"population genome"** for each chromosomes and generate NGS and TGS from it.
 
-Make sure you have the path of the executable program `samtools` in your environment variable `PATH`
-
-You have to edit 2 lines in script `simulation_protocol.sh` to enable activating conda enviroment with **python 2.7** (if you want to run this script)
+Make sure you have these dependencies:
 ```
-# line 193:
-source /data/tusers/zhongrenhu/Software/anaconda3/etc/profile.d/conda.sh --> source path_of_your_anaconda/etc/profile.d/conda.sh
-
-# line 248:
-conda activate python2 --> conda activate name_of_python27_conda_env
+1. samtools
+2. scipy
+3. pysam
+4. cython
 ```
 
 Then, run script `simulation_protocol.sh`:

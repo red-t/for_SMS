@@ -190,7 +190,7 @@ echo -e "ERR_FRAC:\t${ERR_FRAC}"
 
 
 ### Variables Declaration ###
-source /data/tusers/zhongrenhu/Software/anaconda3/etc/profile.d/conda.sh
+# source /data/tusers/zhongrenhu/Software/anaconda3/etc/profile.d/conda.sh
 prog_path=`readlink -f $0` && prog_path=`dirname $prog_path`
 
 
@@ -245,7 +245,6 @@ done
 
 
 ### Build Population Genome & Generate 50X NGS, 3GS data ###
-conda activate python2
 for((i=0; i<$contigs_count; i++))
 do
     if [ -f ${contigs[$i]}/${contigs[$i]}.0.pgd ]; then
@@ -258,17 +257,18 @@ do
             # build population geneome
             echo -e "[ Build ${j}th sub population genome of ${contigs[$i]} ]"
             if [ ! -f ${contigs[$i]}.$j.fa ]; then
-                python $prog_path/simulate/build-population-genome.py --pgd ${contigs[$i]}.$j.pgd --te-seqs $TE_FA --chassis ${contigs[$i]}.tmp.chasis.fasta --output ${contigs[$i]}.$j.fa --ins-seq ${contigs[$i]}.ins.sequence --sub_idx $j --sub_size $SUB_POP_SIZE
+                # python $prog_path/simulate/build-population-genome.py --pgd ${contigs[$i]}.$j.pgd --te-seqs $TE_FA --chassis ${contigs[$i]}.tmp.chasis.fasta --output ${contigs[$i]}.$j.fa --ins-seq ${contigs[$i]}.ins.sequence --sub_idx $j --sub_size $SUB_POP_SIZE
+                python $prog_path/build-population-genome.py --pgd ${contigs[$i]}.$j.pgd --te-seqs $TE_FA --chassis ${contigs[$i]}.tmp.chasis.fasta --output ${contigs[$i]}.$j.fa --ins-seq "" --sub_idx $j --sub_size $SUB_POP_SIZE
             fi
             # generate 50X NGS
             echo -e "[ Generate NGS data from ${j}th sub population genome of ${contigs[$i]} ]"
             if [ ! -f ${contigs[$i]}.${j}_2.fastq ]; then
-                python $prog_path/simulate/read_pool-seq_illumina-PE.py --pg ${contigs[$i]}.$j.fa --read-length $NGS_LEN --inner-distance $NGS_INNER --std-dev $NGS_STD --error-rate $NGS_ERR --reads $NGS_READS --fastq1 ${contigs[$i]}.${j}_1.fastq --fastq2 ${contigs[$i]}.${j}_2.fastq
+                python $prog_path/read_pool-seq_illumina-PE.py --pg ${contigs[$i]}.$j.fa --read-length $NGS_LEN --inner-distance $NGS_INNER --std-dev $NGS_STD --error-rate $NGS_ERR --reads $NGS_READS --fastq1 ${contigs[$i]}.${j}_1.fastq --fastq2 ${contigs[$i]}.${j}_2.fastq
             fi
             # generate 50X TGS
             echo -e "[ Generate TGS data from ${j}th sub population genome of ${contigs[$i]} ]"
             if [ ! -f ${contigs[$i]}.${j}_pacbio.fasta ]; then
-                python $prog_path/simulate/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --tgs-alpha $TGS_ALPHA --tgs-loc $TGS_LOC --tgs-beta $TGS_BETA --error-rate $TGS_ERR --error-fraction $ERR_FRAC --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
+                python $prog_path/read_pool-seq_pacbio.py --pg ${contigs[$i]}.$j.fa --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --read-length $TGS_MEANL --tgs-alpha $TGS_ALPHA --tgs-loc $TGS_LOC --tgs-beta $TGS_BETA --error-rate $TGS_ERR --error-fraction $ERR_FRAC --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta
             fi
             # remove intermediate sub-population genome
             rm ${contigs[$i]}.$j.fa
