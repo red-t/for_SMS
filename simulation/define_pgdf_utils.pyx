@@ -23,8 +23,8 @@ cpdef define_nest_ins(dict idx2te, int nte, int parent_te_len, int parent_trunc_
         str te_id
         int ccs_idx, te_len
     if te_type == "s":
-        ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
-        # ccs_idx = random.choice([1, 2, 3]) # for human
+        # ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
+        ccs_idx = random.choice([1, 2, 3, 4]) # for human
     else:
         ccs_idx = random.randint(1, nte)
     te_id = idx2te[ccs_idx][0]
@@ -84,8 +84,8 @@ cpdef define_ins(int idx, dict idx2te, int nte, str te_type="g", float d_rate=0)
         str te_id
         int ccs_idx, te_len
     if te_type == "s":
-        ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
-        # ccs_idx = random.choice([1, 2, 3]) # for human
+        # ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
+        ccs_idx = random.choice([1, 2, 3, 4]) # for human
     else:
         ccs_idx = random.randint(1, nte)
     te_id = idx2te[ccs_idx][0]
@@ -202,8 +202,8 @@ cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindi
         dist = random.randint(mindist, maxdist)
         counter += dist # in other words, "pos"
         if i in germline_pos:
-            popfreq = random.uniform(0.1, 1) # for fly
-            # popfreq = random.choice((0.5, 1)) # for human
+            # popfreq = random.uniform(0.1, 1) # for fly
+            popfreq = random.choice((0.5, 1)) # for human
             count_te = int(popfreq * popsize)
         else:
             popfreq = float(1) / popsize

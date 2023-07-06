@@ -285,6 +285,9 @@ rm */*fast*
 
 
 # simulation_protocol.sh -d ./ -r line_28_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon_for_simulaTE.fa -N 10000 -R 0 --sub-N 50 --germline-count 500 --avg-somatic-count 20 --min-distance 500 --depth 50
+# simulation_protocol.sh -d ./ -r HG02716_template_h1.fa -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38.transposon.fa -N 1000 -R 0 --sub-N 20 --germline-count 3000 --avg-somatic-count 20 --min-distance 120000 --depth 50
+# simulation_protocol.sh -d ./ -r HG02716_template_h2.fa -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38.transposon.fa -N 100 -R 0 --sub-N 5 --germline-count 3000 --avg-somatic-count 20 --min-distance 120000 --depth 50
+# simulation_protocol.sh -d ./ -r HG02716_template_h1.fa -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38.transposon.fa -N 100 -R 0 --sub-N 5 --germline-count 0 --avg-somatic-count 1000 --min-distance 25000 --depth 5
 
 # for((i=0; i<$contigs_count; i++))
 # do
