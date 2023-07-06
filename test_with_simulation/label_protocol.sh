@@ -14,12 +14,13 @@ function help_info(){
     echo -e "\t-l <minl>"
     echo -e "\t-L <maxdist>"
     echo -e "\t-G <path> path of TEMP3.py"
+    echo -e "\t-s <subsize> size of sub-population genome"
     echo -e "\t-h \tShow this information"
 }
 
 
 ######## Getting Parameters ########
-ARGS=`getopt -o b:d:r:g:T:x:p:t:l:L:G:h -n "$0" -- "$@"`
+ARGS=`getopt -o b:d:r:g:T:x:p:t:l:L:G:s:h -n "$0" -- "$@"`
 if [ $? != 0 ]; then
     echo "Terminating..."
     exit 1
@@ -74,6 +75,10 @@ do
             TEMP3_PATH=$2
             shift 2
             ;;
+        -s)
+            SUBSIZE=$2
+            shift 2
+            ;;
         --)
             shift
             break
@@ -92,6 +97,8 @@ do
 done
 
 
+
+[ -z $SUBSIZE ] && SUBSIZE=50
 ### Checking Parameters ###
 echo -e "label_protocol.sh parameters:"
 echo -e "BAM:\t${BAM}"
@@ -105,6 +112,7 @@ echo -e "NTHREADS:\t${NTHREADS}"
 echo -e "MINL:\t${MINL}"
 echo -e "MAXDIST:\t${MAXDIST}"
 echo -e "TEMP3_PATH:\t${TEMP3_PATH}"
+echo -e "SUBSIZE:\t${SUBSIZE}"
 
 
 ### Generate All Candidates ###
@@ -127,7 +135,7 @@ rm tmp.sam && rm tmp_candidates_alignments*bam && rm header
 
 ### Filtering ###
 cut -f 1-6 ${WORK_DIR}/*/*ins.summary > AllIns.bed && bgzip AllIns.bed && tabix AllIns.bed.gz
-python ${PROG_PATH}/Filter_TP_and_FP.py --workdir ${WORK_DIR} --bam tmp_all_candidates_alignments.bam --qbed tmp_all_candidates.bed --rbed AllIns.bed.gz --segf tmp_all_seg.txt
+python ${PROG_PATH}/Filter_TP_and_FP.py --workdir ${WORK_DIR} --bam tmp_all_candidates_alignments.bam --qbed tmp_all_candidates.bed --rbed AllIns.bed.gz --segf tmp_all_seg.txt --subsize ${SUBSIZE}
 python ${PROG_PATH}/rename.py
 ${PROG_PATH}/merge_TP_and_FP.sh tmp_all_candidates_alignments.bam
 

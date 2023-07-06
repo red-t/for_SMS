@@ -1,15 +1,17 @@
 import glob
 from subprocess import Popen, PIPE, STDOUT, DEVNULL
 
-### rename tp_f_oid.bam --> fp_oid.bam, with oids in nohup.out ###
+### rename tp_f_oid.bam --> fp_oid.bam, with oids in log.txt ###
 oids = set()
-for l in open("nohup.out", "r"):
-    if l.startswith('all'):
-        oid = l.split()[4]
-        oids.add(oid)
+try:
+    for l in open("log.txt", "r"):
+        if l.startswith('all'):
+            oid = l.split()[4]
+            oids.add(oid)
+except:
+    print("no log.txt")
 
-
-### move record in TP.bed into FP.bed, with record's oid in nohup.out ###
+### move record in TP.bed into FP.bed, with record's oid in log.txt ###
 tpnew = open("TP_new.bed", "w")
 fp    = open("FP.bed", "a")
 

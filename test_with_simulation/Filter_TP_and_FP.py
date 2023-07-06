@@ -12,6 +12,7 @@ def get_parser():
     parser.add_argument("--qbed", type=str, dest="qbed", default="./all_candidates.bed", help="path to the insertion candidates BED file.")
     parser.add_argument("--rbed", type=str, dest="rbed", default="./AllIns.bed.gz", help="path to the simulated insertion information BED file, with tabix index.")
     parser.add_argument("--segf", type=str, dest="segf", default="./all_candidates_segments.txt", help="file of candidates segments information.")
+    parser.add_argument("--subsize", type=int, dest="subsize", default=50, help="size of sub population genome")
     return parser
 
 # ---------------------------------------------------------------
@@ -275,6 +276,7 @@ def deep_filter(tp_dict, ins2hg, chr):
     ins2hg: dict
         a dictionary, insertion_ID <-- {hgx, hgy, hgz, ...}
     '''
+    logf = open('log.txt', 'a')
     for id in tp_dict:
         insl = tp_dict[id]
         for ins in insl:
@@ -322,7 +324,7 @@ def deep_filter(tp_dict, ins2hg, chr):
                 # print("all support alignments of {} is true".format(oid))
                 cmd_idx = ['mv tp_{}.bam tp_t_{}.bam && mv tp_{}.bam.bai tp_t_{}.bam.bai && rm tp_f_{}.bam'.format(oid, oid, oid, oid, oid)]
             elif m == 0:
-                print("all support alignments of {} is false".format(oid))
+                print("all support alignments of {} is false".format(oid), file=logf)
                 cmd_idx = ['mv tp_{}.bam fp_{}.bam && mv tp_{}.bam.bai fp_{}.bam.bai && rm tp_*_{}.bam'.format(oid, oid, oid, oid, oid)]
             else:
                 # print("there are both true & flase support alignments of {}".format(oid))
@@ -332,6 +334,8 @@ def deep_filter(tp_dict, ins2hg, chr):
             exitcode = idx_proc.wait()
             if exitcode != 0:
                 raise Exception("Error: samtools index for {} failed".format(oid))
+    
+    logf.close()
 
 # ---------------------------------------------------------------
 
@@ -370,7 +374,7 @@ if __name__ == '__main__':
         # fill ins2hg with pgd files
         pgdfs = glob.glob("{0}/{1}/*pgd".format(args.workdir, chr))
         for pgdf in pgdfs:
-            find_target_hg(pgdf, tp_dict, ins2hg)
+            find_target_hg(pgdf, tp_dict, ins2hg, args.subsize)
         
         # perform deep filteration
         deep_filter(tp_dict, ins2hg, chr)
