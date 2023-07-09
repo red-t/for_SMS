@@ -58,8 +58,16 @@ def classification(qbed, rbed):
         
         if start < 0:
             start = 0
+        
+        # for GRCh38 somatic insertions
+        try:
+            ite = tabix.fetch(chrom, start, end, parser=pysam.asTuple())
+        except ValueError:
+            fp_outf.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                          chrom, l[1], l[2], l[3], l[4], '*'))
+            fp_dict[l[3]] = set()
+            continue
 
-        ite = tabix.fetch(chrom, start, end, parser=pysam.asTuple())
         while 1:
             try:
                 row = next(ite)

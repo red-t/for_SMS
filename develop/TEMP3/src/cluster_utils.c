@@ -147,7 +147,7 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
         }
         // both segments have the same qname
         retval = strcmp(bam_get_qname(b1), bam_get_qname(b2));
-        if (retval == 0) clts[0].single = 1;
+        if (retval == 0) clts[0].single = 2;
         break;
         
     default:

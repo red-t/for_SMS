@@ -25,6 +25,8 @@ def parse_args():
                                  help='minimun segment length, cigar operation with length < minl will not be used to create insert segment.', default=50)
     parser.add_argument('-L', '--maxdist', dest='maxdist', type=int,
                                  help='max merging distance, segments with distance larger than maxdist will not be merged in to the same cluster.', default=50)
+    parser.add_argument('-i', '--reftid', dest='reftid', type=int,
+                                 help='specify a tid, which will be used to estimate background information', default=0)
     
     args = parser.parse_args()
     return args
@@ -43,7 +45,8 @@ if __name__ == '__main__':
                                              args.nprocess,
                                              args.nthreads,
                                              args.minl,
-                                             args.maxdist)
+                                             args.maxdist,
+                                             args.reftid)
     
     # next
     print("当前版本构建的 clusters 总数:")

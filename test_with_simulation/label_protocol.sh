@@ -15,12 +15,13 @@ function help_info(){
     echo -e "\t-L <maxdist>"
     echo -e "\t-G <path> path of TEMP3.py"
     echo -e "\t-s <subsize> size of sub-population genome"
+    echo -e "\t-i <reftid> specify a tid, which will be used to estimate background information"
     echo -e "\t-h \tShow this information"
 }
 
 
 ######## Getting Parameters ########
-ARGS=`getopt -o b:d:r:g:T:x:p:t:l:L:G:s:h -n "$0" -- "$@"`
+ARGS=`getopt -o b:d:r:g:T:x:p:t:l:L:G:s:i:h -n "$0" -- "$@"`
 if [ $? != 0 ]; then
     echo "Terminating..."
     exit 1
@@ -79,6 +80,10 @@ do
             SUBSIZE=$2
             shift 2
             ;;
+        -i)
+            REFTID=$2
+            shift 2
+            ;;
         --)
             shift
             break
@@ -99,6 +104,7 @@ done
 
 
 [ -z $SUBSIZE ] && SUBSIZE=50
+[ -z $REFTID ] && REFTID=0
 ### Checking Parameters ###
 echo -e "label_protocol.sh parameters:"
 echo -e "BAM:\t${BAM}"
@@ -117,7 +123,7 @@ echo -e "SUBSIZE:\t${SUBSIZE}"
 
 ### Generate All Candidates ###
 PROG_PATH=`readlink -f $0` && PROG_PATH=`dirname ${PROG_PATH}`
-python ${PROG_PATH}/../develop/TEMP3.py -b ${BAM} -r ${REPEAT} -g ${GAP} -T ${TE} -p ${NPROCESS} -t ${NTHREADS} -l ${MINL}
+python ${PROG_PATH}/../develop/TEMP3.py -b ${BAM} -r ${REPEAT} -g ${GAP} -T ${TE} -p ${NPROCESS} -t ${NTHREADS} -l ${MINL} -i ${REFTID}
 
 # merge candidate clusters & segments
 cat tmp_clt_*txt > tmp_all_clt.txt && cut -f 1-6 tmp_all_clt.txt > tmp_all_candidates.bed && rm tmp_clt_*txt

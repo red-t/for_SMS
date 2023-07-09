@@ -6,17 +6,21 @@ cdef background_info(str fpath,
                      int nthreads,
                      int *nchroms,
                      float *bdiv,
-                     float *coverage):
+                     float *coverage,
+                     int tid = 0):
     cdef:
         BamFile rbf = BamFile(fpath, nthreads, "rb")
-        int i, tid = 0
+        int i
         int maxlen = 0
     
     # get the longest chromosome
-    for i in range(rbf.hdr.n_targets):
-        if maxlen < sam_hdr_tid2len(rbf.hdr, i):
-            tid = i
-            maxlen = sam_hdr_tid2len(rbf.hdr, i)
+    if tid:
+        maxlen = sam_hdr_tid2len(rbf.hdr, tid)
+    else:
+        for i in range(rbf.hdr.n_targets):
+            if maxlen < sam_hdr_tid2len(rbf.hdr, i):
+                tid = i
+                maxlen = sam_hdr_tid2len(rbf.hdr, i)
 
     cdef:
         Iterator ite = Iterator(rbf, tid)
@@ -52,7 +56,8 @@ cpdef dict build_cluster_parallel(str fpath,
                                   int nprocess,
                                   int nthreads,
                                   int minl,
-                                  int maxdist):
+                                  int maxdist,
+                                  int reftid):
     '''call build_cluster in parallel
 
     call build_cluster in parallel with multiple process.
@@ -89,7 +94,7 @@ cpdef dict build_cluster_parallel(str fpath,
         float div, coverage
 
     # get background information
-    background_info(fpath, nprocess, &nchroms, &div, &coverage)
+    background_info(fpath, nprocess, &nchroms, &div, &coverage, reftid)
     print("background divergence: {}\nestimated coverage: {}".format(div, coverage))
 
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
