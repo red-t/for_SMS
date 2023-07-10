@@ -121,34 +121,36 @@ echo -e "TEMP3_PATH:\t${TEMP3_PATH}"
 echo -e "SUBSIZE:\t${SUBSIZE}"
 
 
-### Generate All Candidates ###
+
 PROG_PATH=`readlink -f $0` && PROG_PATH=`dirname ${PROG_PATH}`
-python ${PROG_PATH}/../develop/TEMP3.py -b ${BAM} -r ${REPEAT} -g ${GAP} -T ${TE} -p ${NPROCESS} -t ${NTHREADS} -l ${MINL} -i ${REFTID}
+if [ ! -f 'tmp_all_seg.txt' ]; then
+    ### Generate All Candidates ###
+    python ${PROG_PATH}/../develop/TEMP3.py -b ${BAM} -r ${REPEAT} -g ${GAP} -T ${TE} -p ${NPROCESS} -t ${NTHREADS} -l ${MINL} -i ${REFTID}
+    
+    # merge candidate clusters & segments
+    cat tmp_clt_*txt > tmp_all_clt.txt && cut -f 1-6 tmp_all_clt.txt > tmp_all_candidates.bed && rm tmp_clt_*txt
+    cat tmp_seg_*txt > tmp_all_seg.txt && rm tmp_seg_*txt
+    
+    # merge candidate alignments
+    samtools view -H tmp_candidates_alignments.0.bam > header
+    for bam in tmp_candidates_alignments*bam
+    do
+        samtools view -@ ${NTHREADS} ${bam} >> tmp.sam
+    done
+    cat header tmp.sam | samtools view -@ ${NTHREADS} -bhS - | samtools sort -@ ${NTHREADS} -o tmp_all_candidates_alignments.bam - && samtools index tmp_all_candidates_alignments.bam
+    rm tmp.sam && rm tmp_candidates_alignments*bam && rm header
+else
+    ### Filtering ###
+    cut -f 1-6 ${WORK_DIR}/*/*ins.summary > AllIns.bed && bgzip AllIns.bed && tabix AllIns.bed.gz
+    python ${PROG_PATH}/Filter_TP_and_FP.py --workdir ${WORK_DIR} --bam tmp_all_candidates_alignments.bam --qbed tmp_all_candidates.bed --rbed AllIns.bed.gz --segf tmp_all_seg.txt --subsize ${SUBSIZE}
+    python ${PROG_PATH}/rename.py
+    ${PROG_PATH}/merge_TP_and_FP.sh tmp_all_candidates_alignments.bam
 
-# merge candidate clusters & segments
-cat tmp_clt_*txt > tmp_all_clt.txt && cut -f 1-6 tmp_all_clt.txt > tmp_all_candidates.bed && rm tmp_clt_*txt
-cat tmp_seg_*txt > tmp_all_seg.txt && rm tmp_seg_*txt
 
-# merge candidate alignments
-samtools view -H tmp_candidates_alignments.0.bam > header
-for bam in tmp_candidates_alignments*bam
-do
-    samtools view -@ ${NTHREADS} ${bam} >> tmp.sam
-done
-cat header tmp.sam | samtools view -@ ${NTHREADS} -bhS - | samtools sort -@ ${NTHREADS} -o tmp_all_candidates_alignments.bam - && samtools index tmp_all_candidates_alignments.bam
-rm tmp.sam && rm tmp_candidates_alignments*bam && rm header
-
-
-### Filtering ###
-cut -f 1-6 ${WORK_DIR}/*/*ins.summary > AllIns.bed && bgzip AllIns.bed && tabix AllIns.bed.gz
-python ${PROG_PATH}/Filter_TP_and_FP.py --workdir ${WORK_DIR} --bam tmp_all_candidates_alignments.bam --qbed tmp_all_candidates.bed --rbed AllIns.bed.gz --segf tmp_all_seg.txt --subsize ${SUBSIZE}
-python ${PROG_PATH}/rename.py
-${PROG_PATH}/merge_TP_and_FP.sh tmp_all_candidates_alignments.bam
-
-
-### Clean Up###
-rm fp_*bam* && rm tp_*bam*
-rm tmp*fa* && rm tmp*bam*
-rm tmp_all_candidates.bed
-rm tmp_all_clt.txt && rm tmp_all_seg.txt
-rm header
+    ### Clean Up###
+    rm fp_*bam* && rm tp_*bam*
+    rm tmp*fa* && rm tmp*bam*
+    rm tmp_all_candidates.bed
+    rm tmp_all_clt.txt && rm tmp_all_seg.txt
+    rm header
+fi
