@@ -187,8 +187,9 @@ cpdef define_header(str ref_fa, str te_fa, int germline_count, int somatic_count
 cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindist, int maxdist, set germline_pos, list ins_ids):
     cdef:
         int i, j
-        int dist
-        int counter = 1
+        # int dist
+        # int counter = 1
+        int st, ed, pos
         int count_te, count_empty
         float popfreq
         str id, tows, dsl, strand
@@ -199,8 +200,17 @@ cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindi
     summary = open("{0}.ins.summary".format(contig_id), "w")
     # write insertions
     for i in range(ntotal):
-        dist = random.randint(mindist, maxdist)
-        counter += dist # in other words, "pos"
+        if i > 0:
+            st = maxdist * i
+            ed = maxdist * (i+1)
+            if st - pos < mindist:
+                st = pos + mindist
+            pos = random.randint(st, ed)
+        else:
+            pos = random.randint(1, maxdist)
+
+        # dist = random.randint(mindist, maxdist)
+        # counter += dist # in other words, "pos"
         if i in germline_pos:
             # popfreq = random.uniform(0.1, 1) # for fly
             popfreq = random.choice((0.5, 1)) # for human
@@ -213,8 +223,9 @@ cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindi
         toshuf = [id for j in range(count_te)]
         toshuf.extend("*" * count_empty)
         random.shuffle(toshuf)
-        toshuf.insert(0, str(counter))
+        toshuf.insert(0, str(pos))
         tows = " ".join(toshuf)
+
         # write out body
         fout.write(tows+"\n")
 
@@ -222,8 +233,8 @@ cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindi
         dsl = id2dsl[id]
         strand = re.search(r"([+-])", dsl).group(1)
         tsd_len = int(re.search("([\d\.]+)bp$", dsl).group(1))
-        tsd_start = counter - tsd_len + 1
-        summary.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format(contig_id, counter, counter+1, id, dsl, strand, popfreq, tsd_start, counter))
+        tsd_start = pos - tsd_len + 1
+        summary.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format(contig_id, pos, pos+1, id, dsl, strand, popfreq, tsd_start, pos))
     
     fout.close()
     summary.close()
