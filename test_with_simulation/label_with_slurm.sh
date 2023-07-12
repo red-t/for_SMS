@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --time=12:00:00
-#SBATCH --mem=220G
-#SBATCH -c 64
-#SBATCH --array=1-50%5
-#SBATCH --partition=12hours
+#SBATCH --time=4:00:00
+#SBATCH --mem=60G
+#SBATCH -c 24
+#SBATCH --array=1-50%10
+#SBATCH --partition=4hours
 #SBATCH --output=./logs/label-log-%A-%a.out
 
 #########################################
@@ -25,6 +25,10 @@ echo ""
 [ -z $FILELIST ] && FILELIST=/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/dm3/line_21_0/label_filelist
 # [ -z $FILELIST ] && FILELIST=/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/GRCh38/HG02716_S0/label_filelist
 # [ -z $FILELIST ] && FILELIST=/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/GRCh38/HG02716_G0/label_filelist
+
+[ -z $CONTIGS ] && CONTIGS=(`cut -f 1 /data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/dm3/template/line_21/line_21_template.fa.fai`)
+# [ -z $CONTIGS ] && CONTIGS=(`cut -f 1 /data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/GRCh38/template/HG02716_soma/HG02716_template.fa.fai`)
+# [ -z $CONTIGS ] && CONTIGS=(`cut -f 1 /data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/GRCh38/template/HG02716_germ/HG02716_template.fa.fai`)
 
 ### Get parameters from FILELIST ###
 echo "Reading filelist..."
@@ -47,6 +51,9 @@ cd $TMPDIR
 
 ### Copy inputs to temp dir ###
 echo "Copying input file ${BAM} to temp directory..."
+for contig in ${CONTIGS[*]}; do
+    cp -r $WORKDIR/$contig .
+done
 cp -r $OUTPUTDIR .
 cd result_no_secondary && echo "Changing wd: " $(pwd)
 echo "Done."
@@ -64,9 +71,9 @@ conda activate TEMP3
 ### Process the data ###
 ########################
 echo "Labeling for ${BAM}"
-bash /data/tusers.ds/zhongrenhu/for_SMS/bin/demo3/test_with_simulation/label_protocol.sh -b $BAM -d $WORKDIR -r $RMSK -g $GAP -T $TE -p 10 -t 5 -l 100 -s 50
-# bash /data/tusers.ds/zhongrenhu/for_SMS/bin/demo3/test_with_simulation/label_protocol.sh -b $BAM -d $WORKDIR -r $RMSK -g $GAP -T $TE -p 10 -t 5 -l 100 -s 20 -i 19
-# bash /data/tusers.ds/zhongrenhu/for_SMS/bin/demo3/test_with_simulation/label_protocol.sh -b $BAM -d $WORKDIR -r $RMSK -g $GAP -T $TE -p 10 -t 5 -l 100 -s 5
+bash /data/tusers.ds/zhongrenhu/for_SMS/bin/demo3/test_with_simulation/label_protocol.sh -b $BAM -d $TMPDIR -r $RMSK -g $GAP -T $TE -p 10 -t 5 -l 100 -s 50
+# bash /data/tusers.ds/zhongrenhu/for_SMS/bin/demo3/test_with_simulation/label_protocol.sh -b $BAM -d $TMPDIR -r $RMSK -g $GAP -T $TE -p 10 -t 5 -l 100 -s 20 -i 19
+# bash /data/tusers.ds/zhongrenhu/for_SMS/bin/demo3/test_with_simulation/label_protocol.sh -b $BAM -d $TMPDIR -r $RMSK -g $GAP -T $TE -p 10 -t 5 -l 100 -s 5
 echo ""
 
 
