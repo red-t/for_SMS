@@ -213,7 +213,11 @@ cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindi
         # counter += dist # in other words, "pos"
         if i in germline_pos:
             # popfreq = random.uniform(0.1, 1) # for fly
-            popfreq = random.choice((0.5, 1)) # for human
+            popfreq = random.random()
+            if popfreq < 0.3:
+                popfreq = random.uniform(0.1, 1)
+            else:
+                popfreq = random.choice((0.5, 1)) # for human
             count_te = int(popfreq * popsize)
         else:
             popfreq = float(1) / popsize
