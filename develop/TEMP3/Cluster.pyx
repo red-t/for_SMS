@@ -306,6 +306,7 @@ cdef out_put(int tid,
              BamFile rbf,
              object clts,
              seg_dtype_struct[::1] segs,
+             float coverage,
              int minovh=200):
     cdef:
         Iterator ite = Iterator(rbf, tid)
@@ -339,6 +340,9 @@ cdef out_put(int tid,
         
         # chromosome
         a.insert(0, chrom)
+
+        # coverage (depth)
+        a.append(coverage)
 
         # write out clt
         a = [str(x) for x in a]
@@ -461,7 +465,7 @@ cpdef dict build_cluster(str fpath,
     clt_feat(rbf, tid, clts_view, segs_view, rep_ail, gap_ail, div, coverage)
 
     # output
-    out_put(tid, rbf, clts, segs_view)
+    out_put(tid, rbf, clts, segs_view, coverage)
     rbf.close(); del rbf
 
     # free AIList
