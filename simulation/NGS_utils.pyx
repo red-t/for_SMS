@@ -12,7 +12,7 @@ cpdef generate_PE(str pop_gen,
                   float chimera):
     cdef:
         list pgld = get_length_list(pop_gen)
-        PoisonSeqMutator mutator = PoisonSeqMutator(error_rate)
+        NGS_Mutator mutator = NGS_Mutator(error_rate)
         RandomReads randr = RandomReads(nread, pgld)
         FastqPairWriter fqwriter = FastqPairWriter(fq1, fq2)
         int counter = 0

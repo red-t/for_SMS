@@ -1,14 +1,29 @@
 import random
 import math
 
-cdef class PacBioMutator:
-    def __init__(self, float errorrate, str errfrac):
-        frac = errfrac.split(':')
-        self.__er = errorrate
+cdef class TGS_Mutator:
+    def __init__(self, str protocol):
+        # ccs
+        if protocol == "ccs":
+            self.__er = 0.01
+            self.__misf = 0.82
+            self.__delf = 0.91 # mismatch_rate + del_rate
+            pass
+        # clr
+        if protocol == "clr":
+            self.__er = 0.1
+            self.__misf = 0.63
+            self.__delf = 0.76
+            pass
+        # ont
+        if protocol == "ont":
+            self.__er = 0.07
+            self.__misf = 0.73
+            self.__delf = 0.9
+            pass
+
         self.__tr = {'A':['T','C','G'], 'T':['A','C','G'], 'C':['A','T','G'], 'G':['A','T','C'], 'N':['N']}
         self.__ins = ['A','T','C','G']
-        self.__misf = float(frac[0])/100
-        self.__delf = (float(frac[0]) + float(frac[1]))/100
 
     cdef str mutateseq(self, str seq):
         if(self.__er < 0.0000000001):
@@ -38,24 +53,24 @@ cdef class PacBioMutator:
                     lseq[i] = tr[j]
                 # err_f.write('{0}M\n'.format(i/bin_len))
                 # errs[0] += 1
-            elif prob >= self.__misf and prob < self.__delf:
-                # deletion
-                del(lseq[i])
-                # err_f.write('{0}D\n'.format(i/bin_len))
-                # errs[1] += 1
             elif prob >= self.__delf:
                 # insertion
                 j = random.randint(0, 3)
                 lseq.insert(i, self.__ins[j])
                 # err_f.write('{0}I\n'.format(i/bin_len))
                 # errs[2] += 1
+            else:
+                # deletion
+                del(lseq[i])
+                # err_f.write('{0}D\n'.format(i/bin_len))
+                # errs[1] += 1
 
         # err_f.close()
         # return "".join(lseq), errs
         return "".join(lseq)
 
 
-cdef class PoisonSeqMutator:
+cdef class NGS_Mutator:
     def __init__(self, float errorrate):
         self.__er = errorrate
         self.__tr = {'A':['T','C','G'], 'T':['A','C','G'], 'C':['A','T','G'], 'G':['A','T','C'], 'N':['N']}

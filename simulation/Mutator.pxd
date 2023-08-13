@@ -1,4 +1,4 @@
-cdef class PacBioMutator:
+cdef class TGS_Mutator:
     cdef float   __er
     cdef dict    __tr
     cdef list    __ins
@@ -8,7 +8,7 @@ cdef class PacBioMutator:
     cdef str mutateseq(self, str seq)
 
 
-cdef class PoisonSeqMutator:
+cdef class NGS_Mutator:
     cdef float   __er
     cdef dict    __tr
     

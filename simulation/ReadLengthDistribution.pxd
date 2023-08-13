@@ -1,8 +1,6 @@
-cdef class RLDfactory_gamma:
+cdef class RLDfactory:
     cdef float __alpha
     cdef float __loc
-    cdef float __beta
-    cdef int nextl(self)
-
-
-cdef RLDfactory_gamma get_rld_factory(int mean, float alpha, float loc, float beta, str rldfile)
+    cdef float __scale
+    cdef int gamma_nextl(self)
+    cdef int expon_nextl(self)

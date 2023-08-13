@@ -8,7 +8,7 @@ parser.add_argument("--inner-distance", type=int, required=True, dest="inner_dis
 parser.add_argument("--std-dev", type=int, required=True, dest="std_dev", default=None, help="the standard deviation of the inner distance")
 parser.add_argument("--error-rate", type=float, required=False, dest="error_rate", default=0.0, help="the error rate of the reads")
 parser.add_argument("--reads", type=int, required=True, dest="reads", default=None, help="the total number of paired-end reads")
-parser.add_argument("--fraction-chimera", type=float, required=False, dest="chimera", default=0.0, help="fraction of chimeric paired ends; i.e. paired-ends from unrelated positions")
+parser.add_argument("--fraction-chimera", type=float, required=False, dest="chimera", default=0.01, help="fraction of chimeric paired ends; i.e. paired-ends from unrelated positions")
 parser.add_argument("--fastq1", type=str, required=True, dest="fastq1", default=None, help="output fastq file - first read")
 parser.add_argument("--fastq2", type=str, required=True, dest="fastq2", default=None, help="output fastq file - second read")
 args = parser.parse_args()

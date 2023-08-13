@@ -1,17 +1,19 @@
 from fastaIO cimport readAllTuples, rc, get_length_list, FastaWriter
-from Mutator cimport PacBioMutator
+from Mutator cimport TGS_Mutator
 from CoverageGenerator cimport RandomReads
-from ReadLengthDistribution cimport RLDfactory_gamma, get_rld_factory
+from ReadLengthDistribution cimport RLDfactory
 
-cpdef generate_TGS(str pop_gen,
-                   float error_rate,
-                   str err_frac,
+cpdef generate_PACBIO(str pop_gen,
+                      int nread,
+                      int minl,
+                      int maxl,
+                      str outfa,
+                      str protocol)
+
+
+cpdef generate_ONT(str pop_gen,
                    int nread,
-                   int rlen,
-                   float alpha,
-                   float loc,
-                   float beta,
-                   str rldfile,
+                   int minl,
+                   int maxl,
                    str outfa,
-                   int tgs_minl,
-                   int tgs_maxl)
+                   str protocol)

@@ -17,14 +17,16 @@ cpdef set get_germline_pos(int ngermline, int nsomatic):
 #
 #
 #
-cpdef define_nest_ins(dict idx2te, int nte, int parent_te_len, int parent_trunc_len, str te_type, float d_rate):
+cpdef define_nest_ins(dict idx2te, int nte, int parent_te_len, int parent_trunc_len, str te_type, float div_rate, str species):
     # Chose TE id
     cdef:
         str te_id
         int ccs_idx, te_len
     if te_type == "s":
-        # ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
-        ccs_idx = random.choice([1, 2, 3, 4]) # for human
+        if species == "human":
+            ccs_idx = random.choice([1, 2, 3, 4]) # for human
+        if species == "fly":
+            ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
     else:
         ccs_idx = random.randint(1, nte)
     te_id = idx2te[ccs_idx][0]
@@ -65,27 +67,29 @@ cpdef define_nest_ins(dict idx2te, int nte, int parent_te_len, int parent_trunc_
         str nest_id = ""
         str left, right
     if random.random() <= 0.01:
-        nest_id, nest_dsl = define_nest_ins(idx2te, nte, te_len, trunc_len, te_type, d_rate)
+        nest_id, nest_dsl = define_nest_ins(idx2te, nte, te_len, trunc_len, te_type, div_rate, species)
         nest_id = "(" + nest_id + ")"
         nest_dsl = "{" + nest_dsl + "}"
 
     left = "{0}~{1}{2}{3}".format(te_id, trunc_id, l_strand, nest_id)
-    if d_rate > 0:
-        right = "{0}:${1}{2}{3}{4}{5}%{6}bp".format(pos, ccs_idx, trunc_dsl, strand, nest_dsl, d_rate, tsd)
+    if div_rate > 0:
+        right = "{0}:${1}{2}{3}{4}{5}%{6}bp".format(pos, ccs_idx, trunc_dsl, strand, nest_dsl, div_rate, tsd)
     else:
         right = "{0}:${1}{2}{3}{4}{5}bp".format(pos, ccs_idx, trunc_dsl, strand, nest_dsl, tsd)
     return left, right
 #
 #
 #
-cpdef define_ins(int idx, dict idx2te, int nte, str te_type="g", float d_rate=0):
+cpdef define_ins(int idx, dict idx2te, int nte, str te_type, float div_rate, str species):
     # Chose TE id
     cdef:
         str te_id
         int ccs_idx, te_len
     if te_type == "s":
-        # ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
-        ccs_idx = random.choice([1, 2, 3, 4]) # for human
+        if species == "human":
+            ccs_idx = random.choice([1, 2, 3, 4]) # for human
+        if species == "fly":
+            ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
     else:
         ccs_idx = random.randint(1, nte)
     te_id = idx2te[ccs_idx][0]
@@ -122,13 +126,13 @@ cpdef define_ins(int idx, dict idx2te, int nte, str te_type="g", float d_rate=0)
         str nest_id = ""
         str left, right
     if random.random() <= 0.1:
-        nest_id, nest_dsl = define_nest_ins(idx2te, nte, te_len, trunc_len, te_type, d_rate)
+        nest_id, nest_dsl = define_nest_ins(idx2te, nte, te_len, trunc_len, te_type, div_rate, species)
         nest_id = "(" + nest_id + ")"
         nest_dsl = "{" + nest_dsl + "}"
 
     left = "{0}~{1}~{2}{3}{4}".format(idx, te_id, trunc_id, l_strand, nest_id)
-    if d_rate > 0:
-        right = "${0}{1}{2}{3}{4}%{5}bp".format(ccs_idx, trunc_dsl, strand, nest_dsl, d_rate, tsd)
+    if div_rate > 0:
+        right = "${0}{1}{2}{3}{4}%{5}bp".format(ccs_idx, trunc_dsl, strand, nest_dsl, div_rate, tsd)
     else:
         right = "${0}{1}{2}{3}{4}bp".format(ccs_idx, trunc_dsl, strand, nest_dsl, tsd)
 
@@ -136,7 +140,7 @@ cpdef define_ins(int idx, dict idx2te, int nte, str te_type="g", float d_rate=0)
 #
 #
 #
-cpdef define_header(str ref_fa, str te_fa, int germline_count, int somatic_count, set germline_pos, float d_rate):
+cpdef define_header(str ref_fa, str te_fa, int germline_count, int somatic_count, set germline_pos, float div_rate, str species):
     cdef:
         str ref_idx = ref_fa+".fai"
         str te_idx = te_fa+".fai"
@@ -171,9 +175,9 @@ cpdef define_header(str ref_fa, str te_fa, int germline_count, int somatic_count
     fout = open("{0}.tmp.pgd.header".format(contig_id), "a")
     for idx in range(1, ins_count+1):
         if (idx-1) in germline_pos:
-            left, right = define_ins(idx, idx2te, nte, d_rate=d_rate)
+            left, right = define_ins(idx, idx2te, nte, "g", div_rate, species)
         else:
-            left, right = define_ins(idx, idx2te, nte, "s", d_rate=d_rate)
+            left, right = define_ins(idx, idx2te, nte, "s", div_rate, species)
         
         ins_ids.append(left)
         id2dsl[left] = right
@@ -184,11 +188,9 @@ cpdef define_header(str ref_fa, str te_fa, int germline_count, int somatic_count
 #
 #
 #
-cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindist, int maxdist, set germline_pos, list ins_ids):
+cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindist, int maxdist, set germline_pos, list ins_ids, str species):
     cdef:
         int i, j
-        # int dist
-        # int counter = 1
         int st, ed, pos
         int count_te, count_empty
         float popfreq
@@ -200,6 +202,7 @@ cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindi
     summary = open("{0}.ins.summary".format(contig_id), "w")
     # write insertions
     for i in range(ntotal):
+        # position
         if i > 0:
             st = maxdist * i
             ed = maxdist * (i+1)
@@ -209,20 +212,23 @@ cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindi
         else:
             pos = random.randint(1, maxdist)
 
-        # dist = random.randint(mindist, maxdist)
-        # counter += dist # in other words, "pos"
+        # frequency
         if i in germline_pos:
-            # popfreq = random.uniform(0.1, 1) # for fly
-            popfreq = random.random()
-            if popfreq < 0.3:
+            if species == "human":
+                popfreq = random.random()
+                if popfreq < 0.1:
+                    popfreq = random.uniform(0.1, 1)
+                else:
+                    popfreq = random.choice((0.5, 1))
+            if species == "fly":
                 popfreq = random.uniform(0.1, 1)
-            else:
-                popfreq = random.choice((0.5, 1)) # for human
             count_te = int(popfreq * popsize)
         else:
             popfreq = float(1) / popsize
             count_te = 1
         count_empty = popsize - count_te
+
+        # id
         id = ins_ids[i]
         toshuf = [id for j in range(count_te)]
         toshuf.extend("*" * count_empty)
