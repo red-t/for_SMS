@@ -46,7 +46,12 @@
  @field  avg_mapq   average mapq of this cluster
  @field  avg_AS     average per base alignment score
  @field  avg_qfrac  average query aligned fraction
- @field  avg_div    average per base divergence (normalized by estimated background divergence)
+ @field  avg_div    average per-base divergence ((#mismatches + #I + #D) / (#mismatches + #I + #D + #matches))
+ @field  avg_de     average per-base gap-compressed divergence (normalized background)
+ @field  back_div   background div
+ @field  back_de    background de
+ @field  back_depth background depth
+ @field  back_readlen   background read length
  */
 typedef struct {
     int32_t     st;
@@ -71,6 +76,11 @@ typedef struct {
     float_t     avg_AS;
     float_t     avg_qfrac;
     float_t     avg_div;
+    float_t     avg_de;
+    float_t     back_div;
+    float_t     back_de;
+    float_t     back_depth;
+    float_t     back_readlen;
 } __attribute__((packed)) cluster_dtype_struct;
 
 
@@ -90,7 +100,7 @@ void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clt
  * @param nR    number of right-clip segments
  * @param nseg  number of total segments in the cluster
  */
-float_t clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg);
+float_t clt_entropy(int32_t nL, int32_t nM, int32_t nR, int32_t nseg);
 
 
 /// Compute fraction of alignment with different loc_flag.
@@ -98,7 +108,7 @@ float_t clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg);
  * @param clts  address to the cluster record
  * @param nseg  number of segments in the cluster
  */
-void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg);
+void clt_dffloc(cluster_dtype_struct clts[], int32_t nseg);
 
 
 /// Compute features of a cluster record.
@@ -109,6 +119,18 @@ void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg);
  * @param gapail    AIList of gaps
  * @param minovh    minimum length of segment overhang
  */
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh, int tid, htsFile *htsfp, bam1_t *b1, bam1_t *b2);
+void cclt_feat(cluster_dtype_struct clts[],
+               seg_dtype_struct segs[],
+               ailist_t *rep_ail,
+               ailist_t *gap_ail,
+               float_t back_div,
+               float_t back_de,
+               float_t back_depth,
+               float_t back_readlen,
+               int minovh,
+               int tid,
+               htsFile *htsfp,
+               bam1_t *b1,
+               bam1_t *b2);
 
 #endif // CLUSTER_UTILS_H

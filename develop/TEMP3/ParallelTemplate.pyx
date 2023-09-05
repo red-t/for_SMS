@@ -1,3 +1,4 @@
+import numpy as np
 from .Cluster import build_cluster
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -5,44 +6,66 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 cdef background_info(str fpath,
                      int nthreads,
                      int *nchroms,
-                     float *bdiv,
-                     float *coverage,
-                     int tid = 0):
+                     float *back_div,
+                     float *back_de,
+                     float *back_depth,
+                     float *back_readlen):
     cdef:
         BamFile rbf = BamFile(fpath, nthreads, "rb")
-        int i
-        int maxlen = 0
+        int i, tid = 0, maxlen = 0
     
-    # get the longest chromosome
-    if tid:
-        maxlen = sam_hdr_tid2len(rbf.hdr, tid)
-    else:
-        for i in range(rbf.hdr.n_targets):
-            if maxlen < sam_hdr_tid2len(rbf.hdr, i):
-                tid = i
-                maxlen = sam_hdr_tid2len(rbf.hdr, i)
-
+    # Get the longest chromosome
+    for i in range(rbf.hdr.n_targets):
+        if maxlen < sam_hdr_tid2len(rbf.hdr, i):
+            tid = i
+            maxlen = sam_hdr_tid2len(rbf.hdr, i)
+    
     cdef:
         Iterator ite = Iterator(rbf, tid)
-        int64_t sumlen = 0
-        int n = 0, retval
-        float div = 0
-    
-    # estiamte background divergence & coverage
+        int retval, N = 0, M = 499980, alnlen
+        object divs, des, readlens, templatef, templatei
+        float[::1] divs_view
+        float[::1] des_view
+        int[::1] readlens_view
+        float div
+
+    templatef   = np.zeros(500000, dtype=np.float32)
+    templatei   = np.zeros(500000, dtype=np.int32)
+    divs        = np.zeros(500000, dtype=np.float32)
+    des         = np.zeros(500000, dtype=np.float32)
+    readlens    = np.zeros(500000, dtype=np.int32)
+    divs_view       = divs
+    des_view        = des
+    readlens_view   = readlens
+
+    # Estiamte background divergence & coverage & readlen
     while 1:
+        if N > M:
+            divs        = np.concatenate((divs, templatef))
+            des         = np.concatenate((des, templatef))
+            readlens    = np.concatenate((readlens, templatei))
+            divs_view       = divs
+            des_view        = des
+            readlens_view   = readlens
+            M = des.shape[0] - 20
+
         retval = ite.cnext1()
         if retval > 0:
             if bam_filtered(ite.b):
                 continue
             
-            div += get_div(ite.b)
-            sumlen += ite.b.core.l_qseq
-            n += 1
+            get_div(&alnlen, &div, ite.b)
+            divs_view[N]     = div
+            des_view[N]      = get_de(ite.b)
+            readlens_view[N] = ite.b.core.l_qseq
+            N += 1
             continue
 
-        nchroms[0] = rbf.hdr.n_targets
-        bdiv[0] = div/n
-        coverage[0] = sumlen/maxlen
+        nchroms[0]  = rbf.hdr.n_targets
+        back_div[0] = np.mean(divs[:N])
+        back_de[0]  = np.mean(des[:N])
+        back_depth[0]   = np.sum(readlens[:N]) / maxlen
+        back_readlen[0] = np.median(readlens[:N])
         del ite; rbf.close(); del rbf
         return
 #
@@ -58,7 +81,7 @@ cpdef dict build_cluster_parallel(str fpath,
                                   int minl,
                                   int maxdist,
                                   int reftid):
-    '''call build_cluster in parallel
+    '''call  in parallel
 
     call build_cluster in parallel with multiple process.
 
@@ -90,13 +113,12 @@ cpdef dict build_cluster_parallel(str fpath,
     cdef:
         dict result={}, ret
         set futures
-        int tid, nchroms
-        float div, coverage
+        int nchroms
+        float back_div, back_de, back_depth, back_readlen
 
     # get background information
-    background_info(fpath, nprocess, &nchroms, &div, &coverage, reftid)
-    print("background divergence: {}\nestimated coverage: {}".format(div, coverage))
-
+    background_info(fpath, nprocess, &nchroms, &back_div, &back_de, &back_depth, &back_readlen)
+    print("background div: {}\nbackground de: {}\nbackground coverage: {}\nbackground readlen: {}".format(back_div, back_de, back_depth, back_readlen))
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
         futures = set([executor.submit(build_cluster,
                                        fpath,
@@ -108,8 +130,10 @@ cpdef dict build_cluster_parallel(str fpath,
                                        tid,
                                        minl,
                                        maxdist,
-                                       div,
-                                       coverage) for tid in range(nchroms)])
+                                       back_div,
+                                       back_de,
+                                       back_depth,
+                                       back_readlen) for tid in range(nchroms)])
         # merge result from each process
         for future in as_completed(futures):
             ret = future.result()

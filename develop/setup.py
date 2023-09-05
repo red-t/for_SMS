@@ -65,7 +65,7 @@ ext = [
               library_dirs = lib_dirs),
 
     Extension(name = "TEMP3.ParallelTemplate",
-              sources = ["TEMP3/ParallelTemplate.pyx"],
+              sources = ["TEMP3/ParallelTemplate.pyx",  "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c"],
               include_dirs = incl_dirs,
               libraries = ["hts"],
               library_dirs = lib_dirs)

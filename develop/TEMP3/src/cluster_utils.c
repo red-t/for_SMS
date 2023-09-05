@@ -23,7 +23,7 @@ void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clt
 }
 
 
-float_t clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg) {
+float_t clt_entropy(int32_t nL, int32_t nM, int32_t nR, int32_t nseg) {
     float_t entropy = 0;
     if (nL > 0) entropy -= ((float_t)nL/nseg) * log2((float_t)nL/nseg);
     if (nM > 0) entropy -= ((float_t)nM/nseg) * log2((float_t)nM/nseg);
@@ -32,7 +32,7 @@ float_t clt_entropy(int16_t nL, int16_t nM, int16_t nR, int16_t nseg) {
 }
 
 
-void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg) {
+void clt_dffloc(cluster_dtype_struct clts[], int32_t nseg) {
     if (clts[0].aln1_frac > 0) clts[0].aln1_frac = clts[0].aln1_frac / nseg;
     if (clts[0].aln2_frac > 0) clts[0].aln2_frac = clts[0].aln2_frac / nseg;
     if (clts[0].aln4_frac > 0) clts[0].aln4_frac = clts[0].aln4_frac / nseg;
@@ -41,13 +41,25 @@ void clt_dffloc(cluster_dtype_struct clts[], int16_t nseg) {
 }
 
 
-void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail, float_t div, float_t coverage, int minovh, int tid, htsFile *htsfp, bam1_t *b1, bam1_t *b2) {
+void cclt_feat(cluster_dtype_struct clts[],
+               seg_dtype_struct segs[],
+               ailist_t *rep_ail,
+               ailist_t *gap_ail,
+               float_t back_div,
+               float_t back_de,
+               float_t back_depth,
+               float_t back_readlen,
+               int minovh,
+               int tid,
+               htsFile *htsfp,
+               bam1_t *b1,
+               bam1_t *b2) {
     // compute cluster location flag
     clt_loc_flag(rep_ail, gap_ail, clts);
 
     // initilization
     uint8_t ntype=0;
-    int16_t nL=0, nM=0, nR=0, nseg=0;
+    int32_t nL=0, nM=0, nR=0, nseg=0;
     for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
     {
         // ignore segment with short overhang
@@ -112,6 +124,7 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
             clts[0].avg_AS += segs[j].sumAS / segs[j].nmap;
             clts[0].avg_qfrac += (float_t)segs[j].lmap / (segs[j].qed - segs[j].qst);
             clts[0].avg_div += segs[j].sumdiv / segs[j].nmap;
+            clts[0].avg_de += segs[j].sumde / segs[j].nmap;
             // strand
             if ((segs[j].cnst & 255) > (segs[j].cnst >> 8)) {
                 clts[0].strand += 1;
@@ -120,7 +133,8 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
             }
         } else
         {
-            clts[0].avg_div += div;
+            clts[0].avg_div += back_div;
+            clts[0].avg_de += back_de;
         }
     }
 
@@ -154,8 +168,8 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
         break;
     }
 
-    // features computation
-    clts[0].nseg        = nseg / coverage;
+    // Features from genome alignments
+    clts[0].nseg        = nseg / back_depth;
     clts[0].ntype       = (ntype&1) + ((ntype&2)>>1) + ((ntype&4)>>2);
     clts[0].entropy     = clt_entropy(nL, nM, nR, nseg);
     clts[0].bratio      = (MIN(nL, nR) + 0.01) / (MAX(nL, nR) + 0.01);
@@ -164,14 +178,21 @@ void cclt_feat(cluster_dtype_struct clts[], seg_dtype_struct segs[], ailist_t *r
     clts[0].avg_mapq    = clts[0].avg_mapq / nseg;
     clt_dffloc(clts, nseg);
 
-    // features from TE alignment
+    // Features from transposon alignments
     clts[0].avg_AS      = clts[0].avg_AS / nseg;
     clts[0].avg_qfrac   = clts[0].avg_qfrac / nseg;
-    clts[0].avg_div     = (clts[0].avg_div / nseg) / div;
+    clts[0].avg_div     = (clts[0].avg_div / nseg) / back_div;
+    clts[0].avg_de      = (clts[0].avg_de / nseg) / back_de;
     // strand
     if ((clts[0].strand & 255) > (clts[0].strand >> 8)) {
         clts[0].strand = 1;
     } else if ((clts[0].strand & 255) < (clts[0].strand >> 8)) {
         clts[0].strand = 2;
     }
+
+    // Features from background
+    clts[0].back_div = back_div;
+    clts[0].back_de = back_de;
+    clts[0].back_depth = back_depth;
+    clts[0].back_readlen = back_readlen;
 }

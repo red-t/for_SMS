@@ -78,7 +78,8 @@ inline int is_del_or_skip(uint32_t op) {
  @field  nmap       number of alignments mapped to TE
  @field  lmap       summary query length of the TE alignments
  @field  sumAS      summary per base alignment score of the TE alignments
- @field  sumdiv     summary per base divergence("de") of the TE alignments
+ @field  sumdiv     summary per-base divergence of the TE alignments
+ @field  sumde      summary gap-compressed per-base divergence("de") of the TE alignments
  @field  cnst       number of mathced bases of the alignment
  */
 typedef struct {
@@ -101,6 +102,7 @@ typedef struct {
     int32_t     lmap;
     float_t     sumAS;
     float_t     sumdiv;
+    float_t     sumde;
     uint16_t    cnst;
 } __attribute__((packed)) seg_dtype_struct;
 
@@ -111,7 +113,9 @@ typedef struct {
  @field  AS     alignment score
  @field  qst    query start (original orientation)
  @field  qed    query end (original orientation)
- @field  div    per base divergence ("de")
+ @field  alnlen alignment length
+ @field  div    per-base divergence
+ @field  de     gap-compressed per-base divergence ("de")
  @field  flag   bitwise flag of the alignment
  */
 typedef struct {
@@ -119,7 +123,9 @@ typedef struct {
     int32_t AS;
     int32_t qst;
     int32_t qed;
+    int32_t alnlen;
     float_t div;
+    float_t de;
     int16_t flag;
 } __attribute__((packed)) tealn_dtype_struct;
 
@@ -220,12 +226,19 @@ void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i);
  */
 #define bam_filtered(b) (((b)->core.flag & BAM_FSECONDARY) != 0 || ((b)->core.flag & BAM_FUNMAP) != 0)
 
+/// Get "per-base divergence" of the alignment
+/*!
+ @param  b  pointer to an alignment
+ @return    per-base divergence
+ */
+void get_div(int32_t *alnlen, float_t *div, bam1_t *b);
+
 /// Get "gap-compressed per-base divergence" of the alignment
 /*!
  @param  b  pointer to an alignment
  @return    gap-compressed per-base divergence
  */
-#define get_div(b) (bam_aux2f(bam_aux_get((b), "de")))
+#define get_de(b) (bam_aux2f(bam_aux_get((b), "de")))
 
 /// Set alignment record memory policy
 /**

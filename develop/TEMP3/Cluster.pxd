@@ -28,21 +28,39 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       avg_AS
         float       avg_qfrac
         float       avg_div
+        float       avg_de
+        float       back_div
+        float       back_de
+        float       back_depth
+        float       back_readlen
 
     # Compute features of a cluster record
-    # @param clts		address to the cluster record
-    # @param segs       address to the arrary of segments
-    # @param rep_ail	AIList of repeats
-    # @param gap_ail    AIList of gaps
-    # @param div        estimated background divergence
-    # @param coverage   estimated background coverage
-    # @param minovh     minimum length of segment overhang
-    # @param tid        target id
-    # @param htsfp      pointer to the htsFile
-    # @param idx        pointer to the hts_idx_t
-    # @param b1         first bam1_t record
-    # @param b2         second bam1_t record
-    void cclt_feat(cluster_dtype_struct *, seg_dtype_struct *, ailist_t *rep_ail, ailist_t *gap_ail, float div, float coverage, int minovh, int tid, htsFile *htsfp, bam1_t *b1, bam1_t *b2)
+    # @param clts           address to the cluster record
+    # @param segs           address to the arrary of segments
+    # @param rep_ail        AIList of repeats
+    # @param gap_ail        AIList of gaps
+    # @param back_de        estimated background gap-compressed per-base divergence
+    # @param back_depth     estimated background coverage
+    # @param back_readlen   estimated background read length
+    # @param minovh         minimum length of segment overhang
+    # @param tid            target id
+    # @param htsfp          pointer to the htsFile
+    # @param idx            pointer to the hts_idx_t
+    # @param b1             first bam1_t record
+    # @param b2             second bam1_t record
+    void cclt_feat(cluster_dtype_struct *,
+                   seg_dtype_struct *,
+                   ailist_t *rep_ail,
+                   ailist_t *gap_ail,
+                   float back_div,
+                   float back_de,
+                   float back_depth,
+                   float back_readlen,
+                   int minovh,
+                   int tid,
+                   htsFile *htsfp,
+                   bam1_t *b1,
+                   bam1_t *b2)
 #
 # ---------------------------------------------------------------
 #
@@ -76,6 +94,7 @@ cdef extern from "src/seg_utils.h" nogil:
         int32_t     lmap
         float       sumAS
         float       sumdiv
+        float       sumde
         uint16_t    cnst
 
     ctypedef packed struct tealn_dtype_struct:
@@ -83,7 +102,9 @@ cdef extern from "src/seg_utils.h" nogil:
         int32_t AS
         int32_t qst
         int32_t qed
+        int32_t alnlen
         float   div
+        float   de
         int16_t flag
     
     # parse alignment's CIGAR and extract segments.
@@ -129,10 +150,15 @@ cdef extern from "src/seg_utils.h" nogil:
     # @return    1 if query is secondary or unmapped, 0 if not
     int bam_filtered(bam1_t *b)
 
+    # Get "per-base divergence" of the alignment
+    # @param  b  pointer to an alignment
+    # @return    per-base divergence
+    void get_div(int *alnlen, float *div, bam1_t *b)
+    
     # Get "gap-compressed per-base divergence" of the alignment
     # @param  b  pointer to an alignment
     # @return    gap-compressed per-base divergence
-    float get_div(bam1_t *b)
+    float get_de(bam1_t *b)
 
     # Compute features of a segment record
     # @param src   source alignment record     
@@ -192,5 +218,7 @@ cpdef dict build_cluster(str fpath,
                          int tid,
                          int minl,
                          int maxdist,
-                         float div,
-                         float coverage)
+                         float back_div,
+                         float back_de,
+                         float back_depth,
+                         float back_readlen)

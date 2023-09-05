@@ -22,6 +22,7 @@ SEG_DTYPE = np.dtype([
     ('lmap',        np.int32),
     ('sumAS',       np.float32),
     ('sumdiv',      np.float32),
+    ('sumde',       np.float32),
     ('cnst',        np.uint16),
 ])
 
@@ -31,7 +32,9 @@ TEALN_DTYPE = np.dtype([
     ('AS',      np.int32),
     ('qst',     np.int32),
     ('qed',     np.int32),
+    ('alnlen',  np.int32),
     ('div',     np.float32),
+    ('de',      np.float32),
     ('flag',    np.int16),
 ])
 
@@ -59,6 +62,11 @@ CLUSTER_DTYPE = np.dtype([
     ('avg_AS',      np.float32),
     ('avg_qfrac',   np.float32),
     ('avg_div',     np.float32),
+    ('avg_de',      np.float32),
+    ('back_div',    np.float32),
+    ('back_de',     np.float32),
+    ('back_depth',      np.float32),
+    ('back_readlen',    np.float32),
 ])
 #
 # ---------------------------------------------------------------
@@ -212,7 +220,7 @@ cdef object seg_feat_te(seg_dtype_struct[::1] segs,
 #
 cdef object merge_seg(seg_dtype_struct[::1] segs,
                       int maxdist,
-                      int minovh=100):
+                      int minovh=200):
     '''merge overlapped segments into cluster
     
     Parameters:
@@ -287,16 +295,30 @@ cdef clt_feat(BamFile rbf,
               seg_dtype_struct[::1] segs,
               ailist_t *rep_ail,
               ailist_t *gap_ail,
-              float div,
-              float coverage,
-              int minovh=100):
+              float back_div,
+              float back_de,
+              float back_depth,
+              float back_readlen,
+              int minovh=200):
     cdef:
         ssize_t i
         bam1_t *b1 = bam_init1()
         bam1_t *b2 = bam_init1()
     
     for i in range(clts.shape[0]):
-        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, div, coverage, minovh, tid, rbf.htsfile, b1, b2)
+        cclt_feat(&clts[i],
+                  &segs[0],
+                  rep_ail,
+                  gap_ail,
+                  back_div,
+                  back_de,
+                  back_depth,
+                  back_readlen,
+                  minovh,
+                  tid,
+                  rbf.htsfile,
+                  b1,
+                  b2)
     
     bam_destroy1(b1); bam_destroy1(b2)
 #
@@ -306,7 +328,6 @@ cdef out_put(int tid,
              BamFile rbf,
              object clts,
              seg_dtype_struct[::1] segs,
-             float coverage,
              int minovh=200):
     cdef:
         Iterator ite = Iterator(rbf, tid)
@@ -340,9 +361,6 @@ cdef out_put(int tid,
         
         # chromosome
         a.insert(0, chrom)
-
-        # coverage (depth)
-        a.append(coverage)
 
         # write out clt
         a = [str(x) for x in a]
@@ -381,8 +399,10 @@ cpdef dict build_cluster(str fpath,
                          int tid,
                          int minl,
                          int maxdist,
-                         float div,
-                         float coverage):
+                         float back_div,
+                         float back_de,
+                         float back_depth,
+                         float back_readlen):
     '''build cluster
     Parameters:
     -----------
@@ -462,10 +482,10 @@ cpdef dict build_cluster(str fpath,
     cdef cluster_dtype_struct[::1] clts_view = clts
 
     # features computing
-    clt_feat(rbf, tid, clts_view, segs_view, rep_ail, gap_ail, div, coverage)
+    clt_feat(rbf, tid, clts_view, segs_view, rep_ail, gap_ail, back_div, back_de, back_depth, back_readlen)
 
     # output
-    out_put(tid, rbf, clts, segs_view, coverage)
+    out_put(tid, rbf, clts, segs_view)
     rbf.close(); del rbf
 
     # free AIList

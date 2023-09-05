@@ -211,9 +211,10 @@ void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i)
         }
     }
 
-    // compute average alignment score, nmap, consistency
-    segs[idx].sumAS += (float_t)tealns[i].AS/(tealns[i].qed - tealns[i].qst);
+    // compute average alignment score, nmap, divergence
+    segs[idx].sumAS += (float_t)tealns[i].AS / tealns[i].alnlen;
     segs[idx].sumdiv += tealns[i].div;
+    segs[idx].sumde += tealns[i].de;
     segs[idx].nmap += 1;
     if ((segs[idx].flag & BAM_FREVERSE) == (tealns[i].flag & BAM_FREVERSE)) {
         segs[idx].cnst += 1;
@@ -225,6 +226,22 @@ void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i)
 /*************************
  *** Alignment records ***
  *************************/
+
+void get_div(int32_t *alnlen, float_t *div, bam1_t *b)
+{
+    uint32_t ALIGNED = 0x3c03f;
+    uint32_t *cigar = bam_get_cigar(b);
+    int n_cigar = b->core.n_cigar, i, l;
+    for (i = l = 0; i < n_cigar; i++)
+    {
+        // M/I/D/=/X
+        if ((ALIGNED >> (bam_cigar_op(cigar[i])<<1) & 3) & 1)
+            l += bam_cigar_oplen(cigar[i]);
+    }
+    *alnlen = l;
+    *div = (float_t)(bam_aux2i(bam_aux_get(b, "NM")) - bam_aux2i(bam_aux_get(b, "nn"))) / l;
+}
+
 
 int sam_realloc_bam_data1(bam1_t *b, size_t desired)
 {
@@ -356,13 +373,17 @@ void origion_qpos(int32_t *qst, int32_t *qed, bam1_t *bam)
 
 
 void parse_tealns(bam1_t *bam, tealn_dtype_struct tealns[])
-{   int32_t qst, qed;
+{   int32_t qst, qed, alnlen;
+    float_t div;
 
     origion_qpos(&qst, &qed, bam);
+    get_div(&alnlen, &div, bam);
     tealns[0].idx = atoi(bam_get_qname(bam));
     tealns[0].AS = bam_aux2i(bam_aux_get(bam, "AS"));
     tealns[0].qst = qst;
     tealns[0].qed = qed;
-    tealns[0].div = bam_aux2f(bam_aux_get(bam, "de"));
+    tealns[0].alnlen = alnlen;
+    tealns[0].div = div;
+    tealns[0].de = get_de(bam);
     tealns[0].flag = bam->core.flag;
 }
