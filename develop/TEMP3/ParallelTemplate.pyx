@@ -27,6 +27,7 @@ cdef background_info(str fpath,
         float[::1] divs_view
         float[::1] des_view
         int[::1] readlens_view
+        int64_t sum_alnlen = 0
         float div
 
     templatef   = np.zeros(500000, dtype=np.float32)
@@ -55,6 +56,7 @@ cdef background_info(str fpath,
                 continue
             
             get_div(&alnlen, &div, ite.b)
+            sum_alnlen      += alnlen
             divs_view[N]     = div
             des_view[N]      = get_de(ite.b)
             readlens_view[N] = ite.b.core.l_qseq
@@ -64,7 +66,7 @@ cdef background_info(str fpath,
         nchroms[0]  = rbf.hdr.n_targets
         back_div[0] = np.mean(divs[:N])
         back_de[0]  = np.mean(des[:N])
-        back_depth[0]   = np.sum(readlens[:N]) / maxlen
+        back_depth[0]   = float(sum_alnlen) / maxlen
         back_readlen[0] = np.median(readlens[:N])
         del ite; rbf.close(); del rbf
         return
