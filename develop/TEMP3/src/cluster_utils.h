@@ -52,6 +52,9 @@
  @field  back_de    background de
  @field  back_depth background depth
  @field  back_readlen   background read length
+ @field  flag       bitwise flag
+                        0: passed
+                        1: low alnfrac
  */
 typedef struct {
     int32_t     st;
@@ -81,6 +84,7 @@ typedef struct {
     float_t     back_de;
     float_t     back_depth;
     float_t     back_readlen;
+    int16_t     flag;
 } __attribute__((packed)) cluster_dtype_struct;
 
 

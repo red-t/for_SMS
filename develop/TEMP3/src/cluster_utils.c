@@ -54,12 +54,59 @@ void cclt_feat(cluster_dtype_struct clts[],
                htsFile *htsfp,
                bam1_t *b1,
                bam1_t *b2) {
-    // compute cluster location flag
-    clt_loc_flag(rep_ail, gap_ail, clts);
+    // Compute fraction of TE-aligned segments
+    int32_t nseg=0, naln=0;
+    for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
+    {
+        // ignore segment with short overhang
+        if (segs[j].overhang < minovh) continue;
+        if (segs[j].nmap > 0) naln += 1;
+        nseg += 1;
+    }
+    float_t alnfrac = (float_t)naln / nseg;
 
-    // initilization
+    // Single or Multiple support-read
+    int32_t retval, second = 0;
+    switch (nseg)
+    {
+    case 1:
+        clts[0].single = 1;
+        break;
+
+    case 2:
+        for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
+        {
+            if (segs[j].overhang < minovh) continue;
+            if (second) {
+                retval = bgzf_seek(htsfp->fp.bgzf, segs[j].offset, SEEK_SET);
+                retval = bam_read1(htsfp->fp.bgzf, b2);
+            } else {
+                retval = bgzf_seek(htsfp->fp.bgzf, segs[j].offset, SEEK_SET);
+                retval = bam_read1(htsfp->fp.bgzf, b1);
+                second = 1;
+            }
+        }
+        // both segments have the same qname
+        retval = strcmp(bam_get_qname(b1), bam_get_qname(b2));
+        if (retval == 0) clts[0].single = 2;
+        break;
+        
+    default:
+        break;
+    }
+
+    // Skip cluster with low alnfrac
+    if (clts[0].single > 0 && alnfrac < 1) {
+        clts[0].flag |= 1;
+        return;
+    } else if (clts[0].single == 0 && alnfrac < 0.8) {
+        clts[0].flag |= 1;
+        return;
+    }
+    
+    // Statistics of segments
     uint8_t ntype=0;
-    int32_t nL=0, nM=0, nR=0, nseg=0;
+    int32_t nL=0, nM=0, nR=0;
     for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
     {
         // ignore segment with short overhang
@@ -116,11 +163,9 @@ void cclt_feat(cluster_dtype_struct clts[],
         
         // sum of mapq
         clts[0].avg_mapq += segs[j].mapq;
-        nseg += 1;
 
         // features from TE alignment
-        if (segs[j].nmap > 0)
-        {
+        if (segs[j].nmap > 0) {
             clts[0].avg_AS += segs[j].sumAS / segs[j].nmap;
             clts[0].avg_qfrac += (float_t)segs[j].lmap / (segs[j].qed - segs[j].qst);
             clts[0].avg_div += segs[j].sumdiv / segs[j].nmap;
@@ -131,42 +176,14 @@ void cclt_feat(cluster_dtype_struct clts[],
             } else if ((segs[j].cnst & 255) < (segs[j].cnst >> 8)) {
                 clts[0].strand += 256;
             }
-        } else
-        {
+        } else {
             clts[0].avg_div += back_div;
             clts[0].avg_de += back_de;
         }
     }
 
-    // single support read
-    int32_t retval, second = 0;
-    switch (nseg)
-    {
-    case 1:
-        clts[0].single = 1;
-        break;
-
-    case 2:
-        for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
-        {
-            if (segs[j].overhang < minovh) continue;
-            if (second) {
-                retval = bgzf_seek(htsfp->fp.bgzf, segs[j].offset, SEEK_SET);
-                retval = bam_read1(htsfp->fp.bgzf, b2);
-            } else {
-                retval = bgzf_seek(htsfp->fp.bgzf, segs[j].offset, SEEK_SET);
-                retval = bam_read1(htsfp->fp.bgzf, b1);
-                second = 1;
-            }
-        }
-        // both segments have the same qname
-        retval = strcmp(bam_get_qname(b1), bam_get_qname(b2));
-        if (retval == 0) clts[0].single = 2;
-        break;
-        
-    default:
-        break;
-    }
+    // Cluster location flag
+    clt_loc_flag(rep_ail, gap_ail, clts);
 
     // Features from genome alignments
     clts[0].nseg        = nseg / back_depth;

@@ -33,6 +33,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       back_de
         float       back_depth
         float       back_readlen
+        int16_t     flag
 
     # Compute features of a cluster record
     # @param clts           address to the cluster record
