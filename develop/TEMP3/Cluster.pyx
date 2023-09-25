@@ -24,6 +24,9 @@ SEG_DTYPE = np.dtype([
     ('sumdiv',      np.float32),
     ('sumde',       np.float32),
     ('cnst',        np.uint16),
+    ('st_idx',      np.int32),
+    ('ed_idx',      np.int32),
+    ('TE',          np.int32),
 ])
 
 
@@ -36,6 +39,7 @@ TEALN_DTYPE = np.dtype([
     ('div',     np.float32),
     ('de',      np.float32),
     ('flag',    np.int16),
+    ('TE',      np.int32),
 ])
 
 
@@ -68,6 +72,7 @@ CLUSTER_DTYPE = np.dtype([
     ('back_depth',      np.float32),
     ('back_readlen',    np.float32),
     ('flag',        np.int16),
+    ('TE',          np.int32),
 ])
 #
 # ---------------------------------------------------------------
@@ -198,23 +203,32 @@ cdef object extract_tealn(Iterator ite):
 cdef object seg_feat_te(seg_dtype_struct[::1] segs,
                         int tid,
                         int threads):
+    ### Parse TE alignments ###
     cdef:
         BamFile  rbf = BamFile("tmp.all_supp_reads.{}.bam".format(tid), threads, "rb")
         Iterator ite = Iterator(rbf)
         object   tealns
         tealn_dtype_struct[::1] tealns_view
-    
     tealns = extract_tealn(ite)
     tealns.sort(order=['idx', 'qst'])
     tealns_view = tealns
 
+    ### Compute segment features ###
     cdef:
-        int i
-
+        int i, N = rbf.hdr.n_targets
+        object TEs = np.zeros(N, dtype=np.int32)
+        int[::1] TEs_view = TEs
+    # Basic features
     for i in range(tealns_view.shape[0]):
         cseg_feat_te(&segs[0], &tealns_view[0], i)
 
-    del ite; rbf.close(); del rbf
+    # Determine TE tid
+    for i in range(segs.shape[0]):
+        if segs[i].nmap:
+            cseg_tetype(&segs[i], &tealns_view[0], &TEs_view[0], N)
+            segs[i].TE = np.argmax(TEs)
+
+    del ite; rbf.close(); del rbf; del TEs
     return tealns
 #
 # ---------------------------------------------------------------
@@ -305,7 +319,12 @@ cdef clt_feat(BamFile rbf,
         ssize_t i
         bam1_t *b1 = bam_init1()
         bam1_t *b2 = bam_init1()
+        BamFile terbf = BamFile("tmp.all_supp_reads.{}.bam".format(tid), 1, "rb")
+        int N = terbf.hdr.n_targets
+        object TEs = np.zeros(N, dtype=np.int32)
+        int[::1] TEs_view = TEs
     
+    terbf.close(); del terbf
     for i in range(clts.shape[0]):
         cclt_feat(&clts[i],
                   &segs[0],
@@ -319,9 +338,14 @@ cdef clt_feat(BamFile rbf,
                   tid,
                   rbf.htsfile,
                   b1,
-                  b2)
+                  b2,
+                  &TEs_view[0],
+                  N)
+        if clts[i].flag:
+            continue
+        clts[i].TE = np.argmax(TEs)
     
-    bam_destroy1(b1); bam_destroy1(b2)
+    bam_destroy1(b1); bam_destroy1(b2); del TEs
 #
 # ---------------------------------------------------------------
 #
@@ -343,7 +367,7 @@ cdef out_put(int tid,
 
     for i in range(clts.shape[0]):
         ### skip clusters by flag ###
-        if clts[i]['flag'] != 0:
+        if clts[i]['flag']:
             continue
 
         ### output clt ###

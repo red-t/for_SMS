@@ -81,6 +81,9 @@ inline int is_del_or_skip(uint32_t op) {
  @field  sumdiv     summary per-base divergence of the TE alignments
  @field  sumde      summary gap-compressed per-base divergence("de") of the TE alignments
  @field  cnst       number of mathced bases of the alignment
+ @field  st_idx     0-based start index on array of TE alignments, included
+ @field  ed_idx     0-based end index on array of TE alignments, excluded
+ @field  TE         majority TE-tid of the segment
  */
 typedef struct {
     uint16_t    flag;
@@ -104,6 +107,9 @@ typedef struct {
     float_t     sumdiv;
     float_t     sumde;
     uint16_t    cnst;
+    int32_t     st_idx;
+    int32_t     ed_idx;
+    int32_t     TE;
 } __attribute__((packed)) seg_dtype_struct;
 
 
@@ -117,6 +123,7 @@ typedef struct {
  @field  div    per-base divergence
  @field  de     gap-compressed per-base divergence ("de")
  @field  flag   bitwise flag of the alignment
+ @field  TE     tid of the TE alignment
  */
 typedef struct {
     int32_t idx;
@@ -127,6 +134,7 @@ typedef struct {
     float_t div;
     float_t de;
     int16_t flag;
+    int32_t TE;
 } __attribute__((packed)) tealn_dtype_struct;
 
 
@@ -206,6 +214,16 @@ void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail);
  * @param i         index of the used alignment record
  */
 void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i);
+
+
+/// Determine the majority TE type of a segment record
+/*!
+ * @param segs		address to the segment record
+ * @param tealns    address to the TE alignments array
+ * @param TEs       address to the TE frequency array
+ * @param TE_size   size of the TE frequency array
+ */
+void cseg_tetype(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int TEs[], int TE_size);
 
 
 /*************************

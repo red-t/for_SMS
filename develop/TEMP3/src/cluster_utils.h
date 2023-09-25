@@ -55,6 +55,7 @@
  @field  flag       bitwise flag
                         0: passed
                         1: low alnfrac
+ @field  TE         majority TE-tid of the cluster
  */
 typedef struct {
     int32_t     st;
@@ -85,6 +86,7 @@ typedef struct {
     float_t     back_depth;
     float_t     back_readlen;
     int16_t     flag;
+    int32_t     TE;
 } __attribute__((packed)) cluster_dtype_struct;
 
 
@@ -117,11 +119,21 @@ void clt_dffloc(cluster_dtype_struct clts[], int32_t nseg);
 
 /// Compute features of a cluster record.
 /*!
- * @param clts      address to the cluster record
- * @param segs      address to the arrary of segments
- * @param repail    AIList of repeats
- * @param gapail    AIList of gaps
- * @param minovh    minimum length of segment overhang
+ * @param clts          address to the cluster record
+ * @param segs          address to the arrary of segments
+ * @param repail        AIList of repeats
+ * @param gapail        AIList of gaps
+ * @param back_div      estimated background per-base divergence
+ * @param back_de       estimated background gap-compressed per-base divergence
+ * @param back_depth    estimated background coverage
+ * @param back_readlen  estimated background read length
+ * @param minovh        minimum length of segment overhang
+ * @param tid           target id
+ * @param htsfp         pointer to the htsFile
+ * @param b1            first bam1_t record
+ * @param b2            second bam1_t record
+ * @param TEs           address to the TE frequency array
+ * @param TE_size       size of the TE frequency array
  */
 void cclt_feat(cluster_dtype_struct clts[],
                seg_dtype_struct segs[],
@@ -135,6 +147,8 @@ void cclt_feat(cluster_dtype_struct clts[],
                int tid,
                htsFile *htsfp,
                bam1_t *b1,
-               bam1_t *b2);
+               bam1_t *b2,
+               int TEs[],
+               int TE_size);
 
 #endif // CLUSTER_UTILS_H

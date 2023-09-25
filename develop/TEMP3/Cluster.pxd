@@ -34,6 +34,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       back_depth
         float       back_readlen
         int16_t     flag
+        int32_t     TE
 
     # Compute features of a cluster record
     # @param clts           address to the cluster record
@@ -49,6 +50,8 @@ cdef extern from "src/cluster_utils.h" nogil:
     # @param idx            pointer to the hts_idx_t
     # @param b1             first bam1_t record
     # @param b2             second bam1_t record
+    # @param TEs            address to the TE frequency array
+    # @param TE_size        size of the TE frequency array
     void cclt_feat(cluster_dtype_struct *,
                    seg_dtype_struct *,
                    ailist_t *rep_ail,
@@ -61,7 +64,9 @@ cdef extern from "src/cluster_utils.h" nogil:
                    int tid,
                    htsFile *htsfp,
                    bam1_t *b1,
-                   bam1_t *b2)
+                   bam1_t *b2,
+                   int *,
+                   int TE_size)
 #
 # ---------------------------------------------------------------
 #
@@ -97,6 +102,9 @@ cdef extern from "src/seg_utils.h" nogil:
         float       sumdiv
         float       sumde
         uint16_t    cnst
+        int32_t     st_idx
+        int32_t     ed_idx
+        int32_t     TE
 
     ctypedef packed struct tealn_dtype_struct:
         int32_t idx
@@ -107,6 +115,7 @@ cdef extern from "src/seg_utils.h" nogil:
         float   div
         float   de
         int16_t flag
+        int32_t TE
     
     # parse alignment's CIGAR and extract segments.
     # @param bam    Alignment record
@@ -138,9 +147,16 @@ cdef extern from "src/seg_utils.h" nogil:
 
     # Compute features of a segment record from TE alignment
     # @param segs		address to the segment record
-    # @param tealns    address to the TE alignments array
-    # @param i         index of the used alignment record
+    # @param tealns     address to the TE alignments array
+    # @param i          index of the used alignment record
     void cseg_feat_te(seg_dtype_struct *, tealn_dtype_struct *, int i)
+
+    # Determine the majority TE type of a segment record
+    # @param segs       address to the segment record
+    # @param tealns     address to the TE alignments array
+    # @param TEs        address to the TE frequency array
+    # @param TE_size    size of the TE frequency array
+    void cseg_tetype(seg_dtype_struct *, tealn_dtype_struct *, int *, int TE_size)
 
     #########################
     ### Alignment records ###

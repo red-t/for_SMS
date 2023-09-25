@@ -194,6 +194,7 @@ void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i)
     // compute mapped query length
     if (segs[idx].nmap == 0)
     {
+        segs[idx].st_idx = i;
         segs[idx].lmap += tealns[i].qed - tealns[i].qst;
     } else
     { // i-th and (i-1)-th alignment come from the same segment
@@ -211,7 +212,8 @@ void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i)
         }
     }
 
-    // compute average alignment score, nmap, divergence
+    // compute per-base alignment score, nmap, divergence
+    segs[idx].ed_idx = i+1;
     segs[idx].sumAS += (float_t)tealns[i].AS / tealns[i].alnlen;
     segs[idx].sumdiv += tealns[i].div;
     segs[idx].sumde += tealns[i].de;
@@ -220,6 +222,15 @@ void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i)
         segs[idx].cnst += 1;
     } else {
         segs[idx].cnst += (1 << 8);
+    }
+}
+
+void cseg_tetype(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int TEs[], int TE_size)
+{
+    memset(TEs, 0, TE_size * sizeof(int));
+    for (int i = segs[0].st_idx; i < segs[0].ed_idx; i++)
+    {
+        TEs[tealns[i].TE] += 1;
     }
 }
 
@@ -386,4 +397,5 @@ void parse_tealns(bam1_t *bam, tealn_dtype_struct tealns[])
     tealns[0].div = div;
     tealns[0].de = get_de(bam);
     tealns[0].flag = bam->core.flag;
+    tealns[0].TE = bam->core.tid;
 }

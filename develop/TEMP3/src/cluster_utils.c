@@ -53,7 +53,9 @@ void cclt_feat(cluster_dtype_struct clts[],
                int tid,
                htsFile *htsfp,
                bam1_t *b1,
-               bam1_t *b2) {
+               bam1_t *b2,
+               int TEs[],
+               int TE_size) {
     // Compute fraction of TE-aligned segments
     int32_t nseg=0, naln=0;
     for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
@@ -107,6 +109,7 @@ void cclt_feat(cluster_dtype_struct clts[],
     // Statistics of segments
     uint8_t ntype=0;
     int32_t nL=0, nM=0, nR=0;
+    memset(TEs, 0, TE_size * sizeof(int));
     for (int32_t j = clts[0].st_idx; j < clts[0].ed_idx; j++)
     {
         // ignore segment with short overhang
@@ -166,6 +169,9 @@ void cclt_feat(cluster_dtype_struct clts[],
 
         // features from TE alignment
         if (segs[j].nmap > 0) {
+            // majority TE type
+            TEs[segs[j].TE] += 1;
+            // similarity related features
             clts[0].avg_AS += segs[j].sumAS / segs[j].nmap;
             clts[0].avg_qfrac += (float_t)segs[j].lmap / (segs[j].qed - segs[j].qst);
             clts[0].avg_div += segs[j].sumdiv / segs[j].nmap;
