@@ -71,6 +71,7 @@ CLUSTER_DTYPE = np.dtype([
     ('back_de',     np.float32),
     ('back_depth',      np.float32),
     ('back_readlen',    np.float32),
+    ('alnfrac',     np.float32),
     ('flag',        np.int16),
     ('TE',          np.int32),
 ])
@@ -366,10 +367,6 @@ cdef out_put(int tid,
     seg_output = open('tmp_seg_{}.txt'.format(tid), 'w')
 
     for i in range(clts.shape[0]):
-        ### skip clusters by flag ###
-        if clts[i]['flag']:
-            continue
-
         ### output clt ###
         a = list(clts[i])
 

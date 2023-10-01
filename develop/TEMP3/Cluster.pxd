@@ -33,6 +33,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       back_de
         float       back_depth
         float       back_readlen
+        float       alnfrac
         int16_t     flag
         int32_t     TE
 

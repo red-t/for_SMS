@@ -97,6 +97,7 @@ void cclt_feat(cluster_dtype_struct clts[],
         break;
     }
 
+    clts[0].alnfrac = alnfrac;
     // Skip cluster with low alnfrac
     if (clts[0].single > 0 && alnfrac < 1) {
         clts[0].flag |= 1;

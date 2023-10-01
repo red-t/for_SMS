@@ -85,6 +85,7 @@ typedef struct {
     float_t     back_de;
     float_t     back_depth;
     float_t     back_readlen;
+    float_t     alnfrac;
     int16_t     flag;
     int32_t     TE;
 } __attribute__((packed)) cluster_dtype_struct;
