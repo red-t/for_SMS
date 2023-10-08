@@ -154,12 +154,11 @@ cdef trim_seg(BamFile rbf,
 #
 cdef align_mm2(int tid,
                int threads,
-               str ref,
-               str preset):
+               str ref):
     cdef:
         int retval
-        str cmd_mm2 = "minimap2 -t {} -aYx {} {} tmp.all_supp_reads.{}.fa | " \
-                      "samtools view -@ {} -bhS -o tmp.all_supp_reads.{}.bam -".format(threads, preset, ref, tid, threads, tid)
+        str cmd_mm2 = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t {} -aY {} tmp.all_supp_reads.{}.fa | " \
+                      "samtools view -@ {} -bhS -o tmp.all_supp_reads.{}.bam -".format(threads, ref, tid, threads, tid)
 
     proc = Popen([cmd_mm2], stderr=DEVNULL, shell=True, executable='/bin/bash')
     retval = proc.wait()
@@ -420,7 +419,6 @@ cpdef dict build_cluster(str fpath,
                          str rep_path,
                          str gap_path,
                          str teref,
-                         str preset,
                          int threads,
                          int tid,
                          int minl,
@@ -487,7 +485,7 @@ cpdef dict build_cluster(str fpath,
     trim_seg(rbf, tid, threads, segs_view)
 
     # align segment sequences to TE CSS
-    align_mm2(tid, threads, teref, preset)
+    align_mm2(tid, threads, teref)
 
     # compute features from TE alignments
     alns = seg_feat_te(segs_view, tid, threads)

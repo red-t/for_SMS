@@ -13,8 +13,6 @@ def parse_args():
                                  help='path of gap annotation file', default='')
     parser.add_argument('-T', '--teref', dest='teref', type=str,
                                  help='path of reference transposon (fa/mmi)', default='')
-    parser.add_argument('-x', '--preset', dest='preset', type=str,
-                                 help='minimap2 preset', default='map-pb')
     parser.add_argument('-o', '--out_path', dest='out_path', type=str,
                                  help='Path of the output', default='./')
     parser.add_argument('-p', '--nprocess', dest='nprocess', type=int,
@@ -41,7 +39,6 @@ if __name__ == '__main__':
                                              args.rep_path,
                                              args.gap_path,
                                              args.teref,
-                                             args.preset,
                                              args.nprocess,
                                              args.nthreads,
                                              args.minl,
