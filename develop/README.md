@@ -1,68 +1,100 @@
 ----
-#### Dependencies
-
-**1. pysam 0.20.0**
+#### Dependency
+**1. Autogluon**
 ```
-# install with conda (recommended)
-conda config --add channels r
-conda config --add channels bioconda
-conda install pysam=0.20.0
+conda create -n TEMP3 python=3.10
 
-# install through pypi
-pip install
-```
+conda activate TEMP3
 
-**2. htslib 1.16**
-```
-# download
-wget https://github.com/samtools/htslib/releases/download/1.16/htslib-1.16.tar.bz2
-tar -jxvf htslib-1.16.tar.bz2 && mv htslib-1.16 htslib
+conda install -c conda-forge mamba
 
-# compile (at present, don't need to install)
-cd htslib
-./configure --prefix=/xx/xx/xx
-make
-
-# or install with conda (not support yet)
-conda install htslib=1.16
+mamba install -c conda-forge autogluon
 ```
 
-**3. cython**
+**2. Samtools (1.7)**
 ```
-# install through pypi
-pip install Cython --install-option="--no-cython-compile"
+# 最新版本的应该就是 1.7
 
-# maybe conda is also ok?
+conda install samtools -c conda-forge
+```
+
+**3. Minimap2 (2.26-r1175)**
+```
+# 最新版本的应该就是 2.26-r1175
+
+conda install minimap2 -c conda-forge
+```
+
+**4. Cython (0.29.33)**
+```
+# 最新版本的应该就是 0.29.33
+
+pip install cython
 ```
 
 ----
 #### Compile
-
 ```
-# now your workdir should be path/to/TEMP3
-python setup.py build
-mv build/lib*/* . && rm -r build/ && rm *c
+# Now your workdir should be path/to/develop
+# Once compiled, only the executable file *.so is needed.
 
-# once compiled, only the executable file *.so is needed.
+python setup.py build_ext -i
+rm -r build/ && rm TEMP3/*c
 ```
 
 ----
 #### Usage
-
 ```
-# now your workdir should be path/to/TEMP3
-import AlignmentFileIO
+python path/to/develop/TEMP3.py -b BAM -r REPEAT.bed -g GAP.bed -T TE.fa -p NUM_PROCESS -t NUM_THREAD -l 100
+```
 
-fn = "ex2.bam" # should be indexed
-nthread = 5
-stid = 0
-maxtid = 15
-bf = AlignmentFileIO.BamFile(fn, nthread)
-a = []
-for b in bf.fetch(stid, maxtid):
-	if len(b):
-		a.extend(b)
-
-len(a)
-bf.close()
+---
+#### Result
+```
+# Now, each column of the *clt.txt is:
+# Column 1 --- chrom
+# Column 2 --- start
+# Column 3 --- end
+# Column 4 --- cluster id
+# Column 5 --- number of segment (normalized by background depth)
+# Column 6 --- strand
+# Column 7 --- start index (index of corresponding segments)
+# Column 8 --- end index
+# Column 9 --- nseg (normalized by background depth)
+# Column 10 --- strand flag (the orientation of this insertion)
+					1:forward
+					2:reverse
+					other:unkown
+# Column 11 --- single flag (whether the cluster only have single support read)
+					0:multiple support reads
+					1: single read with 1 alignment
+					2: single read with 2 alignments
+# Column 12 --- cluster location flag
+					1: at normal region
+					2: at repeat/gap boundary
+					4: inside repeat/gap
+# Column 13 --- number of segment type
+# Column 14 --- entropy
+# Column 15 --- balance ratio
+# Column 16 --- fraction of segments with low mapq (<5)
+# Column 17 --- fraction of "dual-clip" alignments
+# Column 18 --- fraction of segments with loc_flag=1
+# Column 19 --- fraction of segments with loc_flag=2
+# Column 20 --- fraction of segments with loc_flag=4
+# Column 21 --- fraction of segments with loc_flag=8
+# Column 22 --- fraction of segments with loc_flag=16
+# Column 23 --- average mapq of this cluster
+# Column 24 --- average per base alignment score
+# Column 25 --- average query aligned fraction
+# Column 26 --- average per-base divergence ((#mismatches + #I + #D) / (#mismatches + #I + #D + #matches))
+# Column 27 --- average per-base gap-compressed divergence (normalized background)
+# Column 28 --- background div
+# Column 29 --- background de
+# Column 30 --- background depth
+# Column 31 --- background read length
+# Column 32 --- fraction of TE-aligned segment
+# Column 33 --- flag (if the cluster pass TE-alnfrac threshold)
+					0: passed
+					1: low alnfrac
+# Column 34 --- TE (tid of corresponding TE)
 ```
