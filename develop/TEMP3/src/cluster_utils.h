@@ -44,9 +44,7 @@
  @field  meanAlnScore       mean per-base alignment score (based on teAlignments)
  @field  meanQueryMapFrac   mean query mapped fraction (based on teAlignments)
  @field  meanDivergence     mean per-base divergence ((#mismatches + #I + #D) / (#mismatches + #I + #D + #matches))
- @field  meanDe             mean per-base gap-compressed divergence
  @field  bgDiv              background divergence (for normalization)
- @field  bgDe               background de (for normalization)
  @field  bgDepth            background depth (for normalization)
  @field  bgReadLen          background read length
  @field  teTid              majority TE-tid of cluster
@@ -74,9 +72,7 @@ typedef struct {
     float_t     meanAlnScore;
     float_t     meanQueryMapFrac;
     float_t     meanDivergence;
-    float_t     meanDe;
     float_t     bgDiv;
-    float_t     bgDe;
     float_t     bgDepth;
     float_t     bgReadLen;
     float_t     teAlignedFrac;
@@ -92,7 +88,6 @@ typedef struct {
     int         *teTidCountTable;
     int         minOverhang;
     float       bgDiv;
-    float       bgDe;
     float       bgDepth;
     float       bgReadLen;
     htsFile     *genomeBamFile;
@@ -106,7 +101,7 @@ typedef struct {
 /**********************
  *** Update Cluster ***
  **********************/
-Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDe, float bgDepth, float bgReadLen);
+Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDepth, float bgReadLen);
 void updateCluster(Cluster *cltArray, Segment *segArray, Args args);
 
 

@@ -1,5 +1,5 @@
 from .AlignmentFileIO cimport BamFile, Iterator
-from .Cluster cimport bamIsInvalid, getMapLenAndDiv, getDe
+from .Cluster cimport bamIsInvalid, getMapLenAndDiv
 from .htslib_external cimport *
 
 cpdef dict buildClusterParallel(object args)

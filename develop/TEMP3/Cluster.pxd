@@ -25,9 +25,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       meanAlnScore
         float       meanQueryMapFrac
         float       meanDivergence
-        float       meanDe
         float       bgDiv
-        float       bgDe
         float       bgDepth
         float       bgReadLen
         float       teAlignedFrac
@@ -42,7 +40,6 @@ cdef extern from "src/cluster_utils.h" nogil:
         int         *teTidCountTable
         int         minOverhang
         float       bgDiv
-        float       bgDe
         float       bgDepth
         float       bgReadLen
         htsFile     *genomeBamFile
@@ -53,7 +50,7 @@ cdef extern from "src/cluster_utils.h" nogil:
     
     int isValidCandidate(Cluster *cluster)
     int overhangIsShort(Segment *segment, int minOverhang)
-    Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDe, float bgDepth, float bgReadLen)
+    Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDepth, float bgReadLen)
     void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
 
 
@@ -81,7 +78,6 @@ cdef extern from "src/seg_utils.h" nogil:
         int         sumQueryMapLen
         float       sumAlnScore
         float       sumDivergence
-        float       sumDe
         uint16_t    directionFlag
         int         startIndex
         int         endIndex
@@ -94,7 +90,6 @@ cdef extern from "src/seg_utils.h" nogil:
         int     queryEnd
         int     mapLen
         float   divergence
-        float   de
         int16_t flag
         int     teTid
     
@@ -108,7 +103,6 @@ cdef extern from "src/seg_utils.h" nogil:
     #########################
     int bamIsInvalid(bam1_t *bamRecord)
     void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bamRecord);
-    float getDe(bam1_t *b)
     int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIndex, int sourceStart, int sourceEnd)
     void fillTeArray(bam1_t *bamRecord, TeAlignment *teArray)
 
@@ -136,6 +130,5 @@ cpdef dict buildCluster(
     int minSegLen,
     int maxDistance,
     float bgDiv,
-    float bgDe,
     float bgDepth,
     float bgReadLen)

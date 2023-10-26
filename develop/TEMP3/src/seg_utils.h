@@ -39,7 +39,6 @@
  @field  sumQueryMapLen     summary query mapped-length of the TE alignments (M/I/=/X, no overlap)
  @field  sumAlnScore        summary per base alignment score of the TE alignments
  @field  sumDivergence      summary per base divergence of the TE alignments
- @field  sumDe              summary gap-compressed per base divergence("de") of the TE alignments
  @field  directionFlag      flag representing segment direction
  @field  startIndex         start index in TE alignments array (0-based, include)
  @field  endIndex           end index in TE alignments array (0-based, not-include)
@@ -65,7 +64,6 @@ typedef struct {
     int         sumQueryMapLen;
     float_t     sumAlnScore;
     float_t     sumDivergence;
-    float_t     sumDe;
     uint16_t    directionFlag;
     int         startIndex;
     int         endIndex;
@@ -93,7 +91,6 @@ typedef struct {
  @field  queryEnd       query end (original direction of segment)
  @field  mapLen         mapped length (M/I/D/=/X)
  @field  divergence     per-base divergence
- @field  de             gap-compressed per-base divergence ("de")
  @field  flag           bitwise flag of the alignment
  @field  teTid          tid of the TE alignment
  */
@@ -104,7 +101,6 @@ typedef struct {
     int     queryEnd;
     int     mapLen;
     float_t divergence;
-    float_t de;
     int16_t flag;
     int     teTid;
 } __attribute__((packed)) TeAlignment;
@@ -169,7 +165,6 @@ static inline int lastCigarIsClip(uint32_t *cigarArray, int numCigar);
 void getMapLenAndDiv(int *mapLenPtr, float_t *divergencePtr, bam1_t *bamRecord);
 float_t getDivergence(bam1_t *bamRecord, int mapLen);
 void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart, int queryEnd, int mapLen, float_t divergence);
-float_t getDe(bam1_t *bamRecord);
 
 
 /********************

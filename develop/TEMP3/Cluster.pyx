@@ -24,7 +24,6 @@ SegmentDt = np.dtype([
     ('sumQueryMapLen',  np.int32),
     ('sumAlnScore',     np.float32),
     ('sumDivergence',   np.float32),
-    ('sumDe',           np.float32),
     ('directionFlag',   np.uint16),
     ('startIndex',      np.int32),
     ('endIndex',        np.int32),
@@ -38,7 +37,6 @@ TeAlignmentDt = np.dtype([
     ('queryEnd',    np.int32),
     ('mapLen',      np.int32),
     ('divergence',  np.float32),
-    ('de',          np.float32),
     ('flag',        np.int16),
     ('teTid',       np.int32),
 ])
@@ -66,9 +64,7 @@ ClusterDt = np.dtype([
     ('meanAlnScore',        np.float32),
     ('meanQueryMapFrac',    np.float32),
     ('meanDivergence',      np.float32),
-    ('meanDe',              np.float32),
     ('bgDiv',       np.float32),
-    ('bgDe',        np.float32),
     ('bgDepth',     np.float32),
     ('bgReadLen',   np.float32),
     ('teAlignedFrac',       np.float32),
@@ -345,13 +341,12 @@ cpdef dict buildCluster(
     int minSegLen,
     int maxDistance,
     float bgDiv,
-    float bgDe,
     float bgDepth,
     float bgReadLen,
     int minOverhang=200):
     
     # 1. construct segments
-    cdef Args args = initArgs(numThread, tid, minSegLen, maxDistance, minOverhang, bgDiv, bgDe, bgDepth, bgReadLen)
+    cdef Args args = initArgs(numThread, tid, minSegLen, maxDistance, minOverhang, bgDiv, bgDepth, bgReadLen)
     cdef BamFile genomeBamFile = BamFile(genomeBamFilePath, "rb", numThread)
     cdef object segArray = getSegArray(genomeBamFile, args)
     cdef Segment[::1] segArrayView = segArray

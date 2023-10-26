@@ -3,7 +3,7 @@
 /**********************
  *** Update Cluster ***
  **********************/
-Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDe, float bgDepth, float bgReadLen)
+Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDepth, float bgReadLen)
 {
     Args args;
     args.numThread = numThread;
@@ -12,7 +12,6 @@ Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOve
     args.maxDistance = maxDistance;
     args.minOverhang = minOverhang;
     args.bgDiv = bgDiv;
-    args.bgDe = bgDe;
     args.bgDepth = bgDepth;
     args.bgReadLen = bgReadLen;
 
@@ -107,11 +106,7 @@ void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numL
 
     countAlnFracs(cluster, segment);
 
-    if (noTeAlignment(segment)) {
-        cluster->meanDivergence += args.bgDiv;
-        cluster->meanDe += args.bgDe;
-        return;
-    }
+    if (noTeAlignment(segment)) { cluster->meanDivergence += args.bgDiv; return; }
 
     args.teTidCountTable[segment->teTid] += 1;
 
@@ -120,7 +115,6 @@ void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numL
     cluster->meanQueryMapFrac += (float_t)segment->sumQueryMapLen / (segment->queryEnd - segment->queryStart);
 
     cluster->meanDivergence += segment->sumDivergence / segment->numTeAlignment;
-    cluster->meanDe += segment->sumDe / segment->numTeAlignment;
 
     if (directionIsConsistent(segment)) cluster->directionFlag += 1;
     else if (directionIsInconsistent(segment)) cluster->directionFlag += 256;
@@ -206,7 +200,6 @@ static inline void divideValuesByNumSeg(Cluster *cluster)
     cluster->dualClipFrac = cluster->dualClipFrac / cluster->numSeg;
     cluster->lowMapQualFrac = cluster->lowMapQualFrac / cluster->numSeg;
     cluster->meanQueryMapFrac = cluster->meanQueryMapFrac / cluster->numSeg;
-    cluster->meanDe = cluster->meanDe / cluster->numSeg;
     cluster->meanDivergence = cluster->meanDivergence / cluster->numSeg;
     cluster->meanMapQual = cluster->meanMapQual / cluster->numSeg;
     cluster->meanAlnScore = cluster->meanAlnScore / cluster->numSeg;
@@ -214,7 +207,6 @@ static inline void divideValuesByNumSeg(Cluster *cluster)
 
 static inline void divideValuesByBackbg(Cluster *cluster, Args args)
 {
-    cluster->meanDe = cluster->meanDe / args.bgDe;
     cluster->meanDivergence = cluster->meanDivergence / args.bgDiv;
     cluster->numSeg = cluster->numSeg / args.bgDepth;
 }
@@ -227,7 +219,6 @@ static inline void setDirection(Cluster *cluster)
 
 static inline void setBackbgInfo(Cluster *cluster, Args args)
 {
-    cluster->bgDe = args.bgDe;
     cluster->bgDiv = args.bgDiv;
     cluster->bgDepth = args.bgDepth;
     cluster->bgReadLen = args.bgReadLen;

@@ -202,7 +202,6 @@ void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIn
     segment->endIndex = teIndex + 1;
     segment->numTeAlignment += 1;
     segment->sumQueryMapLen += queryMapLen;
-    segment->sumDe += teAlignment->de;
     segment->sumDivergence += teAlignment->divergence;
     segment->sumAlnScore += (float_t)teAlignment->AlnScore / teAlignment->mapLen;
     
@@ -286,13 +285,9 @@ void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart
     teAlignment->queryEnd = queryEnd;
     teAlignment->mapLen = mapLen;
     teAlignment->divergence = divergence;
-    teAlignment->de = getDe(bamRecord);
     teAlignment->flag = bamRecord->core.flag;
     teAlignment->teTid = bamRecord->core.tid;
 }
-
-float_t getDe(bam1_t *bamRecord)
-{ return bam_aux2f(bam_aux_get((bamRecord), "de")); }
 
 
 /********************

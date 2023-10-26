@@ -18,9 +18,7 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
     cdef object templatef = np.zeros(500000, dtype=np.float32)
     cdef object readLenArray = np.zeros(500000, dtype=np.int32)
     cdef object divArray = np.zeros(500000, dtype=np.float32)
-    cdef object deArray = np.zeros(500000, dtype=np.float32)
     cdef float[::1] divArrayView = divArray
-    cdef float[::1] deArrayView = deArray
     cdef int[::1] readLenArrayView = readLenArray
     cdef int returnValue, alnLen
     cdef int64_t sumAlnLen = 0
@@ -32,7 +30,6 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
         if returnValue < 0:
             bgInfo["numChrom"] = genomeBamFile.header.n_targets
             bgInfo["bgDiv"] = np.mean(divArray[:numAln])
-            bgInfo["bgDe"] = np.mean(deArray[:numAln])
             bgInfo["bgDepth"] = float(sumAlnLen) / maxChromLen
             bgInfo["bgReadLen"] = np.median(readLenArray[:numAln])
 
@@ -43,17 +40,14 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
 
         if numAln > maxNumAln:
             divArray = np.concatenate((divArray, templatef))
-            deArray = np.concatenate((deArray, templatef))
             readLenArray = np.concatenate((readLenArray, templatei))
             divArrayView = divArray
-            deArrayView = deArray
             readLenArrayView = readLenArray
-            maxNumAln = deArray.shape[0] - 20
+            maxNumAln = divArray.shape[0] - 20
             
         getMapLenAndDiv(&alnLen, &divergence, iterator.bamRcord)
         sumAlnLen += alnLen
         divArrayView[numAln] = divergence
-        deArrayView[numAln] = getDe(iterator.bamRcord)
         readLenArrayView[numAln] = iterator.bamRcord.core.l_qseq
         numAln += 1
 
@@ -64,7 +58,7 @@ cpdef dict buildClusterParallel(object args):
     cdef dict result = {}, returnValue
     cdef dict bgInfo = getBackgroundInfo(args.genomeBamFilePath, args.numThread)
 
-    print("bg Divergence: {}\nbg de: {}\nbg coverage: {}\nbg readlen: {}".format(bgInfo["bgDiv"], bgInfo["bgDe"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
+    print("bg Divergence: {}\nbg coverage: {}\nbg readlen: {}".format(bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
 
     with ProcessPoolExecutor(max_workers=args.numProcess) as executor:
         futures = set([executor.submit(buildCluster,
@@ -77,7 +71,6 @@ cpdef dict buildClusterParallel(object args):
                                        args.minSegLen,
                                        args.maxDistance,
                                        bgInfo["bgDiv"],
-                                       bgInfo["bgDe"],
                                        bgInfo["bgDepth"],
                                        bgInfo["bgReadLen"]) for tid in range(bgInfo["numChrom"])])
                                        
