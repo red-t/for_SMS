@@ -8,148 +8,144 @@
 #include "seg_utils.h"
 #include "AIList.h"
 //-------------------------------------------------------------------------------------
-#define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
-#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
-//-------------------------------------------------------------------------------------
-/***********************
- *** Cluster records ***
- ***********************/
 
+/******************
+ *** Structures ***
+ ******************/
 /*! @typedef
  @abstract Structure cluster merged from segments.
- @field  st         0-based start on reference, included
- @field  ed         0-based end on reference, excluded
- @field  st_idx     0-based start index on array of segments, included
- @field  ed_idx     0-based end index on array of segments, excluded, TO BE REMOVED
- @field  nseg       number of segments in this cluster (normalized by estimated background coverage)
- @field  strand     the orientation of this insertion
-                        1: forward
-                        2: reverse
- @field  single     whether the cluster only have single support read
-                        0: multiple support reads
-                        1: single read & 1 alignment
-                        2: single read & 2 alignments
- @field  cloc_flag  bitwise flag of the cluster location
-                        1: at normal region
-                        2: at repeat/gap boundary
-                        4: inside repeat/gap
- @field  ntype      number of segment types in this cluster
- @field  entropy    entropy computed based on fraction of different segment types
- @field  bratio     balance ratio computed based on number of lef/right-clip segments
- @field  lmq_frac   fraction of segments with low mapq (<5)
- @field  dclip_frac fraction of "dual-clip" alignments
- @field  aln1_frac  fraction of segments with loc_flag=1
- @field  aln2_frac  fraction of segments with loc_flag=2
- @field  aln4_frac  fraction of segments with loc_flag=4
- @field  aln8_frac  fraction of segments with loc_flag=8
- @field  aln16_frac fraction of segments with loc_flag=16
- @field  avg_mapq   average mapq of this cluster
- @field  avg_AS     average per base alignment score
- @field  avg_qfrac  average query aligned fraction
- @field  avg_div    average per-base divergence ((#mismatches + #I + #D) / (#mismatches + #I + #D + #matches))
- @field  avg_de     average per-base gap-compressed divergence (normalized background)
- @field  back_div   background div
- @field  back_de    background de
- @field  back_depth background depth
- @field  back_readlen   background read length
- @field  flag       bitwise flag
-                        0: passed
-                        1: low alnfrac
- @field  TE         majority TE-tid of the cluster
+ @field  refStart           cluster start on reference sequence (0-based, included)
+ @field  refEnd             cluster end on reference sequence (0-based, not-included)
+ @field  startIndex         start index in segments array (0-based, include)
+ @field  endIndex           start index in segments array (0-based, not-include)
+ @field  numSeg             number of segments in the cluster (normalized by bg depth)
+ @field  directionFlag      bitwise flag representing cluster direction
+                                1: forward
+                                2: reverse
+ @field  cltType            cluster type
+                                0: germline (multiple support reads)
+                                1: somatic (1 support read & 1 alignment)
+                                2: somatic (1 support read & 2 alignments)
+ @field  locationType       bitwise flag representing cluster location
+                                1: inside normal region
+                                2: at repeat/gap boundary
+                                4: inside repeat/gap
+ @field  numSegType         number of different segment types
+ @field  entropy            entropy based on fraction of different type segments
+ @field  balanceRatio       balance ratio based on number of left- & right-clip segments
+ @field  lowMapQualFrac     fraction of segments with low mapQual (<5)
+ @field  dualClipFrac       fraction of "dual-clip" alignments
+ @field  alnFrac1           fraction of segments with alnLocationType=1
+ @field  alnFrac2           fraction of segments with alnLocationType=2
+ @field  alnFrac4           fraction of segments with alnLocationType=4
+ @field  alnFrac8           fraction of segments with alnLocationType=8
+ @field  alnFrac16          fraction of segments with alnLocationType=16
+ @field  meanMapQual        mean mapQual of cluster
+ @field  meanAlnScore       mean per-base alignment score (based on teAlignments)
+ @field  meanQueryMapFrac   mean query mapped fraction (based on teAlignments)
+ @field  meanDivergence     mean per-base divergence ((#mismatches + #I + #D) / (#mismatches + #I + #D + #matches))
+ @field  meanDe             mean per-base gap-compressed divergence
+ @field  bgDiv              background divergence (for normalization)
+ @field  bgDe               background de (for normalization)
+ @field  bgDepth            background depth (for normalization)
+ @field  bgReadLen          background read length
+ @field  teTid              majority TE-tid of cluster
  */
 typedef struct {
-    int32_t     st;
-    int32_t     ed;
-    int32_t     st_idx;
-    int32_t     ed_idx;
-    float_t     nseg;
-    uint16_t    strand;
-    uint8_t     single;
-    uint8_t     cloc_flag;
-    uint8_t     ntype;
+    int         refStart;
+    int         refEnd;
+    int         startIndex;
+    int         endIndex;
+    float_t     numSeg;
+    uint16_t    directionFlag;
+    uint8_t     cltType;
+    uint8_t     locationType;
+    uint8_t     numSegType;
     float_t     entropy;
-    float_t     bratio;
-    float_t     lmq_frac;
-    float_t     dclip_frac;
-    float_t     aln1_frac;
-    float_t     aln2_frac;
-    float_t     aln4_frac;
-    float_t     aln8_frac;
-    float_t     aln16_frac;
-    float_t     avg_mapq;
-    float_t     avg_AS;
-    float_t     avg_qfrac;
-    float_t     avg_div;
-    float_t     avg_de;
-    float_t     back_div;
-    float_t     back_de;
-    float_t     back_depth;
-    float_t     back_readlen;
-    float_t     alnfrac;
-    int16_t     flag;
-    int32_t     TE;
-} __attribute__((packed)) cluster_dtype_struct;
+    float_t     balanceRatio;
+    float_t     lowMapQualFrac;
+    float_t     dualClipFrac;
+    float_t     alnFrac1;
+    float_t     alnFrac2;
+    float_t     alnFrac4;
+    float_t     alnFrac8;
+    float_t     alnFrac16;
+    float_t     meanMapQual;
+    float_t     meanAlnScore;
+    float_t     meanQueryMapFrac;
+    float_t     meanDivergence;
+    float_t     meanDe;
+    float_t     bgDiv;
+    float_t     bgDe;
+    float_t     bgDepth;
+    float_t     bgReadLen;
+    float_t     teAlignedFrac;
+    int         teTid;
+} __attribute__((packed)) Cluster;
+
+typedef struct {
+    int         numThread;
+    int         tid;
+    int         minSegLen;
+    int         maxDistance;
+    int         numTeTid;
+    int         *teTidCountTable;
+    int         minOverhang;
+    float       bgDiv;
+    float       bgDe;
+    float       bgDepth;
+    float       bgReadLen;
+    htsFile     *genomeBamFile;
+    bam1_t      *firstBamRecord;
+    bam1_t      *secondBamRecord;
+    AiList      *repeatAiList;
+    AiList      *gapAiList;
+} Args;
 
 
-/// Compute cluster location flag
-/*!
- * @param rep_ail	AIList of repeats
- * @param gap_ail	AIList of gaps
- * @param clts		address to the cluster record
- */
-void clt_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, cluster_dtype_struct clts[]);
+/**********************
+ *** Update Cluster ***
+ **********************/
+Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDe, float bgDepth, float bgReadLen);
+void updateCluster(Cluster *cltArray, Segment *segArray, Args args);
 
 
-/// Compute entropy based on segment types.
-/*!
- * @param nL    number of left-clip segments
- * @param nM    number of mid-insert segments
- * @param nR    number of right-clip segments
- * @param nseg  number of total segments in the cluster
- */
-float_t clt_entropy(int32_t nL, int32_t nM, int32_t nR, int32_t nseg);
+/************************
+ *** Define Candidate ***
+ ************************/
+#define overhangIsShort(segment, minOverhang) ((segment)->overhang < (minOverhang))
+#define nameIsSame(record1, record2) (strcmp(bam_get_qname((record1)), bam_get_qname((record2))) == 0)
+#define isValidCandidate(cluster) ((cluster)->teAlignedFrac >= 0.8)
+
+void setTeAlignedFrac(Cluster *cluster, Segment *segArray, Args args);
+void setCltType(Cluster *cluster, Segment *segArray, Args args);
 
 
-/// Compute fraction of alignment with different loc_flag.
-/*!
- * @param clts  address to the cluster record
- * @param nseg  number of segments in the cluster
- */
-void clt_dffloc(cluster_dtype_struct clts[], int32_t nseg);
+/**********************************
+ *** Update Cluster By Segments ***
+ **********************************/
+#define isDualClip(segment) (((segment)->alnType & DUAL_CLIP) == 5)
+#define noTeAlignment(segment) ((segment)->numTeAlignment == 0)
+#define directionIsConsistent(record) (((record)->directionFlag & 255) > ((record)->directionFlag >> 8))
+#define directionIsInconsistent(record) (((record)->directionFlag & 255) < ((record)->directionFlag >> 8))
+
+void updateBySegArray(Cluster *cluster, Segment *segArray, Args args);
+void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numLeft, int *numMiddle, int *numRight);
+static inline void countDifferentSeg(int *numLeft, int *numMiddle, int *numRight, Segment *segment);
+static inline void countAlnFracs(Cluster *cluster, Segment *segment);
+static inline void setEntropy(Cluster *cluster, int numLeft, int numMiddle, int numRight);
+float_t getEntropy(int numLeft, int numMiddle, int numRight, int numSeg);
+static inline void setBalanceRatio(Cluster *cluster, int numLeft, int numRight);
+static inline void setNumSegType(Cluster *cluster);
 
 
-/// Compute features of a cluster record.
-/*!
- * @param clts          address to the cluster record
- * @param segs          address to the arrary of segments
- * @param repail        AIList of repeats
- * @param gapail        AIList of gaps
- * @param back_div      estimated background per-base divergence
- * @param back_de       estimated background gap-compressed per-base divergence
- * @param back_depth    estimated background coverage
- * @param back_readlen  estimated background read length
- * @param minovh        minimum length of segment overhang
- * @param tid           target id
- * @param htsfp         pointer to the htsFile
- * @param b1            first bam1_t record
- * @param b2            second bam1_t record
- * @param TEs           address to the TE frequency array
- * @param TE_size       size of the TE frequency array
- */
-void cclt_feat(cluster_dtype_struct clts[],
-               seg_dtype_struct segs[],
-               ailist_t *rep_ail,
-               ailist_t *gap_ail,
-               float_t back_div,
-               float_t back_de,
-               float_t back_depth,
-               float_t back_readlen,
-               int minovh,
-               int tid,
-               htsFile *htsfp,
-               bam1_t *b1,
-               bam1_t *b2,
-               int TEs[],
-               int TE_size);
+/*********************************
+ *** Update By Backbg Info ***
+ *********************************/
+void setCltLocationType(Cluster *cluster, Args args);
+static inline void divideValuesByNumSeg(Cluster *cluster);
+static inline void divideValuesByBackbg(Cluster *cluster, Args args);
+static inline void setDirection(Cluster *cluster);
+static inline void setBackbgInfo(Cluster *cluster, Args args);
 
 #endif // CLUSTER_UTILS_H

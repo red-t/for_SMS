@@ -1,142 +1,88 @@
 import numpy as np
-from .Cluster import build_cluster
+from .Cluster import buildCluster
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-
-cdef background_info(str fpath,
-                     int nthreads,
-                     int *nchroms,
-                     float *back_div,
-                     float *back_de,
-                     float *back_depth,
-                     float *back_readlen):
-    cdef:
-        BamFile rbf = BamFile(fpath, nthreads, "rb")
-        int i, tid = 0, maxlen = 0
+cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
     
-    # Get the longest chromosome
-    for i in range(rbf.hdr.n_targets):
-        if maxlen < sam_hdr_tid2len(rbf.hdr, i):
+    cdef BamFile genomeBamFile = BamFile(genomeBamFilePath, "rb", numThread)
+    cdef int i, tid=0, maxChromLen=0
+
+    for i in range(genomeBamFile.header.n_targets):
+        if maxChromLen < sam_hdr_tid2len(genomeBamFile.header, i):
+            maxChromLen = sam_hdr_tid2len(genomeBamFile.header, i)
             tid = i
-            maxlen = sam_hdr_tid2len(rbf.hdr, i)
     
-    cdef:
-        Iterator ite = Iterator(rbf, tid)
-        int retval, N = 0, M = 499980, alnlen
-        object divs, des, readlens, templatef, templatei
-        float[::1] divs_view
-        float[::1] des_view
-        int[::1] readlens_view
-        int64_t sum_alnlen = 0
-        float div
+    cdef Iterator iterator = Iterator(genomeBamFile, tid)
+    cdef int numAln = 0, maxNumAln = 499980
+    cdef object templatei = np.zeros(500000, dtype=np.int32)
+    cdef object templatef = np.zeros(500000, dtype=np.float32)
+    cdef object readLenArray = np.zeros(500000, dtype=np.int32)
+    cdef object divArray = np.zeros(500000, dtype=np.float32)
+    cdef object deArray = np.zeros(500000, dtype=np.float32)
+    cdef float[::1] divArrayView = divArray
+    cdef float[::1] deArrayView = deArray
+    cdef int[::1] readLenArrayView = readLenArray
+    cdef int returnValue, alnLen
+    cdef int64_t sumAlnLen = 0
+    cdef float divergence
+    cdef dict bgInfo = {}
 
-    templatef   = np.zeros(500000, dtype=np.float32)
-    templatei   = np.zeros(500000, dtype=np.int32)
-    divs        = np.zeros(500000, dtype=np.float32)
-    des         = np.zeros(500000, dtype=np.float32)
-    readlens    = np.zeros(500000, dtype=np.int32)
-    divs_view       = divs
-    des_view        = des
-    readlens_view   = readlens
+    while True:
+        returnValue = iterator.cnext1()
+        if returnValue < 0:
+            bgInfo["numChrom"] = genomeBamFile.header.n_targets
+            bgInfo["bgDiv"] = np.mean(divArray[:numAln])
+            bgInfo["bgDe"] = np.mean(deArray[:numAln])
+            bgInfo["bgDepth"] = float(sumAlnLen) / maxChromLen
+            bgInfo["bgReadLen"] = np.median(readLenArray[:numAln])
 
-    # Estiamte background divergence & coverage & readlen
-    while 1:
-        if N > M:
-            divs        = np.concatenate((divs, templatef))
-            des         = np.concatenate((des, templatef))
-            readlens    = np.concatenate((readlens, templatei))
-            divs_view       = divs
-            des_view        = des
-            readlens_view   = readlens
-            M = des.shape[0] - 20
+            genomeBamFile.close(); del iterator; del genomeBamFile; return bgInfo
 
-        retval = ite.cnext1()
-        if retval > 0:
-            if bam_filtered(ite.b):
-                continue
-            
-            get_div(&alnlen, &div, ite.b)
-            sum_alnlen      += alnlen
-            divs_view[N]     = div
-            des_view[N]      = get_de(ite.b)
-            readlens_view[N] = ite.b.core.l_qseq
-            N += 1
+        if bamIsInvalid(iterator.bamRcord):
             continue
 
-        nchroms[0]  = rbf.hdr.n_targets
-        back_div[0] = np.mean(divs[:N])
-        back_de[0]  = np.mean(des[:N])
-        back_depth[0]   = float(sum_alnlen) / maxlen
-        back_readlen[0] = np.median(readlens[:N])
-        del ite; rbf.close(); del rbf
-        return
-#
-# ---------------------------------------------------------------
-#
-cpdef dict build_cluster_parallel(str fpath,
-                                  str rep_path,
-                                  str gap_path,
-                                  str teref,
-                                  int nprocess,
-                                  int nthreads,
-                                  int minl,
-                                  int maxdist,
-                                  int reftid):
-    '''call  in parallel
+        if numAln > maxNumAln:
+            divArray = np.concatenate((divArray, templatef))
+            deArray = np.concatenate((deArray, templatef))
+            readLenArray = np.concatenate((readLenArray, templatei))
+            divArrayView = divArray
+            deArrayView = deArray
+            readLenArrayView = readLenArray
+            maxNumAln = deArray.shape[0] - 20
+            
+        getMapLenAndDiv(&alnLen, &divergence, iterator.bamRcord)
+        sumAlnLen += alnLen
+        divArrayView[numAln] = divergence
+        deArrayView[numAln] = getDe(iterator.bamRcord)
+        readLenArrayView[numAln] = iterator.bamRcord.core.l_qseq
+        numAln += 1
 
-    call build_cluster in parallel with multiple process.
 
-    Parameters:
-    -----------
-        fpath: str
-            path of input BAM file.
+cpdef dict buildClusterParallel(object args):
+    '''call buildCluster in multi-process way'''
+    cdef set futures
+    cdef dict result = {}, returnValue
+    cdef dict bgInfo = getBackgroundInfo(args.genomeBamFilePath, args.numThread)
 
-        nprocess: int
-            maximum nummber of worker processes.
-        
-        nthreads: int
-            maximum nummber of extra threads to use in each sub 
-            process.
-        
-        minl: int
-            minimun segment length, cigar operation with length < 
-            minl will not be used to create insert segment.
-        
-        maxdist: int
-            max merging distance, segments with distance larger t-
-            han maxdist will not be merged in to the same cluster.
+    print("bg Divergence: {}\nbg de: {}\nbg coverage: {}\nbg readlen: {}".format(bgInfo["bgDiv"], bgInfo["bgDe"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
 
-    Returns:
-    --------
-        result: dict
-            dictionary of clusters, tid -> list_of_Cluster.
-    '''
-    cdef:
-        dict result={}, ret
-        set futures
-        int nchroms
-        float back_div, back_de, back_depth, back_readlen
-
-    # get background information
-    background_info(fpath, nprocess, &nchroms, &back_div, &back_de, &back_depth, &back_readlen)
-    print("background div: {}\nbackground de: {}\nbackground coverage: {}\nbackground readlen: {}".format(back_div, back_de, back_depth, back_readlen))
-    with ProcessPoolExecutor(max_workers=nprocess) as executor:
-        futures = set([executor.submit(build_cluster,
-                                       fpath,
-                                       rep_path,
-                                       gap_path,
-                                       teref,
-                                       nthreads,
+    with ProcessPoolExecutor(max_workers=args.numProcess) as executor:
+        futures = set([executor.submit(buildCluster,
+                                       args.genomeBamFilePath,
+                                       args.repeatPath,
+                                       args.gapPath,
+                                       args.referenceTe,
+                                       args.numThread,
                                        tid,
-                                       minl,
-                                       maxdist,
-                                       back_div,
-                                       back_de,
-                                       back_depth,
-                                       back_readlen) for tid in range(nchroms)])
-        # merge result from each process
+                                       args.minSegLen,
+                                       args.maxDistance,
+                                       bgInfo["bgDiv"],
+                                       bgInfo["bgDe"],
+                                       bgInfo["bgDepth"],
+                                       bgInfo["bgReadLen"]) for tid in range(bgInfo["numChrom"])])
+                                       
         for future in as_completed(futures):
-            ret = future.result()
-            result = {**result, **ret}
+            returnValue = future.result()
+            result = {**result, **returnValue}
     
     return result

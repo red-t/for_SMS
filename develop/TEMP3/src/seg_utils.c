@@ -1,401 +1,401 @@
 #include "seg_utils.h"
 
+/***************************
+ *** Initialize Segments ***
+ ***************************/
+int fillSegmentArray(bam1_t *bamRecord, Segment *segArray, int64_t fileOffset, int minSegLen)
+{
+    SegValues sameSegValues = initSegmentsFromCigar(bamRecord, segArray, fileOffset, minSegLen);
+    if (sameSegValues.numSeg > 0) setSameSegValues(segArray, sameSegValues);
+    return (int)sameSegValues.numSeg;
+}
+
+SegValues initSegmentsFromCigar(bam1_t *bamRecord, Segment *segArray, int64_t fileOffset, int minSegLen)
+{
+    int numCigar = bamRecord->core.n_cigar;
+    int lastCigarIndex = numCigar - 1;
+    uint32_t *cigarArray = bam_get_cigar(bamRecord);
+
+    SegValues segValues;
+    segValues.numSeg = 0;
+    segValues.segType = 0;
+    segValues.alnType = 0;
+    segValues.matchLen = 0;
+    segValues.queryPosition = 0;
+    segValues.refPosition = bamRecord->core.pos;
+
+    for (int i = 0; i < numCigar; i++)
+    {
+        int cigarLen = bam_cigar_oplen(cigarArray[i]);
+        switch (bam_cigar_op(cigarArray[i]))
+        {
+            case BAM_CMATCH:
+            case BAM_CEQUAL:
+            case BAM_CDIFF:
+                segValues.queryPosition += cigarLen;
+                segValues.refPosition += cigarLen;
+                segValues.matchLen += cigarLen;
+                break;
+
+            case BAM_CSOFT_CLIP:
+            case BAM_CINS:
+                if (cigarLen < minSegLen) { segValues.queryPosition += cigarLen; break; }
+
+                if (i == 0) segValues.segType = LEFT_CLIP;
+                else if (i == lastCigarIndex) segValues.segType = RIGHT_CLIP;
+                else segValues.segType = MID_INSERT;
+                
+                initSegment(&segArray[segValues.numSeg], segValues, cigarLen);
+                segValues.numSeg += 1;
+                segValues.alnType |= segValues.segType;
+                segValues.queryPosition += cigarLen;
+                break;
+
+            case BAM_CDEL:
+            case BAM_CREF_SKIP:
+                segValues.refPosition += cigarLen;
+                break;
+            default:
+                break;
+        }
+    }
+
+    segValues.fileOffset = fileOffset;
+    segValues.mapQual = bamRecord->core.qual;
+    segValues.flag = bamRecord->core.flag;
+    segValues.alnRefStart = bamRecord->core.pos;
+    return segValues;
+}
+
+void initSegment(Segment *segment, SegValues segValues, int cigarLen)
+{
+    segment->queryStart = segValues.queryPosition;
+    segment->queryEnd = segValues.queryPosition + cigarLen;
+    segment->refPosition = segValues.refPosition;
+    segment->overhang = segValues.matchLen;
+    segment->segType = segValues.segType;
+    segment->order = segValues.numSeg;
+}
+
+void setSameSegValues(Segment *segArray, SegValues segValues)
+{
+    for (uint8_t i = 0; i < segValues.numSeg; i++)
+    {
+        Segment *segment = &segArray[i];
+        segment->mapQual = segValues.mapQual;
+        segment->flag = segValues.flag;
+        segment->alnType = segValues.alnType;
+        segment->numSeg = segValues.numSeg;
+        segment->alnRefStart = segValues.alnRefStart;
+        segment->alnRefEnd = segValues.refPosition;
+        segment->matchLen = segValues.matchLen;
+        segment->fileOffset = segValues.fileOffset;
+    }
+}
+
 
 /***********************
- *** Segment records ***
+ *** Update Segments ***
  ***********************/
-
-int parse_cigar(bam1_t *bam, seg_dtype_struct segs[], int64_t offset, int minl)
-{   
-    uint32_t *cigar = bam_get_cigar(bam);
-    uint8_t  idx = 0;
-    uint8_t  rflag = 0;
-    int nmatch = 0;
-    int qpos = 0;
-    int rpos = bam->core.pos;
-    int n = bam->core.n_cigar;
-    int m = n-1;
-
-    // traverse alignment's CIGAR
-    for (int i = 0; i < n; i++)
-    {
-        int len = bam_cigar_oplen(cigar[i]);
-        switch (bam_cigar_op(cigar[i]))
-        {
-        // match
-        case BAM_CMATCH:
-        case BAM_CEQUAL:
-        case BAM_CDIFF:
-            qpos += len;
-            rpos += len;
-            nmatch += len;
-            break;
-        // clip or insert
-        case BAM_CSOFT_CLIP:
-        case BAM_CINS:
-            if (len >= minl)
-            {
-                if (i == 0)
-                {
-                    segs[idx].qst   = qpos;
-                    segs[idx].qed   = qpos + len;
-                    segs[idx].rpos  = rpos;
-                    segs[idx].sflag = LEFT_CLIP;
-                    segs[idx].ith   = idx;
-                    segs[idx].overhang = nmatch;
-                    rflag |= LEFT_CLIP;
-                } else if (i == m)
-                {
-                    segs[idx].qst   = qpos;
-                    segs[idx].qed   = qpos + len;
-                    segs[idx].rpos  = rpos;
-                    segs[idx].sflag = RIGHT_CLIP;
-                    segs[idx].ith   = idx;
-                    segs[idx].overhang = nmatch;
-                    rflag |= RIGHT_CLIP;
-                } else
-                {
-                    segs[idx].qst   = qpos;
-                    segs[idx].qed   = qpos + len;
-                    segs[idx].rpos  = rpos;
-                    segs[idx].sflag = MID_INSERT;
-                    segs[idx].ith   = idx;
-                    segs[idx].overhang = nmatch;
-                    rflag |= MID_INSERT;
-                }
-                idx += 1;
-            }
-            qpos += len;
-            break;
-        // del or skip
-        case BAM_CDEL:
-        case BAM_CREF_SKIP:
-            rpos += len;
-            break;
-        // defalut
-        default:
-            break;
-        }
-    }
-
-    // the same attributes of all segments
-    if (idx > 0)
-    {
-        for (uint8_t i = 0; i < idx; i++)
-        {
-            segs[i].flag    = bam->core.flag;
-            segs[i].mapq    = bam->core.qual;
-            segs[i].rflag   = rflag;
-            segs[i].offset  = offset;
-            segs[i].refst   = bam->core.pos;
-            segs[i].refed   = rpos;
-            segs[i].nseg    = idx;
-            segs[i].nmatch  = nmatch;
-        }
-    }
-
-    return (int)idx;
-}
-
-
-void aln_loc_flag(ailist_t *rep_ail, ailist_t *gap_ail, seg_dtype_struct segs[])
+void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList)
 {
-    int32_t n1 = 0, n2 = 0;
-    int32_t d1 = 0x7fffffff, d2 = 0x7fffffff;
-    uint8_t flag1, flag2;
+    Segment *segment = &segArray[0];
 
-    // intersecting with repeats
-    query_dist_p(rep_ail, segs[0].refst, 50, &n1, &d1);
-    query_dist_p(rep_ail, segs[0].refed, 50, &n2, &d2);
+    if (isLeftClip(segment))
+        segment->overhang = segment->matchLen; // update overhang
+    else if (isMidInsert(segment))
+        segment->overhang = getOverhang(segment->overhang, segment->matchLen);
 
-    // intersecting with gaps
-    query_dist_p(gap_ail, segs[0].refst, 50, &n1, &d1);
-    query_dist_p(gap_ail, segs[0].refed, 50, &n2, &d2);
-
-    // flag of refst
-    if (n1>0){
-        if (d1<50) { // at boundary
-            flag1 = 2;
-        } else { // inside repeats/gap
-            flag1 = 4;
-        }
-    } else { // at normal
-        flag1 = 1;
-    }
-
-    // flag of refed
-    if (n2>0){
-        if (d2<50) { // at boundary
-            flag2 = 2;
-        } else { // inside repeats/gap
-            flag2 = 4;
-        }
-    } else { // at normal
-        flag2 = 1;
-    }
-
-    // flag of the alignment
-    switch (flag1 | flag2)
-    {
-    // at least one side at normal region
-    case 1:
-    case 5:
-        segs[0].loc_flag = 1;
-        break;
-    // both sides at repeat/gap boundary
-    case 2:
-        segs[0].loc_flag = 4;
-        break;
-    // one side at repeat/gap boundary, the other at normal region
-    case 3:
-        segs[0].loc_flag = 8;
-        break;
-    // both sides inside repeat/gap
-    case 4:
-        segs[0].loc_flag = 2;
-        break;
-    // one side at repeat/gap boundary, the other inside repeat/gap
-    case 6:
-        segs[0].loc_flag = 16;
-        break;
+    if (!isFirstSegment(segment)) return;
+    setAlnLocationType(repeatAiList, gapAiList, segment); // update alnLocationType
     
-    default:
-        break;
-    }
+    if (isSingleSegment(segment)) return;
+    for (uint8_t i = 1; i < segment->numSeg; i++) // update alnLocationType for other segments
+        segArray[i].alnLocationType = segment->alnLocationType;
 }
 
+int getOverhang(int overhang, int matchLen)
+{ return (matchLen - overhang) < overhang ? (matchLen - overhang) : overhang; }
 
-void cseg_feat(seg_dtype_struct segs[], ailist_t *rep_ail, ailist_t *gap_ail)
+void setAlnLocationType(AiList *repeatAiList, AiList *gapAiList, Segment *segment)
 {
-    // update overhang
-    if (segs[0].sflag & LEFT_CLIP) {
-        segs[0].overhang = segs[0].nmatch;
-    } else if (segs[0].sflag & MID_INSERT) {
-        segs[0].overhang = update_overhang(segs[0].overhang, segs[0].nmatch);
-    }
-
-    // compute alignment location flag
-    if (segs[0].ith == 0) {
-        aln_loc_flag(rep_ail, gap_ail, segs);
-        if (segs[0].nseg > 1) {
-            for (uint8_t j = 1; j < segs[0].nseg; j++)
-            {
-                segs[j].loc_flag = segs[0].loc_flag;
-            }
-        }
-    }
+    uint8_t startLocationType = getPointLocationType(repeatAiList, gapAiList, segment->alnRefStart);
+    uint8_t endLocationType = getPointLocationType(repeatAiList, gapAiList, segment->alnRefEnd);
+    segment->alnLocationType = getAlnLocationType(startLocationType, endLocationType);
 }
 
-
-void cseg_feat_te(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int i)
+uint8_t getPointLocationType(AiList *repeatAiList, AiList *gapAiList, int point)
 {
-    int idx = tealns[i].idx;
+    int numOverlap = 0;
+    int minDistanceToOverlap = 0x7fffffff;
+    ailistQueryPoint(repeatAiList, point, 50, &numOverlap, &minDistanceToOverlap);
+    ailistQueryPoint(gapAiList, point, 50, &numOverlap, &minDistanceToOverlap);
 
-    // compute mapped query length
-    if (segs[idx].nmap == 0)
+    if (numOverlap == 0) return 1;
+    if (minDistanceToOverlap < 50) return 2;
+    return 4;
+}
+
+uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType)
+{
+    switch (startLocationType | endLocationType)
     {
-        segs[idx].st_idx = i;
-        segs[idx].lmap += tealns[i].qed - tealns[i].qst;
-    } else
-    { // i-th and (i-1)-th alignment come from the same segment
-        int j = i - 1;
-        if (tealns[i].qst < tealns[j].qed) { // i-th alignment overlap with (i-1)-th alignment
-            if (tealns[i].qed > tealns[j].qed) {
-                segs[idx].lmap += tealns[i].qed - tealns[j].qed;
-            } else { // i-th alignment covered by (i-1)-th alignment
-                tealns[i].qed = tealns[j].qed;
-                return;
-            }
-        }
-        else { // no overlap
-            segs[idx].lmap += tealns[i].qed - tealns[i].qst;
-        }
+        case 1:
+        case 5:
+            return 1;   // at least one end inside normal region
+        case 4:
+            return 2;   // both ends inside repeat/gap region
+        case 2:
+            return 4;   // both ends at repeat/gap boundary
+        case 3:
+            return 8;   // one end at repeat/gap boundary, the other inside normal region
+        case 6:
+            return 16;  // one end at repeat/gap boundary, the other inside repeat/gap
+        default:
+            return 0;
+    }
+}
+
+
+/***************************************
+ *** Update Segments By TeAlignments ***
+ ***************************************/
+void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIndex)
+{
+    TeAlignment *teAlignment = &teArray[teIndex];
+    int segIndex = teAlignment->segIndex;
+    Segment *segment = &segArray[segIndex];
+
+    if (isFirstTeAlign(segment)) {
+        segment->startIndex = teIndex;
+        int queryMapLen = getQueryMapLen(teAlignment);
+        updateSegByTeAlignment(segment, teAlignment, teIndex, queryMapLen);
+        return;
     }
 
-    // compute per-base alignment score, nmap, divergence
-    segs[idx].ed_idx = i+1;
-    segs[idx].sumAS += (float_t)tealns[i].AS / tealns[i].alnlen;
-    segs[idx].sumdiv += tealns[i].div;
-    segs[idx].sumde += tealns[i].de;
-    segs[idx].nmap += 1;
-    if ((segs[idx].flag & BAM_FREVERSE) == (tealns[i].flag & BAM_FREVERSE)) {
-        segs[idx].cnst += 1;
+    int prevIndex = teIndex - 1;
+    TeAlignment *prevTeAlignment = &teArray[prevIndex];
+    
+    if (!isOverlap(teAlignment, prevTeAlignment)) {
+        int queryMapLen = getQueryMapLen(teAlignment);
+        updateSegByTeAlignment(segment, teAlignment, teIndex, queryMapLen);
+        return;
+    }
+
+    if (isCover(teAlignment, prevTeAlignment)) {
+        teAlignment->queryEnd = prevTeAlignment->queryEnd;
+        return;
+    }
+
+    int queryMapLen = getOverlapQueryMapLen(teAlignment, prevTeAlignment);
+    updateSegByTeAlignment(segment, teAlignment, teIndex, queryMapLen);
+}
+
+static inline int getQueryMapLen(TeAlignment *teAlignment)
+{ return teAlignment->queryEnd - teAlignment->queryStart; }
+
+static inline int getOverlapQueryMapLen(TeAlignment *teAlignment, TeAlignment *prevTeAlignment)
+{ return teAlignment->queryEnd - prevTeAlignment->queryEnd; }
+
+void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIndex, int queryMapLen)
+{
+    segment->endIndex = teIndex + 1;
+    segment->numTeAlignment += 1;
+    segment->sumQueryMapLen += queryMapLen;
+    segment->sumDe += teAlignment->de;
+    segment->sumDivergence += teAlignment->divergence;
+    segment->sumAlnScore += (float_t)teAlignment->AlnScore / teAlignment->mapLen;
+    
+    if (!isSameDirection(segment, teAlignment)) { segment->directionFlag += (1 << 8); return; }
+    segment->directionFlag += 1;
+}
+
+void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, int numTeTid)
+{
+    Segment *segment = &segArray[0];
+    memset(teTidCountTable, 0, numTeTid * sizeof(int));
+
+    for (int i = segment->startIndex; i < segment->endIndex; i++)
+        teTidCountTable[teArray[i].teTid] += 1;
+}
+
+
+/*******************************
+ *** Initialize TeAlignments ***
+ *******************************/
+void fillTeArray(bam1_t *bamRecord, TeAlignment *teArray)
+{
+    int queryStart, queryEnd;
+    initQueryPosition(&queryStart, &queryEnd, bamRecord);
+
+    int mapLen;
+    float_t divergence;
+    getMapLenAndDiv(&mapLen, &divergence, bamRecord);
+
+    initTeAlignment(&teArray[0], bamRecord, queryStart, queryEnd, mapLen, divergence);
+}
+
+void initQueryPosition(int *queryStartPtr, int *queryEndPtr, bam1_t *bamRecord)
+{
+    int numCigar = bamRecord->core.n_cigar;
+    uint32_t *cigarArray = bam_get_cigar(bamRecord);
+    *queryStartPtr = 0;
+    *queryEndPtr = bamRecord->core.l_qseq;
+
+    if (!bam_is_rev(bamRecord)) {
+        if (firstCigarIsClip(cigarArray))
+            *queryStartPtr = bam_cigar_oplen(cigarArray[0]);
+        if (lastCigarIsClip(cigarArray, numCigar))
+            *queryEndPtr = bamRecord->core.l_qseq - bam_cigar_oplen(cigarArray[numCigar-1]);
+        return;
+    }
+
+    if (lastCigarIsClip(cigarArray, numCigar))
+        *queryStartPtr = bam_cigar_oplen(cigarArray[numCigar-1]);
+    if (firstCigarIsClip(cigarArray))
+        *queryEndPtr = bamRecord->core.l_qseq - bam_cigar_oplen(cigarArray[0]);
+}
+
+static inline int firstCigarIsClip(uint32_t *cigarArray)
+{ return bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP; }
+
+static inline int lastCigarIsClip(uint32_t *cigarArray, int numCigar)
+{ return bam_cigar_op(cigarArray[numCigar-1]) == BAM_CSOFT_CLIP; }
+
+void getMapLenAndDiv(int *mapLenPtr, float_t *divergencePtr, bam1_t *bamRecord)
+{
+    uint32_t *cigarArray = bam_get_cigar(bamRecord);
+    int numCigar = bamRecord->core.n_cigar;
+    int i, mapLen;
+
+    for (i=mapLen=0; i < numCigar; i++)
+        if (isCigarAligned(cigarArray[i])) mapLen += bam_cigar_oplen(cigarArray[i]);
+
+    *mapLenPtr = mapLen;
+    *divergencePtr = getDivergence(bamRecord, mapLen);
+}
+
+float_t getDivergence(bam1_t *bamRecord, int mapLen)
+{ return (float_t)(bam_aux2i(bam_aux_get(bamRecord, "NM")) - bam_aux2i(bam_aux_get(bamRecord, "nn"))) / mapLen; }
+
+void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart, int queryEnd, int mapLen, float_t divergence)
+{
+    teAlignment->segIndex = atoi(bam_get_qname(bamRecord));
+    teAlignment->AlnScore = bam_aux2i(bam_aux_get(bamRecord, "AS"));
+    teAlignment->queryStart = queryStart;
+    teAlignment->queryEnd = queryEnd;
+    teAlignment->mapLen = mapLen;
+    teAlignment->divergence = divergence;
+    teAlignment->de = getDe(bamRecord);
+    teAlignment->flag = bamRecord->core.flag;
+    teAlignment->teTid = bamRecord->core.tid;
+}
+
+float_t getDe(bam1_t *bamRecord)
+{ return bam_aux2f(bam_aux_get((bamRecord), "de")); }
+
+
+/********************
+ *** Trim Segment ***
+ ********************/
+int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIndex, int sourceStart, int sourceEnd)
+{
+    // use segIndex as destName
+    char destName[12];
+    sprintf(destName, "%d", segIndex);
+    
+    int destNameLen = strlen(destName);
+    int numNulls = 4 - destNameLen % 4;
+    int destSeqLen = sourceEnd - sourceStart;
+    int destDataLen = destNameLen + numNulls + (destSeqLen + 1)/2 + 1;
+
+    // re-allocate the data buffer as needed.
+    if (reallocBamData(destRecord, destDataLen) < 0) return -1;
+
+    setDestValues(destRecord, destNameLen, numNulls, destDataLen, sourceRecord->core.flag);
+    uint8_t *destDataPtr = setDestName(destRecord, destName, destNameLen, numNulls);
+    copySequence(sourceRecord, destRecord, destDataPtr, sourceStart, destSeqLen);
+
+    return (int)destDataLen;
+}
+
+static inline int reallocBamData(bam1_t *bamRecord, size_t desired)
+{
+    if (desired <= bamRecord->m_data) return 0;
+    return samReallocBamData(bamRecord, desired);
+}
+
+int samReallocBamData(bam1_t *bamRecord, size_t desired)
+{
+    // similar to sam_realloc_bam_data in htslib sam.c
+    uint32_t newDataMem;
+    uint8_t *newData;
+    newDataMem = desired;
+    kroundup32(newDataMem);
+    if (newDataMem < desired) { errno = ENOMEM; return -1; }
+    if ((bamGetMemPolicy(bamRecord) & BAM_USER_OWNS_DATA) == 0) {
+        newData = realloc(bamRecord->data, newDataMem);
     } else {
-        segs[idx].cnst += (1 << 8);
-    }
-}
-
-void cseg_tetype(seg_dtype_struct segs[], tealn_dtype_struct tealns[], int TEs[], int TE_size)
-{
-    memset(TEs, 0, TE_size * sizeof(int));
-    for (int i = segs[0].st_idx; i < segs[0].ed_idx; i++)
-    {
-        TEs[tealns[i].TE] += 1;
-    }
-}
-
-/*************************
- *** Alignment records ***
- *************************/
-
-void get_div(int32_t *alnlen, float_t *div, bam1_t *b)
-{
-    uint32_t ALIGNED = 0x3c03f;
-    uint32_t *cigar = bam_get_cigar(b);
-    int n_cigar = b->core.n_cigar, i, l;
-    for (i = l = 0; i < n_cigar; i++)
-    {
-        // M/I/D/=/X
-        if ((ALIGNED >> (bam_cigar_op(cigar[i])<<1) & 3) & 1)
-            l += bam_cigar_oplen(cigar[i]);
-    }
-    *alnlen = l;
-    *div = (float_t)(bam_aux2i(bam_aux_get(b, "NM")) - bam_aux2i(bam_aux_get(b, "nn"))) / l;
-}
-
-
-int sam_realloc_bam_data1(bam1_t *b, size_t desired)
-{
-    uint32_t new_m_data;
-    uint8_t *new_data;
-    new_m_data = desired;
-    kroundup32(new_m_data);
-    if (new_m_data < desired) {
-        errno = ENOMEM; // Not strictly true but we can't store the size
-        return -1;
-    }
-    if ((bam_get_mempolicy1(b) & BAM_USER_OWNS_DATA) == 0) {
-        new_data = realloc(b->data, new_m_data);
-    } else {
-        if ((new_data = malloc(new_m_data)) != NULL) {
-            if (b->l_data > 0)
-                memcpy(new_data, b->data,
-                       b->l_data < (int)b->m_data ? b->l_data : (int)b->m_data);
-            bam_set_mempolicy1(b, bam_get_mempolicy1(b) & (~BAM_USER_OWNS_DATA));
+        if ((newData = malloc(newDataMem)) != NULL) {
+            if (bamRecord->l_data > 0)
+                memcpy(newData, bamRecord->data,
+                       bamRecord->l_data < (int)bamRecord->m_data ? bamRecord->l_data : (int)bamRecord->m_data);
+            bamSetMemPolicy(bamRecord, bamGetMemPolicy(bamRecord) & (~BAM_USER_OWNS_DATA));
         }
     }
-    if (!new_data) return -1;
-    b->data = new_data;
-    b->m_data = new_m_data;
+    if (!newData) return -1;
+    bamRecord->data = newData;
+    bamRecord->m_data = newDataMem;
     return 0;
 }
 
+static inline uint32_t bamGetMemPolicy(bam1_t *bamRecord)
+{ return bamRecord->mempolicy; }
 
-int bam_trim1(bam1_t *src, bam1_t *dest, int32_t idx, int32_t qst, int32_t qed)
+static inline void bamSetMemPolicy(bam1_t *bamRecord, uint32_t policy)
+{ bamRecord->mempolicy = policy; }
+
+void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen, uint16_t sourceFlag)
 {
-    // use idx as qname and compute l_qname from it
-    int32_t l_seq = qed - qst;
-    char qname[12];
-    sprintf(qname, "%d", idx);
-    int32_t l_qname = strlen(qname);
-
-    // note: the qname is stored nul terminated and padded as described in the
-    // documentation for the bam1_t struct.
-    int32_t qname_nuls = 4 - l_qname % 4;
-
-    // re-allocate the data buffer as needed.
-    int32_t data_len = l_qname + qname_nuls + (l_seq + 1)/2 + 1;
-    if (realloc_bam_data1(dest, data_len) < 0) {
-        return -1;
-    }
-
-    dest->l_data = (int)data_len;
-    dest->core.l_extranul = (uint8_t)(qname_nuls - 1);
-    dest->core.flag = (src->core.flag & BAM_FREVERSE) | BAM_FUNMAP;
-    dest->core.l_qname = (uint16_t)(l_qname + qname_nuls);
-
-    // set qname
-    uint8_t *cp = dest->data;
-    memcpy(cp, qname, l_qname);
-    int i;
-    for (i = 0; i < qname_nuls; i++) {
-        cp[l_qname + i] = '\0';
-    }
-    cp += l_qname + qname_nuls;
-
-    // set sequence
-    // 1. when qst is even, the first base of seq[qst>>1] is just the start of the query,
-    // when qst is odd, the second base of seq[qst>>1] is the start of the query.
-    // 2. when l_seq is even, memcpy(cp, seq, (l_seq+1)>>1) will copy sequence with length
-    // of l_seq, when l_seq is odd, will copy sequence with length of (l_seq+1).
-    uint8_t *seq = bam_get_seq(src);
-    seq += (qst >> 1);
-    if (qst & 1) { // odd qst
-        if (l_seq & 1) { // odd l_seq
-            memcpy(cp, seq, (l_seq+1) >> 1);
-            dest->core.l_qseq = (int32_t)l_seq + 1;
-        } else { // even l_seq
-            memcpy(cp, seq, (l_seq+2) >> 1);
-            dest->core.l_qseq = (int32_t)l_seq + 1;
-        }
-    } else { // even qst
-        memcpy(cp, seq, (l_seq+1) >> 1);
-        dest->core.l_qseq = (int32_t)l_seq;
-    }
-
-    return (int)data_len;
+    destRecord->core.l_qname = (uint16_t)(destNameLen + numNulls);
+    destRecord->core.l_extranul = (uint8_t)(numNulls - 1);
+    destRecord->l_data = (int)destDataLen;
+    destRecord->core.flag = (sourceFlag & BAM_FREVERSE) | BAM_FUNMAP;
 }
 
-
-void origion_qpos(int32_t *qst, int32_t *qed, bam1_t *bam)
+uint8_t *setDestName(bam1_t *destRecord, char *destName, int destNameLen, int numNulls)
 {
-    int32_t st, ed;
-    uint32_t *cigar = bam_get_cigar(bam);
-    int32_t n = bam->core.n_cigar;
-
-    if (bam_is_rev(bam))
-    { // bam record is reverse
-        if (bam_cigar_op(cigar[n-1]) == BAM_CSOFT_CLIP)
-        {
-            st = bam_cigar_oplen(cigar[n-1]);
-        } else
-        {
-            st = 0;
-        }
-
-        if (bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP)
-        {
-            ed = bam->core.l_qseq - bam_cigar_oplen(cigar[0]);
-        } else
-        {
-            ed = bam->core.l_qseq;
-        }
-    } else { // bam record is forward
-        if (bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP)
-        {
-            st = bam_cigar_oplen(cigar[0]);
-        } else
-        {
-            st = 0;
-        }
-
-        if (bam_cigar_op(cigar[n-1]) == BAM_CSOFT_CLIP)
-        {
-            ed = bam->core.l_qseq - bam_cigar_oplen(cigar[n-1]);
-        } else
-        {
-            ed = bam->core.l_qseq;
-        }
-    }
-
-    *qst = st;
-    *qed = ed;
+    uint8_t *destDataPtr = destRecord->data;
+    
+    memcpy(destDataPtr, destName, destNameLen);
+    for (int i = 0; i < numNulls; i++)
+        destDataPtr[destNameLen + i] = '\0';
+    
+    destDataPtr += destNameLen + numNulls;
+    return destDataPtr;
 }
 
+void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr, int sourceStart, int destSeqLen)
+{
+    uint8_t *sourceSeqPtr = bam_get_seq(sourceRecord);
+    sourceSeqPtr += (sourceStart >> 1);
 
-void parse_tealns(bam1_t *bam, tealn_dtype_struct tealns[])
-{   int32_t qst, qed, alnlen;
-    float_t div;
+    // 1. when sourceStart is even, segment actually start from 1-st base of sourceSeqPtr[0].
+    //    else, start from 2-nd base of sourceSeqPtr[0].
+    // 2. when destSeqLen is even, memcpy(destDataPtr, sourceSeqPtr, (destSeqLen+1) >> 1) will copy destSeqLen bases.
+    //    else, will copy (destSeqLen+1) bases.
+    if (!isOdd(sourceStart)) {
+        memcpy(destDataPtr, sourceSeqPtr, (destSeqLen+1) >> 1);
+        destRecord->core.l_qseq = (int)destSeqLen;
+        return;
+    }
 
-    origion_qpos(&qst, &qed, bam);
-    get_div(&alnlen, &div, bam);
-    tealns[0].idx = atoi(bam_get_qname(bam));
-    tealns[0].AS = bam_aux2i(bam_aux_get(bam, "AS"));
-    tealns[0].qst = qst;
-    tealns[0].qed = qed;
-    tealns[0].alnlen = alnlen;
-    tealns[0].div = div;
-    tealns[0].de = get_de(bam);
-    tealns[0].flag = bam->core.flag;
-    tealns[0].TE = bam->core.tid;
+    if (!isOdd(destSeqLen)) {
+        memcpy(destDataPtr, sourceSeqPtr, (destSeqLen+2) >> 1);
+        destRecord->core.l_qseq = (int)destSeqLen + 1;
+        return;
+    }
+
+    memcpy(destDataPtr, sourceSeqPtr, (destSeqLen+1) >> 1);
+    destRecord->core.l_qseq = (int)destSeqLen + 1;
 }
