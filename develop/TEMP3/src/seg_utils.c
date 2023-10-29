@@ -203,7 +203,7 @@ void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIn
     segment->numTeAlignment += 1;
     segment->sumQueryMapLen += queryMapLen;
     segment->sumDivergence += teAlignment->divergence;
-    segment->sumAlnScore += (float_t)teAlignment->AlnScore / teAlignment->mapLen;
+    segment->sumAlnScore += (float)teAlignment->AlnScore / teAlignment->mapLen;
     
     if (!isSameDirection(segment, teAlignment)) { segment->directionFlag += (1 << 8); return; }
     segment->directionFlag += 1;
@@ -228,7 +228,7 @@ void fillTeArray(bam1_t *bamRecord, TeAlignment *teArray)
     initQueryPosition(&queryStart, &queryEnd, bamRecord);
 
     int mapLen;
-    float_t divergence;
+    float divergence;
     getMapLenAndDiv(&mapLen, &divergence, bamRecord);
 
     initTeAlignment(&teArray[0], bamRecord, queryStart, queryEnd, mapLen, divergence);
@@ -261,7 +261,7 @@ static inline int firstCigarIsClip(uint32_t *cigarArray)
 static inline int lastCigarIsClip(uint32_t *cigarArray, int numCigar)
 { return bam_cigar_op(cigarArray[numCigar-1]) == BAM_CSOFT_CLIP; }
 
-void getMapLenAndDiv(int *mapLenPtr, float_t *divergencePtr, bam1_t *bamRecord)
+void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bamRecord)
 {
     uint32_t *cigarArray = bam_get_cigar(bamRecord);
     int numCigar = bamRecord->core.n_cigar;
@@ -274,10 +274,10 @@ void getMapLenAndDiv(int *mapLenPtr, float_t *divergencePtr, bam1_t *bamRecord)
     *divergencePtr = getDivergence(bamRecord, mapLen);
 }
 
-float_t getDivergence(bam1_t *bamRecord, int mapLen)
-{ return (float_t)(bam_aux2i(bam_aux_get(bamRecord, "NM")) - bam_aux2i(bam_aux_get(bamRecord, "nn"))) / mapLen; }
+float getDivergence(bam1_t *bamRecord, int mapLen)
+{ return (float)(bam_aux2i(bam_aux_get(bamRecord, "NM")) - bam_aux2i(bam_aux_get(bamRecord, "nn"))) / mapLen; }
 
-void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart, int queryEnd, int mapLen, float_t divergence)
+void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart, int queryEnd, int mapLen, float divergence)
 {
     teAlignment->segIndex = atoi(bam_get_qname(bamRecord));
     teAlignment->AlnScore = bam_aux2i(bam_aux_get(bamRecord, "AS"));

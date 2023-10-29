@@ -40,7 +40,7 @@ void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
  ************************/
 void setTeAlignedFrac(Cluster *cluster, Segment *segArray, Args args)
 {
-    float_t numTeAlignedSeg = 0;
+    float numTeAlignedSeg = 0;
 
     for (int i = cluster->startIndex; i < cluster->endIndex; i++) {
         if (segArray[i].overhang < args.minOverhang) continue;
@@ -112,7 +112,7 @@ void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numL
 
     cluster->meanAlnScore += segment->sumAlnScore / segment->numTeAlignment;
 
-    cluster->meanQueryMapFrac += (float_t)segment->sumQueryMapLen / (segment->queryEnd - segment->queryStart);
+    cluster->meanQueryMapFrac += (float)segment->sumQueryMapLen / (segment->queryEnd - segment->queryStart);
 
     cluster->meanDivergence += segment->sumDivergence / segment->numTeAlignment;
 
@@ -157,15 +157,15 @@ static inline void countAlnFracs(Cluster *cluster, Segment *segment)
 static inline void setEntropy(Cluster *cluster, int numLeft, int numMiddle, int numRight)
 { cluster->entropy = getEntropy(numLeft, numMiddle, numRight, cluster->numSeg); }
 
-float_t getEntropy(int numLeft, int numMiddle, int numRight, int numSeg)
+float getEntropy(int numLeft, int numMiddle, int numRight, int numSeg)
 {
-    float_t entropy = 0;
+    float entropy = 0;
     if (numLeft > 0)
-        entropy -= ((float_t)numLeft / numSeg) * log2((float_t)numLeft / numSeg);
+        entropy -= ((float)numLeft / numSeg) * log2((float)numLeft / numSeg);
     if (numMiddle > 0)
-        entropy -= ((float_t)numMiddle / numSeg) * log2((float_t)numMiddle / numSeg);
+        entropy -= ((float)numMiddle / numSeg) * log2((float)numMiddle / numSeg);
     if (numRight > 0)
-        entropy -= ((float_t)numRight / numSeg) * log2((float_t)numRight / numSeg);
+        entropy -= ((float)numRight / numSeg) * log2((float)numRight / numSeg);
     return entropy;
 }
 
@@ -176,7 +176,7 @@ static inline void setNumSegType(Cluster *cluster)
 { cluster->numSegType = (cluster->numSegType&1) + ((cluster->numSegType&2)>>1) + ((cluster->numSegType&4)>>2); }
 
 /*********************************
- *** Update By Backbg Info ***
+ *** Update By Background Info ***
  *********************************/
 void setCltLocationType(Cluster *cluster, Args args)
 {
@@ -222,4 +222,16 @@ static inline void setBackbgInfo(Cluster *cluster, Args args)
     cluster->bgDiv = args.bgDiv;
     cluster->bgDepth = args.bgDepth;
     cluster->bgReadLen = args.bgReadLen;
+}
+
+
+/*****************
+ *** Filtering ***
+ *****************/
+void intersectBlackList(Cluster *cluster, Args args)
+{
+    int numOverlap = 0, minDistanceToOverlap = 0x7fffffff;
+    ailistQueryInterval(args.blackAiList, cluster->refStart, cluster->refEnd, 2, &numOverlap, &minDistanceToOverlap);
+
+    cluster->isInBlacklist = (uint8_t)(numOverlap > 0);
 }

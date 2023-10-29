@@ -65,6 +65,7 @@ cpdef dict buildClusterParallel(object args):
                                        args.genomeBamFilePath,
                                        args.repeatPath,
                                        args.gapPath,
+                                       args.blackListPath,
                                        args.referenceTe,
                                        args.numThread,
                                        tid,

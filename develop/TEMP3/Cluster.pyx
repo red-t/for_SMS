@@ -64,11 +64,12 @@ ClusterDt = np.dtype([
     ('meanAlnScore',        np.float32),
     ('meanQueryMapFrac',    np.float32),
     ('meanDivergence',      np.float32),
-    ('bgDiv',       np.float32),
-    ('bgDepth',     np.float32),
-    ('bgReadLen',   np.float32),
+    ('bgDiv',               np.float32),
+    ('bgDepth',             np.float32),
+    ('bgReadLen',           np.float32),
     ('teAlignedFrac',       np.float32),
     ('teTid',               np.int32),
+    ('isInBlacklist',       np.uint8),
 ])
 
 
@@ -104,6 +105,15 @@ cdef object getSegArray(BamFile genomeBamFile, Args args):
         numSeg += returnValue
         if returnValue > 0:
             outputBamFile.write(iterator.bamRcord)
+
+
+cdef AiList* newAiList(str filePath, const char *chrom):
+    cdef bytes filePathBytes = filePath.encode()
+    cdef AiList *aiList = initAiList()
+
+    readBED(aiList, filePathBytes, chrom)
+    constructAiList(aiList, 20)
+    return aiList
 
 
 cdef updateSegArray(Segment[::1] segArray, Args args):
@@ -328,6 +338,16 @@ cdef outPut(object cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args 
     cltOutput.close(); segOutput.close(); del iterator
 
 
+#################
+### Filtering ###
+#################
+cdef filterByBlacklist(Cluster[::1] cltArray, Args args):
+    cdef int i
+
+    for i in range(cltArray.shape[0]):
+        intersectBlackList(&cltArray[i], args)
+
+
 ############
 ### Main ###
 ############
@@ -335,6 +355,7 @@ cpdef dict buildCluster(
     str genomeBamFilePath,
     str repeatPath,
     str gapPath,
+    str blackListPath,
     str referenceTe,
     int numThread,
     int tid,
@@ -352,21 +373,11 @@ cpdef dict buildCluster(
     cdef Segment[::1] segArrayView = segArray
 
     # 2. compute segment features
-    cdef bytes repeatFileName = repeatPath.encode()
-    cdef bytes gapFileName = gapPath.encode()
     cdef const char *chrom = sam_hdr_tid2name(genomeBamFile.header, tid)
-    cdef AiList *repeatAiList = initAiList()
-    cdef AiList *gapAiList = initAiList()
-
-    readBED(repeatAiList, repeatFileName, chrom)
-    readBED(gapAiList, gapFileName, chrom)
-    constructAiList(repeatAiList, 20)
-    constructAiList(gapAiList, 20)
-    args.repeatAiList = repeatAiList
-    args.gapAiList = gapAiList
+    args.repeatAiList = newAiList(repeatPath, chrom)
+    args.gapAiList = newAiList(gapPath, chrom)
 
     updateSegArray(segArrayView, args)
-
     segArray.sort(order='refPosition')
     ouputSegmentSeqs(segArrayView, genomeBamFile, args)
 
@@ -381,7 +392,11 @@ cpdef dict buildCluster(
     # 4. compute cluster features
     updateCltArray(genomeBamFile, cltArrayView, segArrayView, args)
 
-    # 5. output
+    # 5. filter by blacklist
+    args.blackAiList = newAiList(blackListPath, chrom)
+    filterByBlacklist(cltArrayView, args)
+
+    # 6. output
     outPut(cltArray, segArrayView, genomeBamFile, args)
     genomeBamFile.close(); del genomeBamFile
 

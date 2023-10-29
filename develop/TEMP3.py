@@ -11,6 +11,8 @@ def parseArgs():
                                  help='repeat annotation file', default='')
     parser.add_argument('-g', '--gap', dest='gapPath', type=str,
                                  help='gap annotation file', default='')
+    parser.add_argument('-B', '--blacklist', dest='blackListPath', type=str,
+                                 help='blacklist BED file', default='')
     parser.add_argument('-T', '--refte', dest='referenceTe', type=str,
                                  help='transposon reference fasta file', default='')
     parser.add_argument('-o', '--outpath', dest='outPath', type=str,

@@ -62,8 +62,8 @@ typedef struct {
     uint8_t     alnLocationType;
     uint8_t     numTeAlignment;
     int         sumQueryMapLen;
-    float_t     sumAlnScore;
-    float_t     sumDivergence;
+    float       sumAlnScore;
+    float       sumDivergence;
     uint16_t    directionFlag;
     int         startIndex;
     int         endIndex;
@@ -100,7 +100,7 @@ typedef struct {
     int     queryStart;
     int     queryEnd;
     int     mapLen;
-    float_t divergence;
+    float   divergence;
     int16_t flag;
     int     teTid;
 } __attribute__((packed)) TeAlignment;
@@ -162,9 +162,9 @@ void fillTeArray(bam1_t *bamRecord, TeAlignment *teArray);
 void initQueryPosition(int *queryStartPtr, int *queryEndPtr, bam1_t *bamRecord);
 static inline int firstCigarIsClip(uint32_t *cigarArray);
 static inline int lastCigarIsClip(uint32_t *cigarArray, int numCigar);
-void getMapLenAndDiv(int *mapLenPtr, float_t *divergencePtr, bam1_t *bamRecord);
-float_t getDivergence(bam1_t *bamRecord, int mapLen);
-void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart, int queryEnd, int mapLen, float_t divergence);
+void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bamRecord);
+float getDivergence(bam1_t *bamRecord, int mapLen);
+void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart, int queryEnd, int mapLen, float divergence);
 
 
 /********************

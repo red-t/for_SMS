@@ -54,29 +54,30 @@ typedef struct {
     int         refEnd;
     int         startIndex;
     int         endIndex;
-    float_t     numSeg;
+    float       numSeg;
     uint16_t    directionFlag;
     uint8_t     cltType;
     uint8_t     locationType;
     uint8_t     numSegType;
-    float_t     entropy;
-    float_t     balanceRatio;
-    float_t     lowMapQualFrac;
-    float_t     dualClipFrac;
-    float_t     alnFrac1;
-    float_t     alnFrac2;
-    float_t     alnFrac4;
-    float_t     alnFrac8;
-    float_t     alnFrac16;
-    float_t     meanMapQual;
-    float_t     meanAlnScore;
-    float_t     meanQueryMapFrac;
-    float_t     meanDivergence;
-    float_t     bgDiv;
-    float_t     bgDepth;
-    float_t     bgReadLen;
-    float_t     teAlignedFrac;
+    float       entropy;
+    float       balanceRatio;
+    float       lowMapQualFrac;
+    float       dualClipFrac;
+    float       alnFrac1;
+    float       alnFrac2;
+    float       alnFrac4;
+    float       alnFrac8;
+    float       alnFrac16;
+    float       meanMapQual;
+    float       meanAlnScore;
+    float       meanQueryMapFrac;
+    float       meanDivergence;
+    float       bgDiv;
+    float       bgDepth;
+    float       bgReadLen;
+    float       teAlignedFrac;
     int         teTid;
+    uint8_t     isInBlacklist;
 } __attribute__((packed)) Cluster;
 
 typedef struct {
@@ -95,6 +96,7 @@ typedef struct {
     bam1_t      *secondBamRecord;
     AiList      *repeatAiList;
     AiList      *gapAiList;
+    AiList      *blackAiList;
 } Args;
 
 
@@ -129,18 +131,23 @@ void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numL
 static inline void countDifferentSeg(int *numLeft, int *numMiddle, int *numRight, Segment *segment);
 static inline void countAlnFracs(Cluster *cluster, Segment *segment);
 static inline void setEntropy(Cluster *cluster, int numLeft, int numMiddle, int numRight);
-float_t getEntropy(int numLeft, int numMiddle, int numRight, int numSeg);
+float getEntropy(int numLeft, int numMiddle, int numRight, int numSeg);
 static inline void setBalanceRatio(Cluster *cluster, int numLeft, int numRight);
 static inline void setNumSegType(Cluster *cluster);
 
 
 /*********************************
- *** Update By Backbg Info ***
+ *** Update By Background Info ***
  *********************************/
 void setCltLocationType(Cluster *cluster, Args args);
 static inline void divideValuesByNumSeg(Cluster *cluster);
 static inline void divideValuesByBackbg(Cluster *cluster, Args args);
 static inline void setDirection(Cluster *cluster);
 static inline void setBackbgInfo(Cluster *cluster, Args args);
+
+/*****************
+ *** Filtering ***
+ *****************/
+void intersectBlackList(Cluster *cluster, Args args);
 
 #endif // CLUSTER_UTILS_H

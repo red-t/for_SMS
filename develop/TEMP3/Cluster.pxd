@@ -30,6 +30,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       bgReadLen
         float       teAlignedFrac
         int         teTid
+        uint8_t     isInBlacklist
     
     ctypedef struct Args:
         int         numThread
@@ -47,11 +48,13 @@ cdef extern from "src/cluster_utils.h" nogil:
         bam1_t      *secondBamRecord
         AiList      *repeatAiList
         AiList      *gapAiList
+        AiList      *blackAiList
     
     int isValidCandidate(Cluster *cluster)
     int overhangIsShort(Segment *segment, int minOverhang)
     Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDepth, float bgReadLen)
     void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
+    void intersectBlackList(Cluster *cluster, Args args)
 
 
 cdef extern from "src/seg_utils.h" nogil:
@@ -124,6 +127,7 @@ cpdef dict buildCluster(
     str genomeBamFilePath,
     str repeatPath,
     str gapPath,
+    str blackListPath,
     str referenceTe,
     int numThread,
     int tid,
