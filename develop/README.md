@@ -2,7 +2,7 @@
 #### Dependency
 **1. Autogluon**
 ```
-conda create -n TEMP3 python=3.10
+conda create -n TEMP3 python=3.10.13
 
 conda activate TEMP3
 
@@ -11,11 +11,12 @@ conda install -c conda-forge mamba
 mamba install -c conda-forge autogluon
 ```
 
-**2. Samtools (1.7)**
+**2. Samtools (1.17)**
 ```
-# 最新版本的应该就是 1.7
+conda install samtools=1.17 -c conda-forge
 
-conda install samtools -c conda-forge
+# or
+mamba install samtools=1.17 -c conda-forge
 ```
 
 **3. Minimap2 (2.26-r1175)**
@@ -23,6 +24,9 @@ conda install samtools -c conda-forge
 # 最新版本的应该就是 2.26-r1175
 
 conda install minimap2 -c conda-forge
+
+# or
+mamba install minimap2 -c conda-forge
 ```
 
 **4. Cython (0.29.33)**
@@ -45,56 +49,56 @@ rm -r build/ && rm TEMP3/*c
 ----
 #### Usage
 ```
-python path/to/develop/TEMP3.py -b BAM -r REPEAT.bed -g GAP.bed -T TE.fa -p NUM_PROCESS -t NUM_THREAD -l 100
+python TEMP3.py -b BAM -r REPEAT.bed -g GAP.bed -B BlackList.bed -T TE.fa --germ GERM_MODEL --soma SOMA_MODEL -p NUM_PROCESS -t NUM_THREAD
 ```
 
 ---
 #### Result
 ```
 # Now, each column of the *clt.txt is:
-# Column 1 --- chrom
-# Column 2 --- start
-# Column 3 --- end
-# Column 4 --- cluster id
-# Column 5 --- number of segment (normalized by background depth)
-# Column 6 --- strand
-# Column 7 --- start index (index of corresponding segments)
-# Column 8 --- end index
-# Column 9 --- nseg (normalized by background depth)
-# Column 10 --- strand flag (the orientation of this insertion)
-					1:forward
-					2:reverse
-					other:unkown
-# Column 11 --- single flag (whether the cluster only have single support read)
-					0:multiple support reads
-					1: single read with 1 alignment
-					2: single read with 2 alignments
-# Column 12 --- cluster location flag
-					1: at normal region
-					2: at repeat/gap boundary
-					4: inside repeat/gap
-# Column 13 --- number of segment type
-# Column 14 --- entropy
-# Column 15 --- balance ratio
-# Column 16 --- fraction of segments with low mapq (<5)
-# Column 17 --- fraction of "dual-clip" alignments
-# Column 18 --- fraction of segments with loc_flag=1
-# Column 19 --- fraction of segments with loc_flag=2
-# Column 20 --- fraction of segments with loc_flag=4
-# Column 21 --- fraction of segments with loc_flag=8
-# Column 22 --- fraction of segments with loc_flag=16
-# Column 23 --- average mapq of this cluster
-# Column 24 --- average per base alignment score
-# Column 25 --- average query aligned fraction
-# Column 26 --- average per-base divergence ((#mismatches + #I + #D) / (#mismatches + #I + #D + #matches))
-# Column 27 --- average per-base gap-compressed divergence (normalized background)
-# Column 28 --- background div
-# Column 29 --- background de
-# Column 30 --- background depth
-# Column 31 --- background read length
-# Column 32 --- fraction of TE-aligned segment
-# Column 33 --- flag (if the cluster pass TE-alnfrac threshold)
-					0: passed
-					1: low alnfrac
-# Column 34 --- TE (tid of corresponding TE)
+
+Column	Value	Description
+
+1	chrom				chromosome
+2	refStart			cluster start on reference sequence (0-based, included)
+3	refEnd				cluster end on reference sequence (0-based, not-included)
+4	cltID				cluster ID
+5	numSeg				number of segments in the cluster (normalized by bg depth)
+6	strand				cluster orientation
+7	startIndex			start index in segments array (0-based, include)
+8	endIndex			end index in segments array (0-based, not-include)
+9	numSeg				number of segments in the cluster (normalized by bg depth)
+10	directionFlag		bitwise flag representing cluster direction
+							1: forward
+							2: reverse
+							other: unkown
+11	cltType				cluster type
+							0: germline (multiple support reads)
+							1: somatic (1 support read & 1 alignment)
+							2: somatic (1 support read & 2 alignments)
+12	locationType		bitwise flag representing cluster location
+							1: inside normal region
+							2: at repeat/gap boundary
+							4: inside repeat/gap
+13	numSegType			number of different segment types
+14	entropy				entropy based on fraction of different type segments
+15	balanceRatio		balance ratio based on number of left- & right-clip segments
+16	lowMapQualFrac		fraction of segments with low mapQual (<5)
+17	dualClipFrac		fraction of "dual-clip" alignments
+18	alnFrac1			fraction of segments with alnLocationType=1
+19	alnFrac2			fraction of segments with alnLocationType=2
+20	alnFrac4			fraction of segments with alnLocationType=4
+21	alnFrac8			fraction of segments with alnLocationType=8
+22	alnFrac16			fraction of segments with alnLocationType=16
+23	meanMapQual			mean mapQual of cluster
+24	meanAlnScore		mean per-base alignment score (based on teAlignments)
+25	meanQueryMapFrac	mean query mapped fraction (based on teAlignments)
+26	meanDivergence		mean per-base divergence ((#mismatches + #I + #D) / (#mismatches + #I + #D + #matches))
+27	bgDiv				background divergence (for normalization)
+28	bgDepth				background depth (for normalization)
+29	bgReadLen			background read length
+30	teAlignedFrac		fraction of TE-aligned segments
+31	teTid				majority TE-tid of cluster
+32	isInBlacklist		whether cluster intersects with blacklist
+33	probability			the probability of the cluster to be a positive insertion
 ```

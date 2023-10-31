@@ -17,7 +17,7 @@
  @field  refStart           cluster start on reference sequence (0-based, included)
  @field  refEnd             cluster end on reference sequence (0-based, not-included)
  @field  startIndex         start index in segments array (0-based, include)
- @field  endIndex           start index in segments array (0-based, not-include)
+ @field  endIndex           end index in segments array (0-based, not-include)
  @field  numSeg             number of segments in the cluster (normalized by bg depth)
  @field  directionFlag      bitwise flag representing cluster direction
                                 1: forward
@@ -47,7 +47,10 @@
  @field  bgDiv              background divergence (for normalization)
  @field  bgDepth            background depth (for normalization)
  @field  bgReadLen          background read length
+ @field  teAlignedFrac      fraction of TE-aligned segments
  @field  teTid              majority TE-tid of cluster
+ @field  isInBlacklist      whether cluster intersects with blacklist
+ @field  probability        the probability of the cluster to be a positive insertion
  */
 typedef struct {
     int         refStart;
@@ -78,6 +81,7 @@ typedef struct {
     float       teAlignedFrac;
     int         teTid;
     uint8_t     isInBlacklist;
+    float       probability;
 } __attribute__((packed)) Cluster;
 
 typedef struct {
@@ -103,7 +107,6 @@ typedef struct {
 /**********************
  *** Update Cluster ***
  **********************/
-Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDepth, float bgReadLen);
 void updateCluster(Cluster *cltArray, Segment *segArray, Args args);
 
 

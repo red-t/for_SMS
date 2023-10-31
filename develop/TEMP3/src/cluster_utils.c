@@ -3,21 +3,6 @@
 /**********************
  *** Update Cluster ***
  **********************/
-Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDepth, float bgReadLen)
-{
-    Args args;
-    args.numThread = numThread;
-    args.tid = tid;
-    args.minSegLen = minSegLen;
-    args.maxDistance = maxDistance;
-    args.minOverhang = minOverhang;
-    args.bgDiv = bgDiv;
-    args.bgDepth = bgDepth;
-    args.bgReadLen = bgReadLen;
-
-    return args;
-}
-
 void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
 {
     Cluster *cluster = &cltArray[0];

@@ -52,28 +52,17 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
         numAln += 1
 
 
-cpdef dict buildClusterParallel(object args):
+cpdef dict buildClusterParallel(object cmdArgs):
     '''call buildCluster in multi-process way'''
+    
     cdef set futures
     cdef dict result = {}, returnValue
-    cdef dict bgInfo = getBackgroundInfo(args.genomeBamFilePath, args.numThread)
+    cdef dict bgInfo = getBackgroundInfo(cmdArgs.genomeBamFilePath, cmdArgs.numThread)
 
     print("bg Divergence: {}\nbg coverage: {}\nbg readlen: {}".format(bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
 
-    with ProcessPoolExecutor(max_workers=args.numProcess) as executor:
-        futures = set([executor.submit(buildCluster,
-                                       args.genomeBamFilePath,
-                                       args.repeatPath,
-                                       args.gapPath,
-                                       args.blackListPath,
-                                       args.referenceTe,
-                                       args.numThread,
-                                       tid,
-                                       args.minSegLen,
-                                       args.maxDistance,
-                                       bgInfo["bgDiv"],
-                                       bgInfo["bgDepth"],
-                                       bgInfo["bgReadLen"]) for tid in range(bgInfo["numChrom"])])
+    with ProcessPoolExecutor(max_workers=cmdArgs.numProcess) as executor:
+        futures = set([executor.submit(buildCluster, tid, bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"], cmdArgs) for tid in range(bgInfo["numChrom"])])
                                        
         for future in as_completed(futures):
             returnValue = future.result()

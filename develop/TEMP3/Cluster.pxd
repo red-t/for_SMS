@@ -31,6 +31,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       teAlignedFrac
         int         teTid
         uint8_t     isInBlacklist
+        float       probability
     
     ctypedef struct Args:
         int         numThread
@@ -123,16 +124,4 @@ cdef extern from "src/AIList.h" nogil:
     void constructAiList(AiList *ail, int minCoverageLen)
 
 
-cpdef dict buildCluster(
-    str genomeBamFilePath,
-    str repeatPath,
-    str gapPath,
-    str blackListPath,
-    str referenceTe,
-    int numThread,
-    int tid,
-    int minSegLen,
-    int maxDistance,
-    float bgDiv,
-    float bgDepth,
-    float bgReadLen)
+cpdef dict buildCluster(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs)

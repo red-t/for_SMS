@@ -1,5 +1,7 @@
 import numpy as np
+import pandas as pd
 from subprocess import Popen, DEVNULL
+from autogluon.tabular import TabularPredictor
 
 ##################
 ### Data Types ###
@@ -70,7 +72,33 @@ ClusterDt = np.dtype([
     ('teAlignedFrac',       np.float32),
     ('teTid',               np.int32),
     ('isInBlacklist',       np.uint8),
+    ('probability',         np.float32),
 ])
+
+##############################
+### Construction Functions ###
+##############################
+cdef AiList* newAiList(str filePath, const char *chrom):
+    cdef bytes filePathBytes = filePath.encode()
+    cdef AiList *aiList = initAiList()
+
+    readBED(aiList, filePathBytes, chrom)
+    constructAiList(aiList, 20)
+    return aiList
+
+
+cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs):
+    cdef Args args
+
+    args.tid = tid
+    args.bgDiv = bgDiv
+    args.bgDepth = bgDepth
+    args.bgReadLen = bgReadLen
+    args.numThread = cmdArgs.numThread
+    args.minSegLen = cmdArgs.minSegLen
+    args.maxDistance = cmdArgs.maxDistance
+    args.minOverhang = cmdArgs.minOverhang
+    return args
 
 
 ##########################
@@ -105,15 +133,6 @@ cdef object getSegArray(BamFile genomeBamFile, Args args):
         numSeg += returnValue
         if returnValue > 0:
             outputBamFile.write(iterator.bamRcord)
-
-
-cdef AiList* newAiList(str filePath, const char *chrom):
-    cdef bytes filePathBytes = filePath.encode()
-    cdef AiList *aiList = initAiList()
-
-    readBED(aiList, filePathBytes, chrom)
-    constructAiList(aiList, 20)
-    return aiList
 
 
 cdef updateSegArray(Segment[::1] segArray, Args args):
@@ -252,7 +271,7 @@ cdef object getCltArray(Segment[::1] segArray, Args args):
     del template; return cltArray[:numClt]
 
 
-cdef updateCltArray(BamFile genomeBamFile, Cluster[::1] cltArray, Segment[::1] segArray, Args args):
+cdef updateCltArray(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
     
     cdef BamFile teBamFile = BamFile("tmp.all_supp_reads.{}.bam".format(args.tid), "rb", 1)
     cdef object teTidCountTable = np.zeros(teBamFile.header.n_targets, dtype=np.int32)
@@ -277,6 +296,46 @@ cdef updateCltArray(BamFile genomeBamFile, Cluster[::1] cltArray, Segment[::1] s
     destroyAiList(args.repeatAiList); destroyAiList(args.gapAiList); del teTidCountTable
 
 
+######################
+### Filter Cluster ###
+######################
+cdef filterByBlacklist(Cluster[::1] cltArray, Args args):
+    cdef int i
+
+    for i in range(cltArray.shape[0]):
+        intersectBlackList(&cltArray[i], args)
+    
+    destroyAiList(args.blackAiList)
+
+
+cdef object filterByModel(object cltArray, object cmdArgs):
+    cdef object cltDf = pd.DataFrame(cltArray)
+    
+    filterGermByModel(cltDf, cmdArgs.germModelPath)
+    filterSomaByModel(cltDf, cmdArgs.somaModelPath)
+
+    return cltDf.to_records(index=False)
+
+cdef filterGermByModel(object cltDf, str modelPath):
+    cdef object predictor = TabularPredictor.load(modelPath)
+    cdef object germDf = cltDf.loc[(cltDf['cltType']==0) & (cltDf['teAlignedFrac']>=0.8) & (cltDf['isInBlacklist']==0)]
+
+    probability = predictor.predict_proba(germDf)
+    probability.columns = ['0', 'probability']
+    cltDf.update(probability)
+
+cdef filterSomaByModel(object cltDf, str modelPath):
+    cdef object predictor = TabularPredictor.load(modelPath)
+    cdef object somaDf = cltDf.loc[(cltDf['cltType']>0) & (cltDf['teAlignedFrac']>=0.8) & (cltDf['isInBlacklist']==0)]
+
+    probability = predictor.predict_proba(somaDf)
+    probability.columns = ['0', 'probability']
+    cltDf.update(probability)
+
+
+##############
+### Output ###
+##############
 cdef outPut(object cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
 
     cdef bytes qnameBytes
@@ -338,50 +397,26 @@ cdef outPut(object cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args 
     cltOutput.close(); segOutput.close(); del iterator
 
 
-#################
-### Filtering ###
-#################
-cdef filterByBlacklist(Cluster[::1] cltArray, Args args):
-    cdef int i
-
-    for i in range(cltArray.shape[0]):
-        intersectBlackList(&cltArray[i], args)
-
-
 ############
 ### Main ###
 ############
-cpdef dict buildCluster(
-    str genomeBamFilePath,
-    str repeatPath,
-    str gapPath,
-    str blackListPath,
-    str referenceTe,
-    int numThread,
-    int tid,
-    int minSegLen,
-    int maxDistance,
-    float bgDiv,
-    float bgDepth,
-    float bgReadLen,
-    int minOverhang=200):
-    
+cpdef dict buildCluster(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs):
     # 1. construct segments
-    cdef Args args = initArgs(numThread, tid, minSegLen, maxDistance, minOverhang, bgDiv, bgDepth, bgReadLen)
-    cdef BamFile genomeBamFile = BamFile(genomeBamFilePath, "rb", numThread)
+    cdef Args args = newArgs(tid, bgDiv, bgDepth, bgReadLen, cmdArgs)
+    cdef BamFile genomeBamFile = BamFile(cmdArgs.genomeBamFilePath, "rb", cmdArgs.numThread)
     cdef object segArray = getSegArray(genomeBamFile, args)
     cdef Segment[::1] segArrayView = segArray
 
     # 2. compute segment features
     cdef const char *chrom = sam_hdr_tid2name(genomeBamFile.header, tid)
-    args.repeatAiList = newAiList(repeatPath, chrom)
-    args.gapAiList = newAiList(gapPath, chrom)
+    args.repeatAiList = newAiList(cmdArgs.repeatPath, chrom)
+    args.gapAiList = newAiList(cmdArgs.gapPath, chrom)
 
     updateSegArray(segArrayView, args)
     segArray.sort(order='refPosition')
     ouputSegmentSeqs(segArrayView, genomeBamFile, args)
 
-    mapByMinimap2(referenceTe, args)
+    mapByMinimap2(cmdArgs.referenceTe, args)
     teArray = updateSegArrayByTe(segArrayView, args)
     
     # 3. construct cluster
@@ -390,15 +425,16 @@ cpdef dict buildCluster(
     cdef Cluster[::1] cltArrayView = cltArray
 
     # 4. compute cluster features
-    updateCltArray(genomeBamFile, cltArrayView, segArrayView, args)
+    updateCltArray(cltArrayView, segArrayView, genomeBamFile, args)
 
-    # 5. filter by blacklist
-    args.blackAiList = newAiList(blackListPath, chrom)
+    # 5. filter cluster
+    args.blackAiList = newAiList(cmdArgs.blackListPath, chrom)
     filterByBlacklist(cltArrayView, args)
+    cltArray = filterByModel(cltArray, cmdArgs)
 
     # 6. output
     outPut(cltArray, segArrayView, genomeBamFile, args)
     genomeBamFile.close(); del genomeBamFile
 
-    ResultDict[args.tid] = (cltArray, segArray, teArray)
+    ResultDict[tid] = (cltArray, segArray, teArray)
     return ResultDict

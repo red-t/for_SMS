@@ -15,6 +15,10 @@ def parseArgs():
                                  help='blacklist BED file', default='')
     parser.add_argument('-T', '--refte', dest='referenceTe', type=str,
                                  help='transposon reference fasta file', default='')
+    parser.add_argument('--germ', dest='germModelPath', type=str,
+                                 help='path of germline insertion model', default='')
+    parser.add_argument('--soma', dest='somaModelPath', type=str,
+                                 help='path of somatic insertion model', default='')
     parser.add_argument('-o', '--outpath', dest='outPath', type=str,
                                  help='output directory', default='./')
     parser.add_argument('-p', '--numprocess', dest='numProcess', type=int,
@@ -25,15 +29,23 @@ def parseArgs():
                                  help='min segment length, cigar operation with length < minSegLen will not be used to create segment.', default=100)
     parser.add_argument('-L', '--maxdist', dest='maxDistance', type=int,
                                  help='max merging distance, segments with distance larger than maxdist will not be merged in to the same cluster.', default=50)
+    parser.add_argument('--overhang', dest='minOverhang', type=int,
+                                 help='min overhang length', default=200)
     
     args = parser.parse_args()
     return args
 
 
 if __name__ == '__main__':
-    args = parseArgs()
+    cmdArgs = parseArgs()
 
-    tidToResult = buildClusterParallel(args)
+    if not cmdArgs.germModelPath.endswith('/'):
+        cmdArgs.germModelPath += '/'
+    
+    if not cmdArgs.somaModelPath.endswith('/'):
+        cmdArgs.somaModelPath += '/'
+
+    tidToResult = buildClusterParallel(cmdArgs)
 
     # Log
     print("当前版本构建的 clusters 总数:")
