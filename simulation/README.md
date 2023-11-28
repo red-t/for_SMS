@@ -52,12 +52,25 @@ Based on the **"template genome"** build at step1, here we will build **"populat
 Make sure you have these dependencies:
 ```
 1. samtools
+conda install samtools -c conda-forge
+
 2. scipy
+conda install scipy -c conda-forge
+
 3. pysam
+conda install pysma -c conda-forge
+
 4. cython
+pip install cython
 ```
 
-Then, run script `simulation_protocol.sh`:
+Then compiling
+```
+# make sure you are now in path/to/simulation
+python setup.py build_ext -i && rm -r build && rm *c
+```
+
+Then run script `simulation_protocol.sh`:
 
 #### For Fruitfly
 ```
