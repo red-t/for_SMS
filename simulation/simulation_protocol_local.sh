@@ -224,85 +224,40 @@ done
 ##########################
 ### Generate Raw Reads ###
 ##########################
-# for((i=0; i<$contigs_count; i++))
-# do
-#     if [ -f ${contigs[$i]}/${contigs[$i]}.0.pgd ]; then
-#         cd ${contigs[$i]}
-#         N_SUB=`awk -v sub_pop=$SUB_POP_SIZE -v pop=$POP_SIZE 'BEGIN{n_sub=int(pop/sub_pop); print n_sub}'`
-#         NGS_READS=`awk -v depth=$DEPTH -v g_l=$genome_size -v c_l=${contigs_size[$i]} -v n_sub=$N_SUB -v r_l=150 'BEGIN{ratio=c_l/g_l; ngs_reads=int(ratio*(depth*g_l/(2*r_l))/n_sub); print ngs_reads}'`
-#         TGS_READS=`awk -v depth=$DEPTH -v g_l=$genome_size -v c_l=${contigs_size[$i]} -v n_sub=$N_SUB -v r_l=$TGS_MEANL 'BEGIN{ratio=c_l/g_l; tgs_reads=int(ratio*(depth*g_l/r_l)/n_sub); print tgs_reads}'`
-#         for((j=0; j<$N_SUB; j++))
-#         do
-#             # build population geneome
-#             echo -e "[ Build ${j}th sub population genome of ${contigs[$i]} ]"
-#             if [ ! -f ${contigs[$i]}.$j.fa ]; then
-#                 # python $prog_path/simulate/build-population-genome.py --pgd ${contigs[$i]}.$j.pgd --te-seqs $TE_FA --chassis ${contigs[$i]}.tmp.chasis.fasta --output ${contigs[$i]}.$j.fa --ins-seq ${contigs[$i]}.ins.sequence --sub_idx $j --sub_size $SUB_POP_SIZE
-#                 python $prog_path/build-population-genome.py --pgd ${contigs[$i]}.$j.pgd --te-seqs $TE_FA --chassis ${contigs[$i]}.tmp.chasis.fasta --output ${contigs[$i]}.$j.fa --ins-seq "" --sub_idx $j --sub_size $SUB_POP_SIZE
-#             fi
-#             # generate NGS
-#             echo -e "[ Generate NGS data from ${j}th sub population genome of ${contigs[$i]} ]"
-#             if [ ! -f ${contigs[$i]}.${j}_2.fastq ]; then
-#                 python $prog_path/generate_NGS.py --pg ${contigs[$i]}.$j.fa --read-length $NGS_LEN --inner-distance $NGS_INNER --std-dev $NGS_STD --error-rate $NGS_ERR --reads $NGS_READS --fastq1 ${contigs[$i]}.${j}_1.fastq --fastq2 ${contigs[$i]}.${j}_2.fastq
-#             fi
-#             # generate TGS
-#             echo -e "[ Generate TGS data from ${j}th sub population genome of ${contigs[$i]} ]"
-#             if [ ! -f ${contigs[$i]}.${j}_pacbio.fasta ]; then
-#                 python $prog_path/generate_TGS.py --pg ${contigs[$i]}.$j.fa --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --protocol ${PROTOCOL}
-#             fi
-#             # remove intermediate sub-population genome
-#             rm ${contigs[$i]}.$j.fa
-#         done
-#         cd ..
-#     fi
-# done
+for((i=0; i<$contigs_count; i++))
+do
+    if [ -f ${contigs[$i]}/${contigs[$i]}.0.pgd ]; then
+        cd ${contigs[$i]}
+        N_SUB=`awk -v sub_pop=$SUB_POP_SIZE -v pop=$POP_SIZE 'BEGIN{n_sub=int(pop/sub_pop); print n_sub}'`
+        NGS_READS=`awk -v depth=$DEPTH -v g_l=$genome_size -v c_l=${contigs_size[$i]} -v n_sub=$N_SUB -v r_l=150 'BEGIN{ratio=c_l/g_l; ngs_reads=int(ratio*(depth*g_l/(2*r_l))/n_sub); print ngs_reads}'`
+        TGS_READS=`awk -v depth=$DEPTH -v g_l=$genome_size -v c_l=${contigs_size[$i]} -v n_sub=$N_SUB -v r_l=$TGS_MEANL 'BEGIN{ratio=c_l/g_l; tgs_reads=int(ratio*(depth*g_l/r_l)/n_sub); print tgs_reads}'`
+        for((j=0; j<$N_SUB; j++))
+        do
+            # build population geneome
+            echo -e "[ Build ${j}th sub population genome of ${contigs[$i]} ]"
+            if [ ! -f ${contigs[$i]}.$j.fa ]; then
+                # python $prog_path/simulate/build-population-genome.py --pgd ${contigs[$i]}.$j.pgd --te-seqs $TE_FA --chassis ${contigs[$i]}.tmp.chasis.fasta --output ${contigs[$i]}.$j.fa --ins-seq ${contigs[$i]}.ins.sequence --sub_idx $j --sub_size $SUB_POP_SIZE
+                python $prog_path/build-population-genome.py --pgd ${contigs[$i]}.$j.pgd --te-seqs $TE_FA --chassis ${contigs[$i]}.tmp.chasis.fasta --output ${contigs[$i]}.$j.fa --ins-seq "" --sub_idx $j --sub_size $SUB_POP_SIZE
+            fi
+            # generate NGS
+            echo -e "[ Generate NGS data from ${j}th sub population genome of ${contigs[$i]} ]"
+            if [ ! -f ${contigs[$i]}.${j}_2.fastq ]; then
+                python $prog_path/generate_NGS.py --pg ${contigs[$i]}.$j.fa --read-length $NGS_LEN --inner-distance $NGS_INNER --std-dev $NGS_STD --error-rate $NGS_ERR --reads $NGS_READS --fastq1 ${contigs[$i]}.${j}_1.fastq --fastq2 ${contigs[$i]}.${j}_2.fastq
+            fi
+            # generate TGS
+            echo -e "[ Generate TGS data from ${j}th sub population genome of ${contigs[$i]} ]"
+            if [ ! -f ${contigs[$i]}.${j}_pacbio.fasta ]; then
+                python $prog_path/generate_TGS.py --pg ${contigs[$i]}.$j.fa --reads $TGS_READS --fasta ${contigs[$i]}.${j}_pacbio.fasta --tgs-maxl $TGS_MAXL --tgs-minl $TGS_MINL --protocol ${PROTOCOL}
+            fi
+            # remove intermediate sub-population genome
+            rm ${contigs[$i]}.$j.fa
+        done
+        cd ..
+    fi
+done
 
 
-
-
-
-##############
-### dm3 v1 ###
-##############
-# simulation_protocol.sh -d ./ -r line_28_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon_for_simulaTE.fa -N 10000 -R 0 --sub-N 50 --germline-count 500 --avg-somatic-count 20 --min-distance 500 --depth 50
-
-##############
-### dm3 v3 ###
-##############
-# simulation_protocol.sh -d ./ -r line_21_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon_for_simulaTE.fa -N 100 -R 0 --sub-N 5 --germline-count 1000 --avg-somatic-count 100 --min-distance 6000 --depth 50
-
-###################
-### dm3 v4 test ###
-###################
-# simulation_protocol.sh -d ./ -r line_21_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon_for_simulaTE.fa -N 100 -R 0 --sub-N 5 --germline-count 500 --avg-somatic-count 20 --min-distance 9000 --depth 50 --species fly --protocol ccs
-
-##############
-### dm3 v4 ###
-##############
-# simulation_protocol.sh -d ./ -r line_21_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon_for_simulaTE.fa -N 100 -R 0 --sub-N 5 --germline-count 1000 --avg-somatic-count 50 --min-distance 9000 --depth 50 --species fly --protocol ccs
-
-
-
-#########################
-### GRCh38 v1 somatic ###
-#########################
-# simulation_protocol.sh -d ./ -r HG02716_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38.transposon.fa -N 1000 -R 0 --sub-N 20 --germline-count 0 --avg-somatic-count 20 --min-distance 4000 --depth 50
-
-##########################
-### GRCh38 v1 germline ###
-##########################
-# simulation_protocol.sh -d ./ -r HG02716_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38.transposon.fa -N 100 -R 0 --sub-N 5 --germline-count 5000 --avg-somatic-count 0 --min-distance 100000 --depth 50
-
-#################
-### GRCh38 v3 ###
-#################
-# simulation_protocol.sh -d ./ -r HG02716_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38.transposon.fa -N 100 -R 0 --sub-N 5 --germline-count 5000 --avg-somatic-count 1000 --min-distance 4000 --depth 50
-
-######################
-### GRCh38 v4 test ###
-######################
-# simulation_protocol.sh -d ./ -r HG02716_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38.transposon.fa -N 100 -R 0 --sub-N 5 --germline-count 2000 --avg-somatic-count 20 --min-distance 9000 --depth 50 --species human --protocol ccs
-
-#################
-### GRCh38 v4 ###
-#################
-# simulation_protocol.sh -d ./ -r HG02716_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38.transposon.fa -N 100 -R 0 --sub-N 5 --germline-count 3000 --avg-somatic-count 500 --min-distance 9000 --depth 50 --species human --protocol ccs
+cat */*_pacbio.fasta > TGS.fasta && samtools faidx TGS.fasta
+cat */*_1.fastq > NGS_1.fastq
+cat */*_2.fastq > NGS_2.fastq
+rm */*fast*
