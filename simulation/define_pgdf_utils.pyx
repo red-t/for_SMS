@@ -1,250 +1,292 @@
 import random
 import re
 
-cpdef set get_germline_pos(int ngermline, int nsomatic):
-    cdef:
-        set ret = set()
-        int ntotal = ngermline + nsomatic - 1
-        int x
+cpdef set getGermOrder(int numGerm, int numSoma):
+    cdef set germOrderSet = set()
+    cdef int numTotal = numGerm + numSoma - 1
+    cdef int order
     
-    while len(ret) < ngermline:
-        x = random.randint(0, ntotal)
-        if x in ret:
+    while len(germOrderSet) < numGerm:
+        order = random.randint(0, numTotal)
+        if order in germOrderSet:
             continue
-        ret.add(x)
+        germOrderSet.add(order)
     
-    return ret
+    return germOrderSet
 #
 #
 #
-cpdef define_nest_ins(dict idx2te, int nte, int parent_te_len, int parent_trunc_len, str te_type, float div_rate, str species):
-    # Chose TE id
-    cdef:
-        str te_id
-        int ccs_idx, te_len
-    if te_type == "s":
-        if species == "human":
-            ccs_idx = random.choice([1, 2, 3, 4]) # for human
-        if species == "fly":
-            ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
-    else:
-        ccs_idx = random.randint(1, nte)
-    te_id = idx2te[ccs_idx][0]
-    te_len = idx2te[ccs_idx][1]
+cpdef defineHeader(object args, set germOrderSet):
+    # Get template information
+    cdef int chromLen
+    cdef str chrom
+    cdef str templateIndex = args.templateFa + ".fai"
 
-    # TSD
-    cdef int tsd
-    tsd = random.randint(6, 8)
-
-    # Nest position
-    cdef int pos
-    pos = random.randint(tsd, parent_te_len - parent_trunc_len)
-
-    # Strand
-    cdef str strand, l_strand
-    if random.random() < 0.5:
-        strand = "-"
-        l_strand = "R"
-    else:
-        strand = "+"
-        l_strand = "F"
-
-    # Truncations
-    cdef:
-        str trunc_id = "U"
-        str trunc_dsl = ""
-        int trunc_len = 0
-        int trunc_start
-    if random.random() <= 0.01:
-        trunc_id = "T"
-        trunc_len = int(random.uniform(0.1, 0.6)*te_len)
-        trunc_start = random.randint(1, te_len - trunc_len)
-        trunc_dsl = "[{0}..{1}]".format(trunc_start, trunc_start + trunc_len - 1)
-
-    # Nest
-    cdef:
-        str nest_dsl = ""
-        str nest_id = ""
-        str left, right
-    if random.random() <= 0.01:
-        nest_id, nest_dsl = define_nest_ins(idx2te, nte, te_len, trunc_len, te_type, div_rate, species)
-        nest_id = "(" + nest_id + ")"
-        nest_dsl = "{" + nest_dsl + "}"
-
-    left = "{0}~{1}{2}{3}".format(te_id, trunc_id, l_strand, nest_id)
-    if div_rate > 0:
-        right = "{0}:${1}{2}{3}{4}{5}%{6}bp".format(pos, ccs_idx, trunc_dsl, strand, nest_dsl, div_rate, tsd)
-    else:
-        right = "{0}:${1}{2}{3}{4}{5}bp".format(pos, ccs_idx, trunc_dsl, strand, nest_dsl, tsd)
-    return left, right
-#
-#
-#
-cpdef define_ins(int idx, dict idx2te, int nte, str te_type, float div_rate, str species):
-    # Chose TE id
-    cdef:
-        str te_id
-        int ccs_idx, te_len
-    if te_type == "s":
-        if species == "human":
-            ccs_idx = random.choice([1, 2, 3, 4]) # for human
-        if species == "fly":
-            ccs_idx = random.choice([72, 15, 54, 44, 100, 106]) # for fly
-    else:
-        ccs_idx = random.randint(1, nte)
-    te_id = idx2te[ccs_idx][0]
-    te_len = idx2te[ccs_idx][1]
-
-    # TSD
-    cdef int tsd
-    tsd = random.randint(6,8)
-
-    # Strand
-    cdef str strand, l_strand
-    if random.random() < 0.5:
-        strand = "-"
-        l_strand = "R"
-    else:
-        strand = "+"
-        l_strand = "F"
-
-    # Truncations
-    cdef:
-        str trunc_id = "U"
-        str trunc_dsl = ""
-        int trunc_len = 0
-        int trunc_start
-    if random.random() <= 0.1:
-        trunc_id = "T"
-        trunc_len = int(random.uniform(0.1, 0.6)*te_len)
-        trunc_start = random.randint(1, te_len - trunc_len)
-        trunc_dsl = "[{0}..{1}]".format(trunc_start, trunc_start + trunc_len - 1)
-
-    # Nest
-    cdef:
-        str nest_dsl = ""
-        str nest_id = ""
-        str left, right
-    if random.random() <= 0.1:
-        nest_id, nest_dsl = define_nest_ins(idx2te, nte, te_len, trunc_len, te_type, div_rate, species)
-        nest_id = "(" + nest_id + ")"
-        nest_dsl = "{" + nest_dsl + "}"
-
-    left = "{0}~{1}~{2}{3}{4}".format(idx, te_id, trunc_id, l_strand, nest_id)
-    if div_rate > 0:
-        right = "${0}{1}{2}{3}{4}%{5}bp".format(ccs_idx, trunc_dsl, strand, nest_dsl, div_rate, tsd)
-    else:
-        right = "${0}{1}{2}{3}{4}bp".format(ccs_idx, trunc_dsl, strand, nest_dsl, tsd)
-
-    return left, right
-#
-#
-#
-cpdef define_header(str ref_fa, str te_fa, int germline_count, int somatic_count, set germline_pos, float div_rate, str species):
-    cdef:
-        str ref_idx = ref_fa+".fai"
-        str te_idx = te_fa+".fai"
-        str contig_id
-        dict idx2te = {}
-        dict id2dsl = {}
-        int genome_size
-
-    # reference information
-    for l in open(ref_idx, "r"):
-        l = l.split()
-        contig_id = l[0]
-        genome_size = int(l[1])
-        with open("{0}.tmp.pgd.header".format(contig_id), "w") as fout:
-            fout.write("# Chasis {0}; Length {1} nt\n".format(contig_id, l[1]))
+    for row in open(templateIndex, "r"):
+        row = row.split()
+        chrom = row[0]
+        chromLen = int(row[1])
+        with open("{0}.tmp.pgd.header".format(chrom), "w") as fout:
+            fout.write("# Chasis {0}; Length {1} nt\n".format(chrom, row[1]))
     
-    # parse TE information
-    cdef int counter = 1
-    for l in open(te_idx, "r"):
-        l = l.split()
-        if l[0] != "":
-            idx2te[counter] = (l[0], int(l[1]))
-            counter += 1
+    # Parse TE information
+    cdef int teOrder = 1
+    cdef str teIndex = args.teFa + ".fai"
+    cdef dict teDict = {}
 
-    # simualte total (germline_count + somatic_count) insertions
-    cdef:
-        list ins_ids = []
-        int ins_count = germline_count + somatic_count
-        int idx, nte = len(idx2te)
-        str left, right
+    for row in open(teIndex, "r"):
+        row = row.split()
+        if row[0] != "":
+            teDict[teOrder] = (row[0], int(row[1]))
+            teOrder += 1
 
-    fout = open("{0}.tmp.pgd.header".format(contig_id), "a")
-    for idx in range(1, ins_count+1):
-        if (idx-1) in germline_pos:
-            left, right = define_ins(idx, idx2te, nte, "g", div_rate, species)
+    # Define (args.numGerm + args.numSoma) insertions
+    cdef list insIdList = []
+    cdef int numIns = args.numGerm + args.numSoma
+    cdef int insOrder, numTe = len(teDict)
+    cdef str insId, insExpress
+    cdef dict insIdToExpressionDict = {}
+    fout = open("{0}.tmp.pgd.header".format(chrom), "a")
+
+    for insOrder in range(1, numIns+1):
+        if (insOrder-1) in germOrderSet:
+            insId, insExpress = defineIns(insOrder, teDict, numTe, "g", args)
         else:
-            left, right = define_ins(idx, idx2te, nte, "s", div_rate, species)
+            insId, insExpress = defineIns(insOrder, teDict, numTe, "s", args)
         
-        ins_ids.append(left)
-        id2dsl[left] = right
-        fout.write("{0}={1}\n".format(left, right))
+        insIdList.append(insId)
+        insIdToExpressionDict[insId] = insExpress
+        fout.write("{0}={1}\n".format(insId, insExpress))
     
     fout.close()
-    return id2dsl, contig_id, genome_size, ins_ids
+    return insIdToExpressionDict, chrom, chromLen, insIdList
 #
 #
 #
-cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindist, int maxdist, set germline_pos, list ins_ids, str species):
-    cdef:
-        int i, j
-        int st, ed, pos
-        int count_te, count_empty
-        float popfreq
-        str id, tows, dsl, strand
-        list toshuf
-        int tsd_len, tsd_start
+cpdef tuple defineIns(int insOrder, dict teDict, int numTe, str insType, object args):
+    cdef int teOrder, teLen, truncateLen
+    cdef str teId, truncateId, truncateExpress
 
-    fout = open("{0}.tmp.pgd.body".format(contig_id), "w")
-    summary = open("{0}.ins.summary".format(contig_id), "w")
-    # write insertions
-    for i in range(ntotal):
-        # position
-        if i > 0:
-            st = maxdist * i
-            ed = maxdist * (i+1)
-            if st - pos < mindist:
-                st = pos + mindist
-            pos = random.randint(st, ed)
+    # Generate data for training model
+    if args.mode == 1:
+        ### Choose TE ###
+        teOrder = getTeOrderTrain(insType, numTe, args.species)
+        teId = teDict[teOrder][0]
+        teLen = teDict[teOrder][1]
+
+        ### Define Truncations ###
+        truncateId, truncateExpress, truncateLen = defineTruncateTrain(args.truncProb, teLen)
+
+    else:
+        ### Choose TE ###
+        teOrder = getTeOrderTest(args.species)
+        teId = teDict[teOrder][0]
+        teLen = teDict[teOrder][1]
+
+        ### Define Truncations ###
+        if args.species == "human":
+            truncateId, truncateExpress, truncateLen = defineTruncateTest(teOrder, teLen)
         else:
-            pos = random.randint(1, maxdist)
+            truncateId, truncateExpress, truncateLen = defineTruncateTrain(args.truncProb, teLen)
 
-        # frequency
-        if i in germline_pos:
-            if species == "human":
-                popfreq = random.random()
-                if popfreq < 0.1:
-                    popfreq = random.uniform(0.1, 1)
+    ### Choose TSD ###
+    cdef int tsdLen = random.randint(6,20)
+
+    ### Choose Strand ###
+    cdef str strand, strandId
+    strand, strandId = getStrand()
+
+    ### Define Nested Insertion ###
+    cdef str nestId, nestExpress
+    nestId, nestExpress = defineNestIns(teDict, numTe, teLen, truncateLen, insType, args)
+    
+    ### Output Insertion Definition ###
+    cdef str insId, insExpress
+    cdef float insDivRate = args.insDivRate
+
+    insId = "{0}~{1}~{2}{3}{4}".format(insOrder, teId, truncateId, strandId, nestId)
+    if insDivRate > 0:
+        insExpress = "${0}{1}{2}{3}{4}%{5}bp".format(teOrder, truncateExpress, strand, nestExpress, insDivRate, tsdLen)
+    else:
+        insExpress = "${0}{1}{2}{3}{4}bp".format(teOrder, truncateExpress, strand, nestExpress, tsdLen)
+
+    return insId, insExpress
+#
+#
+#
+cdef int getTeOrderTrain(str insType, int numTe, str species):
+    if insType == "g":
+        return random.randint(1, numTe)
+    if species == "human":
+        # Alu、HERVK、LINE1、SVA
+        return random.choice([1, 2, 3, 4])
+    # 3S18、Max_element、blood、HMS_Beagle、I_element、P_element
+    return random.choice([15, 44, 54, 72, 100, 106])
+#
+#
+#
+cdef int getTeOrderTest(str species):
+    if species == "human":
+        # Alu、HERVK、LINE1、SVA
+        return random.choices([1, 2, 3, 4], [0.83, 0.01, 0.12, 0.04], k=1)[0]
+    # 3S18、Max_element、blood、HMS_Beagle、I_element、P_element
+    return random.choices([15, 44, 54, 72, 100, 106], [0.06, 0.14, 0.07, 0.07, 0.08, 0.58], k=1)[0]
+#
+#
+#
+cdef tuple getStrand():
+    if random.random() < 0.5:
+        return "-", "R"
+
+    return "+", "F"
+#
+#
+#
+cdef tuple defineTruncateTrain(float truncProb, int teLen):
+    cdef str truncateId = "U", truncateExpress = ""
+    cdef int truncateStart, truncateLen = 0
+
+    if random.random() > truncProb:
+        return truncateId, truncateExpress, truncateLen
+    
+    truncateId = "T"
+    truncateLen = int(random.uniform(0.1, 0.3) * teLen)
+    truncateStart = random.randint(1, teLen - truncateLen)
+    truncateExpress = "[{0}..{1}]".format(truncateStart, truncateStart + truncateLen - 1)
+    return truncateId, truncateExpress, truncateLen
+#
+#
+#
+cdef tuple defineTruncateTest(int teOrder, int teLen):
+    cdef str truncateId = "U", truncateExpress = ""
+    cdef int truncateStart, truncateLen = 0
+
+    # Only LINE1
+    if teOrder != 3:
+        return truncateId, truncateExpress, truncateLen
+    
+    # Full length = 30%
+    cdef float truncProb = random.random()
+    if truncProb <= 0.3:
+        return truncateId, truncateExpress, truncateLen
+    
+    truncateId = "T"
+    truncateLen = int(random.uniform(0.1, 0.3) * teLen)
+    
+    # Internal truncation = 20%
+    if truncProb <= 0.5:
+        truncateStart = random.randint(1, teLen - truncateLen)
+        truncateExpress = "[{0}..{1}]".format(truncateStart, truncateStart + truncateLen - 1)
+        return truncateId, truncateExpress, truncateLen
+    
+    # 5' truncation = 50%
+    truncateStart = 1
+    truncateExpress = "[{0}..{1}]".format(truncateStart, truncateStart + truncateLen - 1)
+    return truncateId, truncateExpress, truncateLen
+#
+#
+#
+cpdef defineNestIns(dict teDict, int numTe, int parentTeLen, int parentTruncateLen, str insType, object args):
+    ### No Nesting ###
+    cdef str insId = "", insExpress = ""
+    cdef float nestProb = random.random()
+    if nestProb > args.nestProb:
+        return insId, insExpress
+
+    ### Choose TE ###
+    cdef int teOrder, teLen
+    cdef str teId
+    teOrder = getTeOrderTrain(insType, numTe, args.species)
+    teId = teDict[teOrder][0]
+    teLen = teDict[teOrder][1]
+
+    ### Define Truncations ###
+    cdef int truncateLen
+    cdef str truncateId, truncateExpress
+    truncateId, truncateExpress, truncateLen = defineTruncateTrain(args.truncProb, teLen)
+
+    ### Choose TSD ###
+    cdef int tsdLen = random.randint(6, 20)
+    
+    ### Choose Strand ###
+    cdef str strand, strandId
+    strand, strandId = getStrand()
+    
+    ### Define Nested Insertion ###
+    cdef str nestId, nestExpress
+    nestId, nestExpress = defineNestIns(teDict, numTe, teLen, truncateLen, insType, args)
+    
+    ### Output Insertion Definition ###
+    cdef int intPos = random.randint(tsdLen, parentTeLen - parentTruncateLen)
+    cdef float insDivRate = args.insDivRate
+
+    insId = "({0}~{1}{2}{3})".format(teId, truncateId, strandId, nestId)
+    if insDivRate > 0:
+        insExpress = "{" + "{0}:${1}{2}{3}{4}{5}%{6}bp".format(intPos, teOrder, truncateExpress, strand, nestExpress, insDivRate, tsdLen) + "}"
+    else:
+        insExpress = "{" + "{0}:${1}{2}{3}{4}{5}bp".format(intPos, teOrder, truncateExpress, strand, nestExpress, tsdLen) + "}"
+    return insId, insExpress
+#
+#
+#
+cpdef defineBody(dict insIdToExpressDict, str chrom, int minDist, int maxDist, set germOrderSet, list insIdList, object args):
+    cdef int insOrder, genomeOrder
+    cdef int minPos, maxPos, insPos
+    cdef int numGenome, numEmpty
+    cdef int tsdStart, tsdLen
+    cdef int numTotal = (args.numGerm + args.numSoma)
+    cdef float frequency
+    cdef str insId, body, insExpress, strand
+    cdef list bodyList
+
+    fout = open("{0}.tmp.pgd.body".format(chrom), "w")
+    summary = open("{0}.ins.summary".format(chrom), "w")
+
+    for insOrder in range(numTotal):
+        ### Set insertion Position ###
+        if insOrder > 0:
+            minPos = maxDist * insOrder
+            maxPos = maxDist * (insOrder+1)
+            if minPos - insPos < minDist:
+                minPos = insPos + minDist
+            insPos = random.randint(minPos, maxPos)
+        else:
+            insPos = random.randint(1, maxDist)
+
+        ### Set Insertion Frequency ###
+        if insOrder in germOrderSet:
+            if args.species == "human":
+                frequency = random.random()
+                if frequency < 0.1:
+                    frequency = random.uniform(0.1, 1)
                 else:
-                    popfreq = random.choice((0.5, 1))
-            if species == "fly":
-                popfreq = random.uniform(0.1, 1)
-            count_te = int(popfreq * popsize)
+                    frequency = random.choice((0.5, 1))
+            if args.species == "fly":
+                frequency = random.uniform(0.1, 1)
+            numGenome = int(frequency * args.numTotalGenome)
         else:
-            popfreq = float(1) / popsize
-            count_te = 1
-        count_empty = popsize - count_te
+            frequency = float(1) / args.numTotalGenome
+            numGenome = 1
+        
+        numEmpty = args.numTotalGenome - numGenome
 
-        # id
-        id = ins_ids[i]
-        toshuf = [id for j in range(count_te)]
-        toshuf.extend("*" * count_empty)
-        random.shuffle(toshuf)
-        toshuf.insert(0, str(pos))
-        tows = " ".join(toshuf)
+        ### Construct bodyList ###
+        insId = insIdList[insOrder]
+        bodyList = [insId for genomeOrder in range(numGenome)]
+        bodyList.extend("*" * numEmpty)
+        random.shuffle(bodyList)
+        bodyList.insert(0, str(insPos))
 
-        # write out body
-        fout.write(tows+"\n")
+        ### Write Out Body ###
+        body = " ".join(bodyList)
+        fout.write(body + "\n")
 
-        # write out insertion information
-        dsl = id2dsl[id]
-        strand = re.search(r"([+-])", dsl).group(1)
-        tsd_len = int(re.search("([\d\.]+)bp$", dsl).group(1))
-        tsd_start = pos - tsd_len + 1
-        summary.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format(contig_id, pos, pos+1, id, dsl, strand, popfreq, tsd_start, pos))
+        ### Write Out Insertion Information ###
+        insExpress = insIdToExpressDict[insId]
+        strand = re.search(r"([+-])", insExpress).group(1)
+        tsdLen = int(re.search("([\d\.]+)bp$", insExpress).group(1))
+        tsdStart = insPos - tsdLen + 1
+        summary.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format(chrom, insPos, insPos+1, insId, insExpress, strand, frequency, tsdStart, insPos))
     
     fout.close()
     summary.close()

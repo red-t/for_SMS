@@ -1,5 +1,5 @@
-cpdef set get_germline_pos(int ngermline, int nsomatic)
+cpdef set getGermOrder(int numGerm, int numSoma)
 
-cpdef define_header(str ref_fa, str te_fa, int germline_count, int somatic_count, set germline_pos, float d_rate, str species)
+cpdef defineHeader(object args, set germOrderSet)
 
-cpdef define_body(dict id2dsl, int popsize, int ntotal, str contig_id, int mindist, int maxdist, set germline_pos, list ins_ids, str species)
+cpdef defineBody(dict insIdToExpressDict, str chrom, int minDist, int maxDist, set germOrderSet, list insIdList, object args)

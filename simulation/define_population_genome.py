@@ -1,42 +1,44 @@
 import argparse
-from define_pgdf_utils import get_germline_pos, define_header, define_body
+from define_pgdf_utils import getGermOrder, defineHeader, defineBody
 
 
-def get_parser():
+def getArgs():
     parser = argparse.ArgumentParser(description="Demo of argparse")
 
-    parser.add_argument("--chassis", type=str, dest="ref_fa", default=None, help="the chassis, i.e. the sequence into which TEs will be inserted; a fasta file")
-    parser.add_argument("--te-seqs", type=str, dest="te_fa", default=None, help="TE CCS sequences in a fasta file")
-    parser.add_argument("--N", type=int, dest="pop_size", default=None, help="the number of haploid genomes")
-    parser.add_argument("--divergence-rate", dest="d_rate", help="TE sequence divergence rate (percent)")
-    parser.add_argument("--germline-count", type=int, dest="germline_count", default=1, help="germline insertions mumber in the population genome")
-    parser.add_argument("--somatic-count", type=int, dest="somatic_count", default=1, help="somatic insertions mumber in the population genome")
+    parser.add_argument("--chassis", type=str, dest="templateFa", default=None, help="the template, i.e. the sequence into which TEs will be inserted; a fasta file")
+    parser.add_argument("--te-seqs", type=str, dest="teFa", default=None, help="TE CSS sequences in a fasta file")
+    parser.add_argument("--N", type=int, dest="numTotalGenome", default=None, help="the number of haploid genomes")
+    parser.add_argument("--divergence-rate", type=float, dest="insDivRate", help="TE sequence divergence rate")
+    parser.add_argument("--germline-count", type=int, dest="numGerm", default=1, help="germline insertions mumber in the population genome")
+    parser.add_argument("--somatic-count", type=int, dest="numSoma", default=1, help="somatic insertions mumber in the population genome")
     parser.add_argument("--output", type=str, dest="output", default=None, help="the output file")
-    parser.add_argument("--min-distance", type=int, dest="min_distance", default=1000, help="minimum distance between TE insertions")
+    parser.add_argument("--min-distance", type=int, dest="minDist", default=1000, help="minimum distance between TE insertions")
     parser.add_argument("--species", type=str, dest="species", default="human", help="the transposon library to the corresponding species will be used")
+    parser.add_argument("--truncProb", type=float, dest="truncProb", help="Probability of constructing a truncation on an inserted sequence")
+    parser.add_argument("--nestProb", type=float, dest="nestProb", help="Probability of constructing a nested insertion on an inserted sequence")
+    parser.add_argument("--mode", type=int, dest="mode", help="Generate data for: (1)model training or (2)benchmarking")
     
-    return parser
+    args = parser.parse_args()
+    return args
 
 
 if __name__ == '__main__':
-    parser = get_parser()
-    args = parser.parse_args()
+    args = getArgs()
 
-    if (args.germline_count + args.somatic_count) > 0:        
-        germline_pos = get_germline_pos(args.germline_count, args.somatic_count)
+    if (args.numGerm + args.numSoma) > 0:        
+        germOrderSet = getGermOrder(args.numGerm, args.numSoma)
 
         # define header of the pgd-file (population genome definition)
-        id2dsl, contig_id, genomesize, ins_ids = define_header(args.ref_fa, args.te_fa, args.germline_count, args.somatic_count, germline_pos, float(args.d_rate), args.species)
+        insIdToExpressDict, chrom, chromLen, insIdList = defineHeader(args, germOrderSet)
         
         # define body of the pgd-file (population genome definition)
-        mindist = args.min_distance
+        minDist = args.minDist
         try:
-            maxdist = int(genomesize / (args.germline_count + args.somatic_count))
+            maxDist = int(chromLen / (args.numGerm + args.numSoma))
         except:
-            maxdist = int(genomesize / (args.germline_count + args.somatic_count + 1))
+            maxDist = int(chromLen / (args.numGerm + args.numSoma + 1))
         
-        if(maxdist <= mindist):
-            raise ValueError("Genome of "+str(genomesize)+ " is too small for "+str(args.germline_count + args.somatic_count)+ " insertions with a min-distance between insertions of "+str(mindist))
+        if(maxDist <= minDist):
+            raise ValueError("Genome of "+str(chromLen)+ " is too small for "+str(args.numGerm + args.numSoma)+ " insertions with a min-distance between insertions of "+str(minDist))
 
-        ntotal = args.germline_count + args.somatic_count
-        define_body(id2dsl, args.pop_size, ntotal, contig_id, mindist, maxdist, germline_pos, ins_ids, args.species)
+        defineBody(insIdToExpressDict, chrom, minDist, maxDist, germOrderSet, insIdList, args)

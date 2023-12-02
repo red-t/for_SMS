@@ -21,6 +21,9 @@ function help_info(){
     echo -e "\t--ngs-err <float>\terror rate of NGS reads (fraction)."
     echo -e "\t--species <human/fly>\tthe transposon library to the corresponding species will be used"
     echo -e "\t--protocol <ccs/clr/ont>\tthe error rate, error fraction and length distribution to the corresponding protocol will be used"
+    echo -e "\t--truncProb <float>\tProbability of constructing a truncation on an inserted sequence"
+    echo -e "\t--nestProb <float>\tProbability of constructing a nested insertion on an inserted sequence"
+    echo -e "\t--mode <1/2>\tGenerate data for: (1)model training or (2)benchmarking"
     echo -e "\t-h \tShow this information"
 }
 
@@ -28,7 +31,7 @@ function help_info(){
 ##########################
 ### Getting Parameters ###
 ##########################
-ARGS=`getopt -o d:r:t:N:R:h --long sub-N:,germline-count:,avg-somatic-count:,min-distance:,depth:,ngs-len:,ngs-inner:,ngs-std:,ngs-err:,species:,protocol: -n "$0" -- "$@"`
+ARGS=`getopt -o d:r:t:N:R:h --long sub-N:,germline-count:,avg-somatic-count:,min-distance:,depth:,ngs-len:,ngs-inner:,ngs-std:,ngs-err:,species:,protocol:,truncProb:,nestProb:,mode: -n "$0" -- "$@"`
 if [ $? != 0 ]; then
     echo "Terminating..."
     exit 1
@@ -103,6 +106,18 @@ do
             PROTOCOL=$2
             shift 2
             ;;
+        --truncProb)
+            truncProb=$2
+            shift 2
+            ;;
+        --nestProb)
+            nestProb=$2
+            shift 2
+            ;;
+        --mode)
+            mode=$2
+            shift 2
+            ;;
         --)
             shift
             break
@@ -142,7 +157,7 @@ done
 ###########################
 ### Checking Parameters ###
 ###########################
-echo -e "simulation_protocol.sh parameters:"
+echo -e "Parameters:"
 echo -e "WORKING DIR:\t${WORKING_DIR}"
 echo -e "REF_FA:\t${REF_FA}"
 echo -e "TE_FA:\t${TE_FA}"
@@ -199,7 +214,7 @@ do
     echo -e "Defining TE landscapes for ${contigs[$i]}:"
     if [ ! -f ${contigs[$i]}/${contigs[$i]}.ins.summary ]; then
         samtools faidx ${REF_FA} ${contigs[$i]} > ${contigs[$i]}.tmp.chasis.fasta && samtools faidx ${contigs[$i]}.tmp.chasis.fasta
-        python $prog_path/define_population_genome.py --chassis ${contigs[$i]}.tmp.chasis.fasta --te-seqs ${TE_FA} --N ${POP_SIZE} --divergence-rate ${D_RATE} --germline-count ${tmp_g_count} --somatic-count ${tmp_s_count} --min-distance ${MIN_DIST} --species ${SPECIES}
+        python $prog_path/define_population_genome.py --chassis ${contigs[$i]}.tmp.chasis.fasta --te-seqs ${TE_FA} --N ${POP_SIZE} --divergence-rate ${D_RATE} --germline-count ${tmp_g_count} --somatic-count ${tmp_s_count} --min-distance ${MIN_DIST} --species ${SPECIES} --truncProb ${truncProb} --nestProb ${nestProb} --mode ${mode}
         
         # Divide the pgd-file into several subsets
         if [ -f ${contigs[$i]}.tmp.pgd.header ]; then
