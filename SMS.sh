@@ -157,8 +157,8 @@ fi
 
 
 
-if [ ! -f ${OUT_PATH}/${SAMPLE}.q0.sorted.bam ];then
-    samtools view -bhSq 0 ${OUT_PATH}/${SAMPLE}.genome.bam > ${OUT_PATH}/${SAMPLE}.q0.bam
+if [ ! -f ${OUT_PATH}/${SAMPLE}.q0.sorted.bam ];then # Q1: 通过 samtools view 筛选指定 mapping quality 的 alignment 这一步可以跟上面的合并？不然要 sort 两遍。
+    samtools view -bhSq 0 ${OUT_PATH}/${SAMPLE}.genome.bam > ${OUT_PATH}/${SAMPLE}.q0.bam # Q2: -q option 的默认值是 0, 这里有点多余了？
     samtools sort -@ ${CPU} -o ${OUT_PATH}/${SAMPLE}.q0.sorted.bam ${OUT_PATH}/${SAMPLE}.q0.bam
     samtools index -@ ${CPU} ${OUT_PATH}/${SAMPLE}.q0.sorted.bam
     BAM_FILE=${OUT_PATH}/${SAMPLE}.q0.sorted.bam
