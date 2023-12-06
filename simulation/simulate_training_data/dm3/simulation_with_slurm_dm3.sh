@@ -3,7 +3,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --mem=10G
 #SBATCH -c 20
-#SBATCH --array=1-3450%20
+#SBATCH --array=1-4500%20
 #SBATCH --partition=12hours
 #SBATCH --output=./logs/simulation-log-%A-%a.out
 
@@ -23,10 +23,7 @@ echo ""
 ################################
 ### Parameter initialization ###
 ################################
-# [ -z $FILELIST ] && FILELIST=/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/GRCh38/v1/HG02716_0/simulation_filelist
-# [ -z $FILELIST ] && FILELIST=/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/GRCh38/v3/HG02716_0/simulation_filelist
-# [ -z $FILELIST ] && FILELIST=/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/GRCh38/v4_test/HG02716_0_ccs/simulation_filelist
-[ -z $FILELIST ] && FILELIST=/data/tusers.ds/zhongrenhu/for_SMS/dna/simulation/GRCh38/v4/HG02716_0_ccs/simulation_filelist
+[ -z $FILELIST ] && FILELIST=/data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/v4/line_21_0_ccs/simulation_filelist
 
 [ -z $NGS_LEN ] && NGS_LEN=150
 [ -z $NGS_INNER ] && NGS_INNER=200
@@ -80,7 +77,7 @@ conda activate simulation
 ########################
 cd $CONTIG
 N_SUB=`awk -v sub_pop=$SUB_POP_SIZE -v pop=$POP_SIZE 'BEGIN{n_sub=int(pop/sub_pop); print n_sub}'`
-NGS_READS=`awk -v depth=$DEPTH -v g_l=$GENOME_SIZE -v c_l=$CONTIG_SIZE -v n_sub=$N_SUB -v r_l=150 -v inner=$NGS_INNER 'BEGIN{ratio=c_l/g_l; ngs_reads=int(ratio*(depth*g_l/(2*r_l+inner))/n_sub); print ngs_reads}'`
+NGS_READS=`awk -v depth=$DEPTH -v g_l=$GENOME_SIZE -v c_l=$CONTIG_SIZE -v n_sub=$N_SUB -v r_l=$NGS_LEN -v inner=$NGS_INNER 'BEGIN{ratio=c_l/g_l; ngs_reads=int(ratio*(depth*g_l/(2*r_l+inner))/n_sub); print ngs_reads}'`
 TGS_READS=`awk -v depth=$DEPTH -v g_l=$GENOME_SIZE -v c_l=$CONTIG_SIZE -v n_sub=$N_SUB -v r_l=$TGS_MEANL 'BEGIN{ratio=c_l/g_l; tgs_reads=int(ratio*(depth*g_l/r_l)/n_sub); print tgs_reads}'`
 
 if [ -f $CONTIG.0.pgd ]; then
@@ -89,7 +86,6 @@ if [ -f $CONTIG.0.pgd ]; then
         # build population geneome
         echo -e "[ Build ${j}th sub population genome of $CONTIG ]"
         if [ ! -f $CONTIG.$j.fa ]; then
-            # python $PROG_PATH/build-population-genome.py --pgd $CONTIG.$j.pgd --te-seqs $TE_FA --chassis $CONTIG.tmp.chasis.fasta --output $CONTIG.$j.fa --ins-seq $CONTIG.ins.sequence --sub_idx $j --sub_size $SUB_POP_SIZE
             python $PROG_PATH/build-population-genome.py --pgd $CONTIG.$j.pgd --te-seqs $TE_FA --chassis $CONTIG.tmp.chasis.fasta --output $CONTIG.$j.fa --ins-seq "" --sub_idx $j --sub_size $SUB_POP_SIZE
         fi
 

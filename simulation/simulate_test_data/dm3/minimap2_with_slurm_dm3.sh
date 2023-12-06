@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --time=12:00:00
-#SBATCH --mem=40G
+#SBATCH --mem=60G
 #SBATCH -c 36
 #SBATCH --array=1-6
 #SBATCH --partition=12hours
-#SBATCH --output=./logs/Merge/Dm3/merge-log-dm3-%A-%a.out
+#SBATCH --output=./logs/Minimap2/Dm3/minimap2-log-%A-%a.out
 
 
 #########################################
@@ -23,8 +23,9 @@ echo ""
 ################################
 ### Parameter initialization ###
 ################################
-[ -z $FILELIST ] && FILELIST=/data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/benchmark/merge_filelist
-[ -z $CONTIGS ] && CONTIGS=(`cut -f 1 /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/template/line_28/line_28_template.fa.fai`)
+[ -z $FILELIST ] && FILELIST=/data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/benchmark/minimap2_filelist
+[ -z $SAM_FORMAT ] && SAM_FORMAT=1
+[ -z $THREADS ] && THREADS=30
 
 
 ###############################
@@ -35,7 +36,9 @@ str=`sed "${SLURM_ARRAY_TASK_ID}q;d" $FILELIST`
 # Read the SLURM_ARRAY_TASK_ID'th line from filelist
 # Split line into array
 toks=($str)
-SAMPLE=${toks[0]}
+REF=${toks[0]}
+QUERY=${toks[1]}
+PRESET=${toks[2]}
 
 
 ###########################################
@@ -51,26 +54,36 @@ echo ""
 ###############################
 ### Copy inputs to temp dir ###
 ###############################
-echo "Copying input files from ${SAMPLE}..."
-for contig in ${CONTIGS[*]}
-do
-    mkdir ${contig}
-    cp ${SAMPLE}/${contig}/TGS.fasta ${contig}
-    cp ${SAMPLE}/${contig}/NGS_1.fastq ${contig}
-    cp ${SAMPLE}/${contig}/NGS_2.fastq ${contig}
-done
+echo "Copying input file ${QUERY} to temp directory..."
+cp $REF .
+cp $QUERY .
 echo "Done."
 echo ""
 
 
-###############
-### Process ###
-###############
-echo "Merging..."
-cat */TGS.fasta >> TGS.fasta
-cat */NGS_1.fastq >> NGS_1.fastq
-cat */NGS_2.fastq >> NGS_2.fastq
-echo "Done." && echo ""
+####################################################
+### Get filenames in temp by cutting of the path ###
+####################################################
+PREFIX=`basename ${QUERY%.f*a*}` && QUERY_FA=`basename $QUERY` && REF_FA=`basename $REF`
+[ -z $OUTPUTDIR ] && OUTPUTDIR=`dirname $QUERY`
+
+
+##################################
+### Activate conda environment ###
+##################################
+source /zata/zippy/zhongrenhu/Software/mambaforge/etc/profile.d/conda.sh
+conda activate TEMP3
+
+
+########################
+### Process the data ###
+########################
+echo "Running minimap2 for ${PREFIX}"
+if [ -n $SAM_FORMAT ];then
+    minimap2 -aYx $PRESET --MD -t $THREADS $REF_FA $QUERY_FA | samtools view -@ $THREADS -bhS - | samtools sort -@ $THREADS -o $PREFIX.bam -
+    samtools index -@ $THREADS $PREFIX.bam
+fi
+echo ""
 
 
 #################################
@@ -78,9 +91,9 @@ echo "Done." && echo ""
 ################################
 echo "Copying results to destination..."
 ls -lh
-cp TGS.fasta $SAMPLE
-cp NGS_1.fastq $SAMPLE
-cp NGS_2.fastq $SAMPLE
+mkdir ${OUTPUTDIR}/${PRESET}
+cp -r $PREFIX.bam ${OUTPUTDIR}/${PRESET}
+cp -r $PREFIX.bam.bai ${OUTPUTDIR}/${PRESET}
 echo "Done."
 echo ""
 

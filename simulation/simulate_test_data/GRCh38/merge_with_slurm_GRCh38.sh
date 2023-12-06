@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --time=12:00:00
-#SBATCH --mem=40G
+#SBATCH --mem=60G
 #SBATCH -c 36
 #SBATCH --array=1-6
 #SBATCH --partition=12hours

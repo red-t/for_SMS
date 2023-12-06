@@ -5,7 +5,7 @@
 #SBATCH -c 20
 #SBATCH --array=1-90%6
 #SBATCH --partition=5days
-#SBATCH --output=./log/simulation-log-dm3-%A-%a.out
+#SBATCH --output=./logs/Simulation/Dm3/simulation-log-dm3-%A-%a.out
 
 
 #########################################

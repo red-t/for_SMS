@@ -24,6 +24,8 @@ mamba install pysam
 
 # cython
 pip install cython
+
+# TEMP3 is also needed
 ```
 
 ### 1.2 Compile cython scripts
@@ -44,7 +46,7 @@ Based on **reference genome** and **polymorphisms resources** (from large popula
 # Using SNVs of HG02716 from GGVP
 # Current working directory is /data/tusers/zhongrenhu/for_SMS/dna/simulation/GRCh38/template/HG02716_germ
 
-./build_template_genome.sh -n HG02716 -s F -f /data/tusers.ds/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_X.fa -m /data/tusers.ds/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_Y.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/GRCh38.p13/GGVP/
+bash build_template_genome.sh -n HG02716 -s F -f /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_X.fa -m /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_Y.fa -v /data/tusers/zhongrenhu/for_SMS/reference/GRCh38.p13/GGVP/
 ```
 
 The main results under `/data/tusers/zhongrenhu/for_SMS/dna/simulation/GRCh38/template/HG02716_germ`:
@@ -67,7 +69,7 @@ Run script `build_template_genome_unphased.sh` to build template genome, for exa
 # Using SNVs of line_28 from DGRP
 # Current working directory is /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/template/line_28
 
-./build_template_genome_unphased.sh -n line_28 -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/dm3/DGRP/
+bash build_template_genome_unphased.sh -n line_28 -r /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.fa -v /data/tusers/zhongrenhu/for_SMS/reference/dm3/DGRP/
 ```
 
 The main results under `/data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/template/line_28`:
@@ -100,7 +102,7 @@ chr2L/chr2L.ins.sequence    # sequence of each simulated insertion
 
 ### 3.2 Running on blades
 
-Actually, I fnished this step via blades, see `exmaples`.
+Actually, I fnished this step via blades, see `simulate_training_data` or `simulate_test_data`.
 
 ## 4. Details of output
 
