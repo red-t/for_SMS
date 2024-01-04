@@ -2,14 +2,15 @@
 import sys
 import random
 import collections
+from scipy.stats import gamma
 
 
-def get_rld_factory(mean,std,file):
+def get_rld_factory(mean, alpha, loc, beta, file):
 	if(file is None):
-		if mean is None or std is None:
+		if alpha is None:
 			raise Exception("Either provide a mean read length and standard deviation or a file with the read length distribution")
-		print "Using gaussian read length distribution with mean {0} and standard deviation {1}".format(mean,std)
-		return RLDfactory_gauss(mean,std)
+		print "Using gamma read length distribution with alpha:{0}, loc:{1} and beta:{2}".format(alpha,loc,beta)
+		return RLDfactory_gamma(alpha, loc, beta)
 	else:
 		print "Using read length distribution from file {0}".format(file)
 		return RLDfactory_rldfile(file)
@@ -57,13 +58,15 @@ class RLDfactory_rldfile:
 		
 		
 
-class RLDfactory_gauss:
-	def __init__(self,mean,std):
-		self.__mean=mean
-		self.__std=std
+class RLDfactory_gamma:
+	def __init__(self, alpha, loc, beta):
+		self.__alpha = alpha
+		self.__loc = loc
+		self.__beta = beta
 	
 	def next(self):
-		m=self.__mean
-		s=self.__std
-		rl=int(random.gauss(m,s))
+		alpha = self.__alpha
+		loc = self.__loc
+		beta = self.__beta
+		rl = int(gamma.rvs(alpha, loc=loc, scale=beta))
 		return rl

@@ -10,6 +10,23 @@ Make sure you have the paths of the executable program `VISOR` and `bcftools` in
 export PATH=$PATH:/data/tusers/zhongrenhu/Software/anaconda3/bin/
 ```
 
+#### For Human:
+Run script `build_template_genome.sh` to build template genome, for example, with GRCh38:
+```
+# HG02716 是 GGVP 当中的女性个体之一
+build_template_genome.sh -n HG02716 -s F -f /data/tusers.ds/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_X.fa -m /data/tusers.ds/zhongrenhu/for_SMS/reference/GRCh38.p13/GRCh38_no_alt_Y.fa -v /data/tusers.ds/zhongrenhu/for_SMS/reference/GRCh38.p13/GGVP/
+```
+
+And the main results look like:
+```
+# 路径 /data/tusers/zhongrenhu/for_SMS/dna/simulation/GRCh38/HG02716_templateswithsnp
+HG02716_template_h1.fa			# simulated haplotype 1 template genome
+HG02716_template_h1.fa.fai		# index of it
+HG02716_template_h2.fa			# simulated haplotype 2 template genome
+HG02716_template_h2.fa.fai		# index of it
+```
+
+#### For Fruitfly:
 Run script `build_template_genome_unphased.sh` to build template genome, for example, with dm3:
 ```
 # line_28 是 DGRP 当中的品系之一
@@ -18,8 +35,9 @@ build_template_genome_unphased.sh -n line_28 -r /data/tusers/zhongrenhu/for_SMS/
 
 And the main results look like:
 ```
-line_28_templateswithsnp/line_28_template.fa        # simulated haplotype template genome
-line_28_templateswithsnp/line_28_template.fa.fai    # the index of it
+# 路径 /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/line_28
+line_28_template.fa        # simulated haplotype template genome
+line_28_template.fa.fai    # the index of it
 ```
 
 ----
@@ -40,6 +58,8 @@ conda activate python27 --> conda activate name_of_python27_conda_env
 ```
 
 Then, run script `simulation_protocol.sh`:
+
+#### For Fruitfly
 ```
 # 此时的工作路径是 /data/tusers/zhongrenhu/for_SMS/dna/simulation/dm3/line_28
 simulation_protocol.sh -d ./ -r line_28_template.fa -t /data/tusers/zhongrenhu/for_SMS/reference/dm3/dm3.transposon_for_simulaTE.fa -N 10000 -R 0 --sub-N 50 --germline-count 500 --avg-somatic-count 20 --min-distance 500 --depth 50

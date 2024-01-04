@@ -1,399 +1,440 @@
 import numpy as np
+import pandas as pd
 from subprocess import Popen, DEVNULL
+from autogluon.tabular import TabularPredictor
 
-
-SEG_DTYPE = np.dtype([
-    ('flag',        np.uint16),
-    ('mapq',        np.uint8),
-    ('qst',         np.int32),
-    ('qed',         np.int32),
-    ('rpos',        np.int32),
-    ('sflag',       np.uint8),
-    ('rflag',       np.uint8),
-    ('offset',      np.int64),
-    ('refst',       np.int32),
-    ('refed',       np.int32),
-    ('ith',         np.uint8),
-    ('nseg',        np.uint8),
-    ('overhang',    np.int32),
-    ('nmatch',      np.int32),
-    ('loc_flag',    np.uint8),
-    ('nmap',        np.uint8),
-    ('lmap',        np.int32),
-    ('sumAS',       np.float32),
-    ('sumdiv',      np.float32),
-    ('cnst',        np.uint16),
+##################
+### Data Types ###
+##################
+SegmentDt = np.dtype([
+    ('flag',            np.uint16),
+    ('mapQual',         np.uint8),
+    ('queryStart',      np.int32),
+    ('queryEnd',        np.int32),
+    ('refPosition',     np.int32),
+    ('segType',         np.uint8),
+    ('alnType',         np.uint8),
+    ('fileOffset',      np.int64),
+    ('alnRefStart',     np.int32),
+    ('alnRefEnd',       np.int32),
+    ('order',           np.uint8),
+    ('numSeg',          np.uint8),
+    ('overhang',        np.int32),
+    ('matchLen',        np.int32),
+    ('alnLocationType', np.uint8),
+    ('numTeAlignment',  np.uint8),
+    ('sumQueryMapLen',  np.int32),
+    ('sumAlnScore',     np.float32),
+    ('sumDivergence',   np.float32),
+    ('directionFlag',   np.uint16),
+    ('startIndex',      np.int32),
+    ('endIndex',        np.int32),
+    ('teTid',           np.int32),
 ])
 
-
-TEALN_DTYPE = np.dtype([
-    ('idx',     np.int32),
-    ('AS',      np.int32),
-    ('qst',     np.int32),
-    ('qed',     np.int32),
-    ('div',     np.float32),
-    ('flag',    np.int16),
+TeAlignmentDt = np.dtype([
+    ('segIndex',    np.int32),
+    ('AlnScore',    np.int32),
+    ('queryStart',  np.int32),
+    ('queryEnd',    np.int32),
+    ('mapLen',      np.int32),
+    ('divergence',  np.float32),
+    ('flag',        np.int16),
+    ('teTid',       np.int32),
 ])
 
-
-CLUSTER_DTYPE = np.dtype([
-    ('st',          np.int32),
-    ('ed',          np.int32),
-    ('st_idx',      np.int32),
-    ('ed_idx',      np.int32),
-    ('nseg',        np.float32),
-    ('strand',      np.uint16),
-    ('single',      np.uint8),
-    ('cloc_flag',   np.uint8),
-    ('ntype',       np.uint8),
-    ('entropy',     np.float32),
-    ('bratio',      np.float32),
-    ('lmq_frac',    np.float32),
-    ('dclip_frac',  np.float32),
-    ('aln1_frac',   np.float32),
-    ('aln2_frac',   np.float32),
-    ('aln4_frac',   np.float32),
-    ('aln8_frac',   np.float32),
-    ('aln16_frac',  np.float32),
-    ('avg_mapq',    np.float32),
-    ('avg_AS',      np.float32),
-    ('avg_qfrac',   np.float32),
-    ('avg_div',     np.float32),
+ClusterDt = np.dtype([
+    ('refStart',            np.int32),
+    ('refEnd',              np.int32),
+    ('startIndex',          np.int32),
+    ('endIndex',            np.int32),
+    ('numSeg',              np.float32),
+    ('directionFlag',       np.uint16),
+    ('cltType',             np.uint8),
+    ('locationType',        np.uint8),
+    ('numSegType',          np.uint8),
+    ('entropy',             np.float32),
+    ('balanceRatio',        np.float32),
+    ('lowMapQualFrac',      np.float32),
+    ('dualClipFrac',        np.float32),
+    ('alnFrac1',            np.float32),
+    ('alnFrac2',            np.float32),
+    ('alnFrac4',            np.float32),
+    ('alnFrac8',            np.float32),
+    ('alnFrac16',           np.float32),
+    ('meanMapQual',         np.float32),
+    ('meanAlnScore',        np.float32),
+    ('meanQueryMapFrac',    np.float32),
+    ('meanDivergence',      np.float32),
+    ('bgDiv',               np.float32),
+    ('bgDepth',             np.float32),
+    ('bgReadLen',           np.float32),
+    ('teAlignedFrac',       np.float32),
+    ('teTid',               np.int32),
+    ('isInBlacklist',       np.uint8),
+    ('probability',         np.float32),
 ])
-#
-# ---------------------------------------------------------------
-#
-cdef object extract_seg(BamFile rbf,
-                        int tid,
-                        int minl):
-    cdef:
-        int32_t     retval, M, N=0
-        seg_dtype_struct[::1]   segs_view
-        Iterator ite = Iterator(rbf, tid)
 
-    segs = np.zeros(10000, dtype=SEG_DTYPE)
-    template  = np.zeros(10000, dtype=SEG_DTYPE)
-    segs_view = segs
-    M = segs_view.shape[0] - 20
+##############################
+### Construction Functions ###
+##############################
+cdef AiList* newAiList(str filePath, const char *chrom):
+    cdef bytes filePathBytes = filePath.encode()
+    cdef AiList *aiList = initAiList()
+
+    readBED(aiList, filePathBytes, chrom)
+    constructAiList(aiList, 20)
+    return aiList
+
+
+cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs):
+    cdef Args args
+
+    args.tid = tid
+    args.bgDiv = bgDiv
+    args.bgDepth = bgDepth
+    args.bgReadLen = bgReadLen
+    args.numThread = cmdArgs.numThread
+    args.minSegLen = cmdArgs.minSegLen
+    args.maxDistance = cmdArgs.maxDistance
+    args.minOverhang = cmdArgs.minOverhang
+    return args
+
+
+##########################
+### Construct SegArray ###
+##########################
+cdef object getSegArray(BamFile genomeBamFile, Args args):
+
+    cdef object segArray = np.zeros(10000, dtype=SegmentDt)
+    cdef object template = np.zeros(10000, dtype=SegmentDt)
+    cdef Segment[::1] segArrayView = segArray
+    cdef int maxNumSeg = segArrayView.shape[0] - 20
+    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
+    cdef BamFile outputBamFile = BamFile("tmp_candidates_alignments.{}.bam".format(args.tid), "wb", 5, genomeBamFile)
+    cdef int returnValue, numSeg=0
     
-    while 1:
-        retval = ite.cnext1()
-        if retval > 0:
-            # ignore unmapped & secondary alignments
-            if bam_filtered(ite.b):
-                continue
-            
-            # expand arrary
-            if N > M:
-                segs = np.concatenate((segs, template))
-                segs_view = segs
-                M = segs_view.shape[0] - 20
-            
-            # parse alignment & extract segments
-            retval = parse_cigar(ite.b, &segs_view[N], ite.offset, minl)
-            N += retval
+    while True:
+        returnValue = iterator.cnext1()
+        if returnValue < 0:
+            outputBamFile.close(); del outputBamFile
+            del template; del iterator
+            return segArray[:numSeg]
+
+        if bamIsInvalid(iterator.bamRcord):
             continue
 
-        del template; del ite
-        return segs[:N]
-#
-# ---------------------------------------------------------------
-#
-cdef seg_feat(seg_dtype_struct[::1] segs,
-              ailist_t *rep_ail,
-              ailist_t *gap_ail):
-    cdef ssize_t i
+        if numSeg > maxNumSeg:
+            segArray = np.concatenate((segArray, template))
+            segArrayView = segArray
+            maxNumSeg = segArrayView.shape[0] - 20
 
-    for i in range(segs.shape[0]):
-        cseg_feat(&segs[i], rep_ail, gap_ail)
-#
-# ---------------------------------------------------------------
-#
-cdef trim_seg(BamFile rbf,
-              int tid,
-              int threads,
-              seg_dtype_struct[::1] segs):
-    cdef:
-        str outpath = "tmp.all_supp_reads.{}.fa".format(tid)
-        BamFile wbf = BamFile(outpath, threads, "wF", rbf)
-        Iterator ite = Iterator(rbf, tid)
-        bam1_t *dest = bam_init1()
-        int i, retval
+        returnValue = fillSegmentArray(iterator.bamRcord, &segArrayView[numSeg], iterator.offset, args.minSegLen)
+        numSeg += returnValue
+        if returnValue > 0:
+            outputBamFile.write(iterator.bamRcord)
+
+
+cdef updateSegArray(Segment[::1] segArray, Args args):
     
-    for i in range(segs.shape[0]):
-        # read alignment with specified offset
-        retval = ite.cnext3(segs[i].offset)
-        if retval < 0:
+    cdef int i
+    for i in range(segArray.shape[0]):
+        updateSegment(&segArray[i], args.repeatAiList, args.gapAiList)
+
+
+cdef object updateSegArrayByTe(Segment[::1] segArray, Args args):
+
+    cdef BamFile teBamFile = BamFile("tmp.all_supp_reads.{}.bam".format(args.tid), "rb", args.numThread)
+    cdef Iterator iterator = Iterator(teBamFile)
+    cdef object teArray = getTeArray(iterator)
+    cdef TeAlignment[::1] teArrayView = teArray
+    cdef int numTeTid = teBamFile.header.n_targets
+
+    teArray.sort(order=['segIndex', 'queryStart'])
+    
+    cdef object teTidCountTable = np.zeros(numTeTid, dtype=np.int32)
+    cdef int[::1] teTidCountTableView = teTidCountTable
+    cdef int i
+
+    for i in range(teArrayView.shape[0]):
+        updateSegByTeArray(&segArray[0], &teArrayView[0], i)
+
+    for i in range(segArray.shape[0]):
+        if segArray[i].numTeAlignment:
+            countTeTids(&segArray[i], &teArrayView[0], &teTidCountTableView[0], numTeTid)
+            segArray[i].teTid = np.argmax(teTidCountTable)
+
+    del iterator; teBamFile.close(); del teBamFile; del teTidCountTable
+    return teArray
+
+
+##########################
+### Construct TeArray ###
+##########################
+cdef ouputSegmentSeqs(Segment[::1] segArray, BamFile genomeBamFile, Args args):
+
+    cdef str outputFileName = "tmp.all_supp_reads.{}.fa".format(args.tid)
+    cdef BamFile outputBamFile = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
+    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
+    cdef bam1_t *destRecord = bam_init1()
+    cdef int i, returnValue
+
+    for i in range(segArray.shape[0]):
+        returnValue = iterator.cnext3(segArray[i].fileOffset)
+        if returnValue < 0:
             raise StopIteration
 
-        # trim alignment & write out
-        bam_trim1(ite.b, dest, i, segs[i].qst, segs[i].qed)
-        wbf.write(dest)
+        trimSegment(iterator.bamRcord, destRecord, i, segArray[i].queryStart, segArray[i].queryEnd)
+        outputBamFile.write(destRecord)
     
-    bam_destroy1(dest); wbf.close(); del wbf; del ite
-#
-# ---------------------------------------------------------------
-#
-cdef align_mm2(int tid,
-               int threads,
-               str ref,
-               str preset):
-    cdef:
-        int retval
-        str cmd_mm2 = "minimap2 -t {} -aYx {} {} tmp.all_supp_reads.{}.fa | " \
-                      "samtools view -@ {} -bhS -o tmp.all_supp_reads.{}.bam -".format(threads, preset, ref, tid, threads, tid)
+    bam_destroy1(destRecord); outputBamFile.close(); del outputBamFile; del iterator
 
-    proc = Popen([cmd_mm2], stderr=DEVNULL, shell=True, executable='/bin/bash')
-    retval = proc.wait()
+
+cdef mapByMinimap2(str reference, Args args):
+
+    cdef int retval
+    cdef str command = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t {} -aY {} tmp.all_supp_reads.{}.fa | " \
+                      "samtools view -@ {} -bhS -o tmp.all_supp_reads.{}.bam -".format(args.numThread, reference, args.tid, args.numThread, args.tid)
+
+    process = Popen([command], stderr=DEVNULL, shell=True, executable='/bin/bash')
+    retval = process.wait()
     if retval != 0:
-        raise Exception("Error: minimap2 failed for tid: {}".format(tid))
-#
-# ---------------------------------------------------------------
-#
-cdef object extract_tealn(Iterator ite):
-    cdef:
-        int32_t     retval, M, N=0
-        tealn_dtype_struct[::1]   tealns_view
+        raise Exception("Error: minimap2 failed for tmp.all_supp_reads.{}.fa".format(args.tid))
 
-    tealns = np.zeros(10000, dtype=TEALN_DTYPE)
-    template  = np.zeros(10000, dtype=TEALN_DTYPE)
-    tealns_view = tealns
-    M = tealns_view.shape[0] - 20
+
+cdef object getTeArray(Iterator iterator):
+
+    cdef object teArray = np.zeros(10000, dtype=TeAlignmentDt)
+    cdef object template  = np.zeros(10000, dtype=TeAlignmentDt)
+    cdef TeAlignment[::1] teArrayView = teArray
+    cdef int maxTeAlignments = teArrayView.shape[0] - 20
+    cdef int returnValue, numTeAlignments=0
     
-    while 1:
-        retval = ite.cnext2()
-        if retval > 0:
-            # ignore unmapped & secondary alignments
-            if bam_filtered(ite.b):
-                continue
-            
-            # expand arrary
-            if N > M:
-                tealns = np.concatenate((tealns, template))
-                tealns_view = tealns
-                M = tealns_view.shape[0] - 20
+    while True:
+        returnValue = iterator.cnext2()
+        if returnValue < 0:
+            del template
+            return teArray[:numTeAlignments]
 
-            # parse & record alignment
-            parse_tealns(ite.b, &tealns_view[N])
-            N += 1
+        if bamIsInvalid(iterator.bamRcord):
             continue
 
-        del template
-        return tealns[:N]
-#
-# ---------------------------------------------------------------
-#
-cdef object seg_feat_te(seg_dtype_struct[::1] segs,
-                        int tid,
-                        int threads):
-    cdef:
-        BamFile  rbf = BamFile("tmp.all_supp_reads.{}.bam".format(tid), threads, "rb")
-        Iterator ite = Iterator(rbf)
-        object   tealns
-        tealn_dtype_struct[::1] tealns_view
+        if numTeAlignments > maxTeAlignments:
+            teArray = np.concatenate((teArray, template))
+            teArrayView = teArray
+            maxTeAlignments = teArrayView.shape[0] - 20
+
+        fillTeArray(iterator.bamRcord, &teArrayView[numTeAlignments])
+        numTeAlignments += 1
+
+
+##########################
+### Construct CltArray ###
+##########################
+cdef object getCltArray(Segment[::1] segArray, Args args):
+
+    cdef object cltArray = np.zeros(10000, dtype=ClusterDt)
+    cdef object template = np.zeros(10000, dtype=ClusterDt)
+    cdef Cluster[::1] cltArrayView = cltArray
+    cdef int maxNumClt = cltArrayView.shape[0] - 20
+    cdef int numClt=0, start=0, end
     
-    tealns = extract_tealn(ite)
-    tealns.sort(order=['idx', 'qst'])
-    tealns_view = tealns
+    while start < segArray.shape[0]:
+        if overhangIsShort(&segArray[start], args.minOverhang):
+            start += 1; continue
 
-    cdef:
-        int i
+        if numClt > maxNumClt:
+            cltArray = np.concatenate((cltArray, template))
+            cltArrayView = cltArray
+            maxNumClt = cltArrayView.shape[0] - 20
+        
+        # initialize numClt-th cluster
+        cltArrayView[numClt].startIndex = start
+        cltArrayView[numClt].refStart = segArray[start].refPosition - 1
+        cltArrayView[numClt].refEnd = segArray[start].refPosition + args.maxDistance
 
-    for i in range(tealns_view.shape[0]):
-        cseg_feat_te(&segs[0], &tealns_view[0], i)
-
-    del ite; rbf.close(); del rbf
-    return tealns
-#
-# ---------------------------------------------------------------
-#
-cdef object merge_seg(seg_dtype_struct[::1] segs,
-                      int maxdist,
-                      int minovh=100):
-    '''merge overlapped segments into cluster
-    
-    Parameters:
-    -----------
-        segs: 
-            typed memoryview of a structed numpy arrary, which stores
-            features of the extracted segments.
-
-        maxdist: int
-            max merging distance. segments with distance larger t-
-            han maxdist will not be merged in to the same cluster
-    '''
-    cdef:
-        int j, M
-        int i   = 0
-        int idx = 0
-        object clts, template
-        cluster_dtype_struct[::1] clts_view
-
-    clts      = np.zeros(10000, dtype=CLUSTER_DTYPE)
-    template  = np.zeros(10000, dtype=CLUSTER_DTYPE)
-    clts_view = clts
-    M = clts_view.shape[0] - 20 
-    
-    while i < segs.shape[0]:
-        # expand the array
-        if idx > M:
-            clts = np.concatenate((clts, template))
-            clts_view = clts
-            M = clts_view.shape[0] - 20
-
-        # ignore segment with short overhang
-        if segs[i].overhang < minovh:
-            i += 1
-            continue
-
-        # initialize the idx-th cluster with the first segment
-        clts_view[idx].st     = segs[i].rpos - 1
-        clts_view[idx].st_idx = i
-        clts_view[idx].ed     = segs[i].rpos + maxdist
-
-        # try to merge segments within maxdist iteratively
-        j = i + 1
-        while j < segs.shape[0]:
-            # ignore segment with short overhang
-            if segs[j].overhang < minovh:
-                j += 1
-                continue
-            # next segment's rpos VS current cluster end
-            if segs[j].rpos <= clts_view[idx].ed:
-                clts_view[idx].ed = segs[j].rpos + maxdist
-                j += 1
-            else:
+        end = start + 1
+        while end < segArray.shape[0]:
+            if overhangIsShort(&segArray[end], args.minOverhang):
+                end += 1; continue
+            if segArray[end].refPosition > cltArrayView[numClt].refEnd:
                 break
+
+            cltArrayView[numClt].refEnd = segArray[end].refPosition + args.maxDistance
+            end += 1
         
-        # update cluster's ed, ed_idx, with the last segment
-        clts_view[idx].ed     = clts_view[idx].ed - maxdist
-        clts_view[idx].ed_idx = j
+        cltArrayView[numClt].endIndex = end
+        cltArrayView[numClt].refEnd = cltArrayView[numClt].refEnd - args.maxDistance
 
-        # jump merged segments
-        i = j
-        idx += 1
+        start = end; numClt += 1
     
-    del template
-    return clts[:idx]
-#
-# ---------------------------------------------------------------
-#
-cdef clt_feat(BamFile rbf,
-              int tid,
-              cluster_dtype_struct[::1] clts,
-              seg_dtype_struct[::1] segs,
-              ailist_t *rep_ail,
-              ailist_t *gap_ail,
-              float div,
-              float coverage,
-              int minovh=100):
-    cdef:
-        ssize_t i
-        bam1_t *b1 = bam_init1()
-        bam1_t *b2 = bam_init1()
+    del template; return cltArray[:numClt]
+
+
+cdef updateCltArray(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
     
-    for i in range(clts.shape[0]):
-        cclt_feat(&clts[i], &segs[0], rep_ail, gap_ail, div, coverage, minovh, tid, rbf.htsfile, b1, b2)
+    cdef BamFile teBamFile = BamFile("tmp.all_supp_reads.{}.bam".format(args.tid), "rb", 1)
+    cdef object teTidCountTable = np.zeros(teBamFile.header.n_targets, dtype=np.int32)
+    cdef int[::1] teTidCountTableView = teTidCountTable
+    cdef int i
     
-    bam_destroy1(b1); bam_destroy1(b2)
-#
-# ---------------------------------------------------------------
-#
-cpdef dict build_cluster(str fpath,
-                         str rep_path,
-                         str gap_path,
-                         str teref,
-                         str preset,
-                         int threads,
-                         int tid,
-                         int minl,
-                         int maxdist,
-                         float div,
-                         float coverage):
-    '''build cluster
-    Parameters:
-    -----------
-        fpath: str
-            path of input BAM file.
+    args.numTeTid = teBamFile.header.n_targets
+    args.teTidCountTable = &teTidCountTableView[0]
+    args.genomeBamFile = genomeBamFile.htsFile
+    args.firstBamRecord = bam_init1()
+    args.secondBamRecord = bam_init1()
+
+    teBamFile.close(); del teBamFile
+    for i in range(cltArray.shape[0]):
+        updateCluster(&cltArray[i], &segArray[0], args)
+
+        if not isValidCandidate(&cltArray[i]):
+            continue
+        cltArray[i].teTid = np.argmax(teTidCountTable)
+    
+    bam_destroy1(args.firstBamRecord); bam_destroy1(args.secondBamRecord)
+    destroyAiList(args.repeatAiList); destroyAiList(args.gapAiList); del teTidCountTable
+
+
+######################
+### Filter Cluster ###
+######################
+cdef filterByBlacklist(Cluster[::1] cltArray, Args args):
+    cdef int i
+
+    for i in range(cltArray.shape[0]):
+        intersectBlackList(&cltArray[i], args)
+    
+    destroyAiList(args.blackAiList)
+
+
+cdef object filterByModel(object cltArray, object cmdArgs):
+    cdef object cltDf = pd.DataFrame(cltArray)
+    
+    filterGermByModel(cltDf, cmdArgs.germModelPath)
+    filterSomaByModel(cltDf, cmdArgs.somaModelPath)
+
+    return cltDf.to_records(index=False)
+
+cdef filterGermByModel(object cltDf, str modelPath):
+    cdef object predictor = TabularPredictor.load(modelPath)
+    cdef object germDf = cltDf.loc[(cltDf['cltType']==0) & (cltDf['teAlignedFrac']>=0.8) & (cltDf['isInBlacklist']==0)]
+
+    probability = predictor.predict_proba(germDf)
+    probability.columns = ['0', 'probability']
+    cltDf.update(probability)
+
+cdef filterSomaByModel(object cltDf, str modelPath):
+    cdef object predictor = TabularPredictor.load(modelPath)
+    cdef object somaDf = cltDf.loc[(cltDf['cltType']>0) & (cltDf['teAlignedFrac']>=0.8) & (cltDf['isInBlacklist']==0)]
+
+    probability = predictor.predict_proba(somaDf)
+    probability.columns = ['0', 'probability']
+    cltDf.update(probability)
+
+
+##############
+### Output ###
+##############
+cdef outPut(object cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
+
+    cdef bytes qnameBytes
+    cdef bytes chromBytes = sam_hdr_tid2name(genomeBamFile.header, args.tid)
+    cdef str cltId, chrom = chromBytes.decode()
+    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
+    cdef list cltList
+    cdef int i, j
+
+    cltOutput = open('tmp_clt_{}.txt'.format(args.tid), 'w')
+    segOutput = open('tmp_seg_{}.txt'.format(args.tid), 'w')
+
+    for i in range(cltArray.shape[0]):
+        ### output clt ###
+        cltList = list(cltArray[i])
+
+        # direction
+        if cltList[5] == 1:
+            cltList.insert(2, '+')
+        elif cltList[5] == 2:
+            cltList.insert(2, '-')
+        else:
+            cltList.insert(2, '*')
         
-        threads: int
-            nummber of threads used for BAM file I/O.
+        # normalized numSeg
+        cltList.insert(2, cltList[5])
+
+        # cluster id
+        cltId = str(args.tid) + '-' + str(i)
+        cltList.insert(2, cltId)
         
-        tid: int
-            tid of the target chromosome.
-        
-        minl: int
-            minimun segment length, cigar operation with length < 
-            minl will not be used to create insert segment.
-        
-        maxdist: int
-            max merging distance, segments with distance larger t-
-            han maxdist will not be merged in to the same cluster.
+        # chromosome
+        cltList.insert(0, chrom)
+
+        # write out clt
+        cltList = [str(x) for x in cltList]
+        cltOutput.write('\t'.join(cltList) + '\n')
+
+        ### output seg ###
+        for j in range(cltArray[i]['startIndex'], cltArray[i]['endIndex']):
+            if segArray[j].overhang < args.minOverhang:
+                continue
+
+            # chromosome & cluster id
+            cltList = [chrom, cltId]
+
+            # refst
+            cltList.append(str(segArray[j].alnRefStart))
+
+            # qname
+            iterator.cnext3(segArray[j].fileOffset)
+
+            qnameBytes = bam_get_qname(iterator.bamRcord)
+            cltList.append(qnameBytes.decode())
+
+            # write out seg
+            segOutput.write('\t'.join(cltList) + '\n')
     
-    Returns:
-    --------
-        clts: object
-            strctured numpy array with `dtype=CLUSTER_DTYPE`.
-    '''
-    ##############################################
-    ### 1. parse alignments & extract segments ###
-    ##############################################
-    cdef:
-        object   segs
-        BamFile  rbf = BamFile(fpath, threads, "rb")
+    cltOutput.close(); segOutput.close(); del iterator
+
+
+############
+### Main ###
+############
+cpdef dict buildCluster(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs):
+    # 1. construct segments
+    cdef Args args = newArgs(tid, bgDiv, bgDepth, bgReadLen, cmdArgs)
+    cdef BamFile genomeBamFile = BamFile(cmdArgs.genomeBamFilePath, "rb", cmdArgs.numThread)
+    cdef object segArray = getSegArray(genomeBamFile, args)
+    cdef Segment[::1] segArrayView = segArray
+
+    # 2. compute segment features
+    cdef const char *chrom = sam_hdr_tid2name(genomeBamFile.header, tid)
+    args.repeatAiList = newAiList(cmdArgs.repeatPath, chrom)
+    args.gapAiList = newAiList(cmdArgs.gapPath, chrom)
+
+    updateSegArray(segArrayView, args)
+    segArray.sort(order='refPosition')
+    ouputSegmentSeqs(segArrayView, genomeBamFile, args)
+
+    mapByMinimap2(cmdArgs.referenceTe, args)
+    teArray = updateSegArrayByTe(segArrayView, args)
     
-    # extract segments
-    segs = extract_seg(rbf, tid, minl)
+    # 3. construct cluster
+    cdef ResultDict = {}
+    cdef object cltArray = getCltArray(segArray, args)
+    cdef Cluster[::1] cltArrayView = cltArray
 
-    ############################################
-    ### 2. compute features for each segment ###
-    ############################################
-    cdef:
-        bytes repfn = rep_path.encode()
-        bytes gapfn = gap_path.encode()
-        const char *chrom = sam_hdr_tid2name(rbf.hdr, tid)
-        ailist_t *rep_ail = ailist_init()
-        ailist_t *gap_ail = ailist_init()
-        seg_dtype_struct[::1] segs_view = segs
+    # 4. compute cluster features
+    updateCltArray(cltArrayView, segArrayView, genomeBamFile, args)
 
-    # construct AIList
-    readBED(rep_ail, repfn, chrom); ailist_construct(rep_ail, 20)
-    readBED(gap_ail, gapfn, chrom); ailist_construct(gap_ail, 20)
+    # 5. filter cluster
+    args.blackAiList = newAiList(cmdArgs.blackListPath, chrom)
+    filterByBlacklist(cltArrayView, args)
+    cltArray = filterByModel(cltArray, cmdArgs)
 
-    # compute features for each segment
-    seg_feat(segs_view, rep_ail, gap_ail)
+    # 6. output
+    outPut(cltArray, segArrayView, genomeBamFile, args)
+    genomeBamFile.close(); del genomeBamFile
 
-    # trimmed & write out segment sequence
-    segs.sort(order='rpos')
-    trim_seg(rbf, tid, threads, segs_view)
-
-    # align segment sequences to TE CSS
-    align_mm2(tid, threads, teref, preset)
-
-    # compute features from TE alignments
-    alns = seg_feat_te(segs_view, tid, threads)
-    
-    ############################
-    ### 3. construct cluster ###
-    ############################
-    cdef:
-        object clts
-        dict   CLUSTER_DICT = {}
-
-    # merge segments into cluster
-    clts = merge_seg(segs, maxdist)
-
-    ############################################
-    ### 4. compute features for each cluster ###
-    ############################################
-    cdef cluster_dtype_struct[::1] clts_view = clts
-
-    # features computing
-    clt_feat(rbf, tid, clts_view, segs_view, rep_ail, gap_ail, div, coverage)
-    rbf.close(); del rbf
-
-    # free AIList
-    ailist_destroy(rep_ail); ailist_destroy(gap_ail)
-
-    CLUSTER_DICT[tid] = (clts, segs, alns)
-    return CLUSTER_DICT
+    ResultDict[tid] = (cltArray, segArray, teArray)
+    return ResultDict

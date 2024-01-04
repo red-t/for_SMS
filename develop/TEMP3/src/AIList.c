@@ -1,244 +1,231 @@
 #include "AIList.h"
 
-ailist_t *ailist_init(void)
+/***************************
+ *** AiList Construction ***
+ ***************************/
+AiList *initAiList(void)
 {
-	ailist_t *ail = malloc(1*sizeof(ailist_t));
-	ail->ctg = malloc(1*sizeof(ctg_t)); // allocate memory for 1 contig
-    ctg_t *p = &ail->ctg[0]; // ctg_t pointer to the first contig
-    p->nr = 0; // initialize nr(number of regions) of the first contig to 0
-    p->mr = 64;
-	p->glist = malloc(p->mr*sizeof(gdata_t)); // allocate memory for mr regions
+	AiList *ail = malloc(1*sizeof(AiList));
+	ail->contigList = malloc(1*sizeof(Contig));
+    Contig *firstContig = &ail->contigList[0];
+
+    firstContig->numInterval = 0;
+    firstContig->maxIntervals = 64;
+	firstContig->intervalList = malloc(firstContig->maxIntervals*sizeof(Interval));
 	return ail;
 }
 
-
-void ailist_destroy(ailist_t *ail)
+void destroyAiList(AiList *ail)
 {
 	if (ail == 0) return;
-    free(ail->ctg[0].glist); // firstly free the list of regions
-	free(ail->ctg[0].maxE); // then free the list of max end
-	free(ail->ctg); // then free the contig
-	free(ail); // finally free the AIList
+    free(ail->contigList[0].intervalList);
+	free(ail->contigList[0].maxEndList);
+	free(ail->contigList);
+	free(ail);
 }
 
-
-void ailist_add(ailist_t *ail, int32_t s, int32_t e)
+void addInterval(AiList *ail, int start, int end)
 {
-	if(s > e) return;
-	ctg_t *q = &ail->ctg[0];
-	if(q->nr == q->mr) EXPAND(q->glist, q->mr);	// if the region list is full, expand mr more
-	gdata_t *p = &q->glist[q->nr++]; // pointer to the nr+1-th region
-	p->start = s;
-	p->end   = e;
-    // TO DO: should add a new feature value, representing the TE family
+	if(start > end) return;
+
+	Contig *firstContig = &ail->contigList[0];
+	if(firstContig->numInterval == firstContig->maxIntervals)
+        EXPAND(firstContig->intervalList, firstContig->maxIntervals);
+
+	Interval *newInterval = &firstContig->intervalList[firstContig->numInterval++];
+	newInterval->start = start;
+	newInterval->end = end;
 	return;
 }
 
-
-void readBED(ailist_t *ail, const char* fn, const char* chr)
+void readBED(AiList *ail, const char* bedFileName, const char* targetChrom)
 {
-    char buf[1024];
-    char *s1, *s2, *s3;
-    FILE* fd = fopen(fn, "r");
-    while(fgets(buf, 1024, fd)){
-        s1 = strtok(buf, "\t");
-        s2 = strtok(NULL, "\t");
-        s3 = strtok(NULL, "\t");
-        // TO DO: need one more strtok to get the information of the TE family,
-        // then change it to value convert it to integer value through a dictionary
-		if(s1){
-            // if the contig of the region is the same as the
-            // given chr, then add the region into region list
-            int32_t ret = strcmp(s1, chr);
-            if(ret == 0) ailist_add(ail, atol(s2), atol(s3));
+    char buffer[1024];
+    char *chrom, *start, *end;
+    FILE* fileHandle = fopen(bedFileName, "r");
+
+    while(fgets(buffer, 1024, fileHandle)){
+        chrom = strtok(buffer, "\t");
+        start = strtok(NULL, "\t");
+        end = strtok(NULL, "\t");
+
+		if(chrom){
+            int ret = strcmp(chrom, targetChrom);
+            if(ret == 0) addInterval(ail, atol(start), atol(end));
         }
 	}
-	fclose(fd);
-	return;
+
+	fclose(fileHandle);
 }
 
-
-void ailist_construct(ailist_t *ail, int cLen)
+void constructAiList(AiList *ail, int minCoverageLen)
 {   //New continueous memory?
-    int cLen1=cLen/2, j1, minL = MAX(64, cLen);
-    cLen += cLen1;
+    int minCoverageLen1=minCoverageLen/2, j1, minL = MAX(64, minCoverageLen);
+    minCoverageLen += minCoverageLen1;
     int lenT, len, iter, j, k, k0, t;
 	//1. Decomposition
-	ctg_t   *p  = &ail->ctg[0];
-	gdata_t *L1 = p->glist;                         //L1: to be rebuilt
-	int32_t  nr = p->nr;
-    if(nr<=minL){
-        p->nc = 1, p->lenC[0] = nr, p->idxC[0] = 0;
+	Contig   *p  = &ail->contigList[0];
+	Interval *L1 = p->intervalList;                         //L1: to be rebuilt
+	int  numInterval = p->numInterval;
+    if(numInterval<=minL){
+        p->numComp = 1, p->lenComp[0] = numInterval, p->idxComp[0] = 0;
     }
     else{
-        gdata_t *L0 = malloc(nr*sizeof(gdata_t)); 	//L0: serve as input list
-        gdata_t *L2 = malloc(nr*sizeof(gdata_t));   //L2: extracted list
-        memcpy(L0, L1, nr*sizeof(gdata_t));
+        Interval *L0 = malloc(numInterval*sizeof(Interval)); 	//L0: serve as input list
+        Interval *L2 = malloc(numInterval*sizeof(Interval));   //L2: extracted list
+        memcpy(L0, L1, numInterval*sizeof(Interval));
         iter = 0;	k = 0;	k0 = 0;
-        lenT = nr;
+        lenT = numInterval;
         while(iter<MAXC && lenT>minL){
             len = 0;
-            for(t=0; t<lenT-cLen; t++){
-                int32_t tt = L0[t].end;
+            for(t=0; t<lenT-minCoverageLen; t++){
+                int tt = L0[t].end;
                 j=1;    j1=1;
-                while(j<cLen && j1<cLen1){
+                while(j<minCoverageLen && j1<minCoverageLen1){
                     if(L0[j+t].end>=tt) j1++;
                     j++;
                 }
-                if(j1<cLen1) memcpy(&L2[len++], &L0[t], sizeof(gdata_t));
-                else memcpy(&L1[k++], &L0[t], sizeof(gdata_t));
+                if(j1<minCoverageLen1) memcpy(&L2[len++], &L0[t], sizeof(Interval));
+                else memcpy(&L1[k++], &L0[t], sizeof(Interval));
             }
-            memcpy(&L1[k], &L0[lenT-cLen], cLen*sizeof(gdata_t));
-            k += cLen, lenT = len;
-            p->idxC[iter] = k0;
-            p->lenC[iter] = k-k0;
+            memcpy(&L1[k], &L0[lenT-minCoverageLen], minCoverageLen*sizeof(Interval));
+            k += minCoverageLen, lenT = len;
+            p->idxComp[iter] = k0;
+            p->lenComp[iter] = k-k0;
             k0 = k, iter++;
             if(lenT<=minL || iter==MAXC-2){			//exit: add L2 to the end
                 if(lenT>0){
-                    memcpy(&L1[k], L2, lenT*sizeof(gdata_t));
-                    p->idxC[iter] = k;
-                    p->lenC[iter] = lenT;
+                    memcpy(&L1[k], L2, lenT*sizeof(Interval));
+                    p->idxComp[iter] = k;
+                    p->lenComp[iter] = lenT;
                     iter++;
                 }
-                p->nc = iter;
+                p->numComp = iter;
             }
-            else memcpy(L0, L2, lenT*sizeof(gdata_t));
+            else memcpy(L0, L2, lenT*sizeof(Interval));
         }
         free(L2),free(L0);
     }
     //2. Augmentation
-    p->maxE = malloc(nr*sizeof(int32_t));
-    for(j=0; j<p->nc; j++){
-        k0 = p->idxC[j];
-        k  = k0 + p->lenC[j];
-        int32_t tt = L1[k0].end;
-        p->maxE[k0] = tt;
+    p->maxEndList = malloc(numInterval*sizeof(int));
+    for(j=0; j<p->numComp; j++){
+        k0 = p->idxComp[j];
+        k  = k0 + p->lenComp[j];
+        int tt = L1[k0].end;
+        p->maxEndList[k0] = tt;
         for(t=k0+1; t<k; t++){
             if(L1[t].end > tt) tt = L1[t].end;
-            p->maxE[t] = tt;
+            p->maxEndList[t] = tt;
         }
     }
 }
 
 
-int32_t bSearch(gdata_t* As, int32_t idxS, int32_t idxE, int32_t qe)
-{   //find tE: index of the first item satisfying .start<qe from right
-    int tL=idxS, tR=idxE-1, tM, tE=-1;
-    // if start of the rightmost region less than qe,
-    // all the other regions on the left is eligible
-    if(As[tR].start < qe)
-        return tR;
-    // if start of the leftmost region larger than qe,
-    // all the other regions on the right is not eligible
-    else if(As[tL].start >= qe)
-        return -1;
-    while(tL<tR-1){ // binary search between tL & tR
-        tM = (tL+tR)/2; 
-        if(As[tM].start >= qe)
-            tR = tM-1;
-        else
-            tL = tM;
-    }
-    if(As[tR].start < qe)
-        tE = tR;
-    else if(As[tL].start < qe)
-        tE = tL;       
-    return tE; 
-}
+/********************
+ *** AiList Query ***
+ ********************/
+#define isOverlap1(queryStart, queryEnd, interval) ((interval)->start < (queryEnd) && (interval)->end > (queryStart))
+#define isOverlap2(queryStart, interval) ((interval)->end > (queryStart))
 
-
-void query_dist_p(ailist_t *ail, int32_t rpos, int32_t flank, int32_t *n, int32_t *d)
-{   
-    int32_t nr = 0; // number of regions overlapped with query
-    int32_t qs = (rpos<flank) ? 0 : rpos-flank; // query start of the extended rpos
-    int32_t qe = rpos + flank; // query end of the extended rpos
-    int32_t k, md;
-    int32_t mdist = 0x7fffffff;
-    ctg_t   *p = &ail->ctg[0]; // point to the first contig
-    
-    // k-th component catains p->lenC[k] regions
-    // search in components one by one
-    for(k=0; k<p->nc; k++){
-        int32_t cs = p->idxC[k];        // component start index
-        int32_t ce = cs + p->lenC[k];   // component end index
-        int32_t t;
-        if(p->lenC[k]>15){
-            t = bSearch(p->glist, cs, ce, qe); 	// get index of the first item satisfying .start<qe from right
-            while(t>=cs && p->maxE[t]>qs){      // search from t-th region to right
-                if(p->glist[t].end>qs){         // .start<qe & .end>qs, overlap
-                    md    = MIN(abs(rpos - p->glist[t].start), \
-                                abs(rpos - p->glist[t].end));
-                    // TO DO: should get value of the overlapped
-                    // and update it if mdist is updated
-                	mdist = MIN(mdist, md);     // calculate the shortest distance from the border
-                    nr++;
-                }
-                t--;
-            }
-        }
-        else{
-            for(t=cs; t<ce; t++){
-                if(p->glist[t].start<qe && p->glist[t].end>qs){
-                	md    = MIN(abs(rpos - p->glist[t].start), \
-                                abs(rpos - p->glist[t].end));
-                    // TO DO: should get value of the overlapped
-                    // and update it if mdist is updated
-                	mdist = MIN(mdist, md);
-                    nr++;
-                }
-			}
-        }
-    }
-    *d = MIN(mdist, *d);
-    *n = *n + nr;
-    // return nr;
-}
-
-
-void query_dist_c(ailist_t *ail, int32_t st, int32_t ed, int32_t flank, int32_t *n, int32_t *d)
+int binarySearch(Interval *intervalList, int startIndex, int endIndex, int queryEnd)
 {
-    int32_t nr = 0;
-    int32_t qs = (st<flank) ? 0 : st-flank; // query start of the extended st
-    int32_t qe = ed + flank; // query end of the extended ed
-    int32_t k, ldist, rdist;
-    int32_t mdist = 0x7fffffff;
-    ctg_t   *p = &ail->ctg[0];
+    //find targetEnd: index of the rightmost interval satisfying (start < queryEnd)
+    int left = startIndex, right = endIndex-1, middle, targetEnd = -1;
 
-    for(k=0; k<p->nc; k++){
-        int32_t cs = p->idxC[k];
-        int32_t ce = cs + p->lenC[k];
-        int32_t t;
-        if(p->lenC[k]>15){
-            t = bSearch(p->glist, cs, ce, qe);
-            while(t>=cs && p->maxE[t]>qs){
-                if(p->glist[t].end>qs){
-                    ldist = MIN(abs((int32_t)st - (int32_t)p->glist[t].start), \
-                                abs((int32_t)st - (int32_t)p->glist[t].end));
-                    rdist = MIN(abs((int32_t)ed - (int32_t)p->glist[t].start), \
-                                abs((int32_t)ed - (int32_t)p->glist[t].end));
-                    // TO DO: should get value of the overlapped
-                    // and update it if mdist is updated
-                    mdist = MIN(mdist, MIN(ldist, rdist));
-                    nr++;
-                }
-                t--;
-            }
-        }
-        else{
-            for(t=cs; t<ce; t++){
-                if(p->glist[t].start<qe && p->glist[t].end>qs){
-                	ldist = MIN(abs((int32_t)st - (int32_t)p->glist[t].start), \
-                                abs((int32_t)st - (int32_t)p->glist[t].end));
-                    rdist = MIN(abs((int32_t)ed - (int32_t)p->glist[t].start), \
-                                abs((int32_t)ed - (int32_t)p->glist[t].end));
-                    // TO DO: should get value of the overlapped
-                    // and update it if mdist is updated
-                    mdist = MIN(mdist, MIN(ldist, rdist));
-                    nr++;
-                }
+    if(intervalList[right].start < queryEnd) return right;
+    else if(intervalList[left].start >= queryEnd) return -1;
+
+    while(left < right-1) {
+        middle = (left + right) / 2;
+        if(intervalList[middle].start >= queryEnd)
+            right = middle - 1;
+        else
+            left = middle;
+    }
+    
+    if(intervalList[right].start < queryEnd)
+        targetEnd = right;
+    else if(intervalList[left].start < queryEnd)
+        targetEnd = left;
+        
+    return targetEnd; 
+}
+
+static inline int getMinDistance(int queryPoint, Interval *interval)
+{ return MIN(abs(queryPoint - interval->start), abs(queryPoint - interval->end)); }
+
+static inline void updateMinDistPoint(Interval *interval, int queryPoint, int *numOverlap, int *minDistance)
+{
+    int prevMinDist = getMinDistance(queryPoint, interval);
+    *minDistance = MIN(*minDistance, prevMinDist);
+    (*numOverlap)++;
+}
+
+void ailistQueryPoint(AiList *ailist, int queryPoint, int flankSize, int *numOverlap, int *minDistance)
+{
+    int queryStart = (queryPoint < flankSize) ? 0 : queryPoint - flankSize;
+    int queryEnd = queryPoint + flankSize;
+    Contig *contig = &ailist->contigList[0];
+    
+    // search intervals in each component one by one
+    for(int i = 0; i < contig->numComp; i++){
+        int compStart = contig->idxComp[i];
+        int compEnd = compStart + contig->lenComp[i];
+
+        if(contig->lenComp[i] <= 15) {
+            for(int j = compStart; j < compEnd; j++) {
+                Interval *interval = &contig->intervalList[j];
+                if(isOverlap1(queryStart, queryEnd, interval))
+                    updateMinDistPoint(interval, queryPoint, numOverlap, minDistance);
 			}
+            continue;
+        }
+
+        // j-th interval is the right-most interval with (start < queryEnd)
+        int j = binarySearch(contig->intervalList, compStart, compEnd, queryEnd);
+        while(j >= compStart && contig->maxEndList[j] > queryStart) {
+            Interval *interval = &contig->intervalList[j];
+            if(isOverlap2(queryStart, interval))
+                updateMinDistPoint(interval, queryPoint, numOverlap, minDistance);
+            j--;
         }
     }
-    *d = MIN(mdist, *d);
-    *n = *n + nr;
+}
+
+static inline void updateMinDistInterval(Interval *interval, int start, int end, int *numOverlap, int *minDistance)
+{
+    int prevMinDistL = getMinDistance(start, interval);
+    int prevMinDistR = getMinDistance(end, interval);
+    *minDistance = MIN(*minDistance, MIN(prevMinDistL, prevMinDistR));
+    (*numOverlap)++;
+}
+
+void ailistQueryInterval(AiList *ailist, int start, int end, int flankSize, int *numOverlap, int *minDistance)
+{
+    int queryStart = (start < flankSize) ? 0 : start - flankSize;
+    int queryEnd = end + flankSize;
+    Contig *contig = &ailist->contigList[0];
+
+    // search intervals in each component one by one
+    for(int i = 0; i < contig->numComp; i++){
+        int compStart = contig->idxComp[i];
+        int compEnd = compStart + contig->lenComp[i];
+
+        if(contig->lenComp[i] <= 15) {
+            for(int j = compStart; j < compEnd; j++) {
+                Interval *interval = &contig->intervalList[j];
+                if(isOverlap1(queryStart, queryEnd, interval))
+                    updateMinDistInterval(interval, start, end, numOverlap, minDistance);
+			}
+            continue;
+        }
+
+        int j = binarySearch(contig->intervalList, compStart, compEnd, queryEnd);
+        while(j >= compStart && contig->maxEndList[j] > queryStart) {
+            Interval *interval = &contig->intervalList[j];
+            if(isOverlap2(queryStart, interval))
+                updateMinDistInterval(interval, start, end, numOverlap, minDistance);
+            j--;
+        }
+    }
 }
