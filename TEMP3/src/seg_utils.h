@@ -27,8 +27,9 @@
  @field  alnRefEnd          alignment reference end (0-based)
  @field  order              segment order in the same alignment
  @field  numSeg             number of segments from the same alignment
- @field  overhang           length of the shorter anchor part around segment breakpoint 
+ @field  overhang           length of the shorter anchor part around segment breakpoint
  @field  matchLen           matched length of the alignment (M/=/X)
+ @field  readLen            read length of the alignment
  @field  alnLocationType    bitwise flag representing alignment location
                                 1:  at least one end inside normal region
                                 2:  both ends inside repeat/gap region
@@ -59,6 +60,7 @@ typedef struct {
     uint8_t     numSeg;
     int         overhang;
     int         matchLen;
+    int         readLen;
     uint8_t     alnLocationType;
     uint8_t     numTeAlignment;
     int         sumQueryMapLen;
@@ -80,6 +82,7 @@ typedef struct {
     int         refPosition;
     int         alnRefStart;
     int         matchLen;
+    int         readLen;
     int64_t     fileOffset;
 } SegValues;
 
@@ -181,5 +184,10 @@ static inline void bamSetMemPolicy(bam1_t *bamRecord, uint32_t policy);
 void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen);
 uint8_t *setDestName(bam1_t *destRecord, char *destName, int destNameLen, int numNulls);
 void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr, int sourceStart, int destSeqLen);
+
+/**********************
+ *** Local Assembly ***
+ **********************/
+void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize);
 
 #endif // SEG_UTILS_H

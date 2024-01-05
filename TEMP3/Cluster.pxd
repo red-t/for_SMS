@@ -53,6 +53,8 @@ cdef extern from "src/cluster_utils.h" nogil:
     
     int isValidCandidate(Cluster *cluster)
     int overhangIsShort(Segment *segment, int minOverhang)
+    int isLowQualGerm(Cluster *cluster)
+    int isLowQualSoma(Cluster *cluster)
     Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDepth, float bgReadLen)
     void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
     void intersectBlackList(Cluster *cluster, Args args)
@@ -77,6 +79,7 @@ cdef extern from "src/seg_utils.h" nogil:
         uint8_t     numSeg
         int         overhang
         int         matchLen
+        int         readLen
         uint8_t     alnLocationType
         uint8_t     numTeAlignment
         int         sumQueryMapLen
@@ -101,6 +104,7 @@ cdef extern from "src/seg_utils.h" nogil:
     void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList)
     void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIndex)
     void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, int numTeTid)
+    void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
 
     #########################
     ### Alignment records ###

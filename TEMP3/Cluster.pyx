@@ -21,6 +21,7 @@ SegmentDt = np.dtype([
     ('numSeg',          np.uint8),
     ('overhang',        np.int32),
     ('matchLen',        np.int32),
+    ('readLen',         np.int32),
     ('alnLocationType', np.uint8),
     ('numTeAlignment',  np.uint8),
     ('sumQueryMapLen',  np.int32),
@@ -111,13 +112,13 @@ cdef object getSegArray(BamFile genomeBamFile, Args args):
     cdef Segment[::1] segArrayView = segArray
     cdef int maxNumSeg = segArrayView.shape[0] - 20
     cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
-    cdef BamFile outputBamFile = BamFile("tmp_candidates_alignments.{}.bam".format(args.tid), "wb", 5, genomeBamFile)
+    # cdef BamFile outputBamFile = BamFile("tmp_candidates_alignments.{}.bam".format(args.tid), "wb", 5, genomeBamFile)
     cdef int returnValue, numSeg=0
     
     while True:
         returnValue = iterator.cnext1()
         if returnValue < 0:
-            outputBamFile.close(); del outputBamFile
+            # outputBamFile.close(); del outputBamFile
             del template; del iterator
             return segArray[:numSeg]
 
@@ -131,8 +132,8 @@ cdef object getSegArray(BamFile genomeBamFile, Args args):
 
         returnValue = fillSegmentArray(iterator.bamRcord, &segArrayView[numSeg], iterator.offset, args.minSegLen)
         numSeg += returnValue
-        if returnValue > 0:
-            outputBamFile.write(iterator.bamRcord)
+        # if returnValue > 0:
+            # outputBamFile.write(iterator.bamRcord)
 
 
 cdef updateSegArray(Segment[::1] segArray, Args args):
@@ -174,7 +175,7 @@ cdef object updateSegArrayByTe(Segment[::1] segArray, Args args):
 cdef ouputSegmentSeqs(Segment[::1] segArray, BamFile genomeBamFile, Args args):
 
     cdef str outputFileName = "tmp.all_supp_reads.{}.fa".format(args.tid)
-    cdef BamFile outputBamFile = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
+    cdef BamFile outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
     cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
     cdef bam1_t *destRecord = bam_init1()
     cdef int i, returnValue
@@ -185,9 +186,9 @@ cdef ouputSegmentSeqs(Segment[::1] segArray, BamFile genomeBamFile, Args args):
             raise StopIteration
 
         trimSegment(iterator.bamRcord, destRecord, i, segArray[i].queryStart, segArray[i].queryEnd)
-        outputBamFile.write(destRecord)
+        outputFasta.write(destRecord)
     
-    bam_destroy1(destRecord); outputBamFile.close(); del outputBamFile; del iterator
+    bam_destroy1(destRecord); outputFasta.close(); del outputFasta; del iterator
 
 
 cdef mapByMinimap2(str reference, Args args):
@@ -397,6 +398,55 @@ cdef outPut(object cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args 
     cltOutput.close(); segOutput.close(); del iterator
 
 
+######################
+### Local Assembly ###
+######################
+cdef assembleClusters(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
+    if cltArray.shape[0] == 0:
+        return
+
+    outputGermlineSeqs(cltArray, segArray, genomeBamFile, args)
+    # wtdbg2Assemble(cltArray)
+    # outputNotAssembledSeqs(cltArray, segArray, genomeBamFile, args)
+    # outputSomaticSeqs(cltArray, segArray, genomeBamFile, args)
+
+cdef outputGermlineSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args, int flankSize=3000):
+
+    cdef str outputFileName
+    cdef BamFile outputFasta
+    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
+    cdef bam1_t *destRecord = bam_init1()
+    cdef int i, j, returnValue
+    cdef int start, end
+
+    for i in range(cltArray.shape[0]):
+        if isLowQualGerm(&cltArray[i]):
+            continue
+
+        outputFileName = "tmp.{}_{}.fa".format(args.tid, i)
+        outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
+
+        for j in range(cltArray[i].startIndex, cltArray[i].endIndex):
+            if overhangIsShort(&segArray[j], args.minOverhang):
+                continue
+            returnValue = iterator.cnext3(segArray[j].fileOffset)
+            getTrimRegion(&segArray[j], &start, &end, flankSize)
+            trimSegment(iterator.bamRcord, destRecord, j, start, end)
+            outputFasta.write(destRecord)
+        
+        outputFasta.close()
+
+    bam_destroy1(destRecord); del iterator
+
+cdef wtdbg2Assemble(Cluster[::1] cltArray):
+    pass
+
+cdef outputNotAssembledSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args, int flankSize=3000):
+    pass
+
+cdef outputSomaticSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args, int flankSize=3000):
+    pass
+
 ############
 ### Main ###
 ############
@@ -431,6 +481,10 @@ cpdef dict buildCluster(int tid, float bgDiv, float bgDepth, float bgReadLen, ob
     args.blackAiList = newAiList(cmdArgs.blackListPath, chrom)
     filterByBlacklist(cltArrayView, args)
     cltArray = filterByModel(cltArray, cmdArgs)
+
+    # 6. local assembly
+    cltArrayView = cltArray
+    assembleClusters(cltArrayView, segArrayView, genomeBamFile, args)
 
     # 6. output
     outPut(cltArray, segArrayView, genomeBamFile, args)

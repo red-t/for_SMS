@@ -64,6 +64,7 @@ SegValues initSegmentsFromCigar(bam1_t *bamRecord, Segment *segArray, int64_t fi
     segValues.mapQual = bamRecord->core.qual;
     segValues.flag = bamRecord->core.flag;
     segValues.alnRefStart = bamRecord->core.pos;
+    segValues.readLen = bamRecord->core.l_qseq;
     return segValues;
 }
 
@@ -89,6 +90,7 @@ void setSameSegValues(Segment *segArray, SegValues segValues)
         segment->alnRefStart = segValues.alnRefStart;
         segment->alnRefEnd = segValues.refPosition;
         segment->matchLen = segValues.matchLen;
+        segment->readLen = segValues.readLen;
         segment->fileOffset = segValues.fileOffset;
     }
 }
@@ -399,4 +401,18 @@ void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr
 
     memcpy(destDataPtr, sourceSeqPtr, (destSeqLen+1) >> 1);
     destRecord->core.l_qseq = (int)destSeqLen + 1;
+}
+
+/**********************
+ *** Local Assembly ***
+ **********************/
+void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
+{
+    *startPtr = 0;
+    *endPtr = segment->readLen;
+
+    if (segment->queryStart - flankSize > 0)
+        *startPtr = segment->queryStart - flankSize;
+    if (segment->queryEnd + flankSize < segment->readLen)
+        *endPtr = segment->queryEnd + flankSize;
 }

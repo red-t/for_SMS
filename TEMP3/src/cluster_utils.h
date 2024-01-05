@@ -148,9 +148,17 @@ static inline void divideValuesByBackbg(Cluster *cluster, Args args);
 static inline void setDirection(Cluster *cluster);
 static inline void setBackbgInfo(Cluster *cluster, Args args);
 
+
 /*****************
  *** Filtering ***
  *****************/
 void intersectBlackList(Cluster *cluster, Args args);
+
+
+/**********************
+ *** Local Assembly ***
+ **********************/
+#define isLowQualGerm(cluster) (((cluster)->isInBlacklist) || ((cluster)->probability <= 0.5) || ((cluster)->cltType != 0))
+#define isLowQualSoma(cluster) (((cluster)->isInBlacklist) || ((cluster)->probability <= 0.5) || ((cluster)->cltType == 0))
 
 #endif // CLUSTER_UTILS_H
