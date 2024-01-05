@@ -204,9 +204,14 @@ void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIn
     segment->sumQueryMapLen += queryMapLen;
     segment->sumDivergence += teAlignment->divergence;
     segment->sumAlnScore += (float)teAlignment->AlnScore / teAlignment->mapLen;
-    
-    if (!isSameDirection(segment, teAlignment)) { segment->directionFlag += (1 << 8); return; }
-    segment->directionFlag += 1;
+
+    if (isReverse(segment))
+    {
+        if (isSameDirection(segment, teAlignment)) { segment->directionFlag += (1 << 8); return; }
+        segment->directionFlag += 1; return;
+    }
+    if (isSameDirection(segment, teAlignment)) { segment->directionFlag += 1; return; }
+    segment->directionFlag += (1 << 8);
 }
 
 void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, int numTeTid)
@@ -307,8 +312,9 @@ int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIndex, int sour
     // re-allocate the data buffer as needed.
     if (reallocBamData(destRecord, destDataLen) < 0) return -1;
 
-    setDestValues(destRecord, destNameLen, numNulls, destDataLen, sourceRecord->core.flag);
+    setDestValues(destRecord, destNameLen, numNulls, destDataLen);
     uint8_t *destDataPtr = setDestName(destRecord, destName, destNameLen, numNulls);
+    // if sourceRecord is reverse, the sequence is reverse-complementary
     copySequence(sourceRecord, destRecord, destDataPtr, sourceStart, destSeqLen);
 
     return (int)destDataLen;
@@ -350,12 +356,12 @@ static inline uint32_t bamGetMemPolicy(bam1_t *bamRecord)
 static inline void bamSetMemPolicy(bam1_t *bamRecord, uint32_t policy)
 { bamRecord->mempolicy = policy; }
 
-void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen, uint16_t sourceFlag)
+void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen)
 {
     destRecord->core.l_qname = (uint16_t)(destNameLen + numNulls);
     destRecord->core.l_extranul = (uint8_t)(numNulls - 1);
     destRecord->l_data = (int)destDataLen;
-    destRecord->core.flag = (sourceFlag & BAM_FREVERSE) | BAM_FUNMAP;
+    destRecord->core.flag = BAM_FUNMAP;
 }
 
 uint8_t *setDestName(bam1_t *destRecord, char *destName, int destNameLen, int numNulls)

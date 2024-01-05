@@ -128,6 +128,7 @@ void setSameSegValues(Segment *segArray, SegValues segValues);
 #define isRightClip(segment) (((segment)->segType & RIGHT_CLIP) != 0)
 #define isFirstSegment(segment) ((segment)->order == 0)
 #define isSingleSegment(segment) ((segment)->numSeg == 1)
+#define isReverse(segment) (((segment)->flag & BAM_FREVERSE) != 0)
 
 void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList);
 int getOverhang(int overhang, int matchLen);
@@ -177,7 +178,7 @@ static inline int reallocBamData(bam1_t *bamRecord, size_t desired);
 int samReallocBamData(bam1_t *bamRecord, size_t desired);
 static inline uint32_t bamGetMemPolicy(bam1_t *bamRecord);
 static inline void bamSetMemPolicy(bam1_t *bamRecord, uint32_t policy);
-void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen, uint16_t sourceFlag);
+void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen);
 uint8_t *setDestName(bam1_t *destRecord, char *destName, int destNameLen, int numNulls);
 void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr, int sourceStart, int destSeqLen);
 
