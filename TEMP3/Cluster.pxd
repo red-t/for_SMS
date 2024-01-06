@@ -53,11 +53,13 @@ cdef extern from "src/cluster_utils.h" nogil:
     
     int isValidCandidate(Cluster *cluster)
     int overhangIsShort(Segment *segment, int minOverhang)
-    int isLowQualGerm(Cluster *cluster)
-    int isLowQualSoma(Cluster *cluster)
+    int isLowQualClt(Cluster *cluster)
+    int isGermClt(Cluster *cluster)
+    int isSomaClt(Cluster *cluster)
     Args initArgs(int numThread, int tid, int minSegLen, int maxDistance, int minOverhang, float bgDiv, float bgDepth, float bgReadLen)
     void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
     void intersectBlackList(Cluster *cluster, Args args)
+    int getOuputSegIndex(Cluster *cluster, Segment *segArray, Args args)
 
 
 cdef extern from "src/seg_utils.h" nogil:

@@ -158,7 +158,10 @@ void intersectBlackList(Cluster *cluster, Args args);
 /**********************
  *** Local Assembly ***
  **********************/
-#define isLowQualGerm(cluster) (((cluster)->isInBlacklist) || ((cluster)->probability <= 0.5) || ((cluster)->cltType != 0))
-#define isLowQualSoma(cluster) (((cluster)->isInBlacklist) || ((cluster)->probability <= 0.5) || ((cluster)->cltType == 0))
+#define isLowQualClt(cluster) (((cluster)->isInBlacklist) || ((cluster)->probability <= 0.5))
+#define isGermClt(cluster) ((cluster)->cltType == 0)
+#define isSomaClt(cluster) ((cluster)->cltType != 0)
+
+int getOuputSegIndex(Cluster *cluster, Segment *segArray, Args args);
 
 #endif // CLUSTER_UTILS_H

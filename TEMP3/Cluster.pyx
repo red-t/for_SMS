@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 from subprocess import Popen, DEVNULL
@@ -182,9 +183,6 @@ cdef ouputSegmentSeqs(Segment[::1] segArray, BamFile genomeBamFile, Args args):
 
     for i in range(segArray.shape[0]):
         returnValue = iterator.cnext3(segArray[i].fileOffset)
-        if returnValue < 0:
-            raise StopIteration
-
         trimSegment(iterator.bamRcord, destRecord, i, segArray[i].queryStart, segArray[i].queryEnd)
         outputFasta.write(destRecord)
     
@@ -405,47 +403,66 @@ cdef assembleClusters(Cluster[::1] cltArray, Segment[::1] segArray, BamFile geno
     if cltArray.shape[0] == 0:
         return
 
-    outputGermlineSeqs(cltArray, segArray, genomeBamFile, args)
+    outputGermSeqs(cltArray, segArray, genomeBamFile, args)
     # wtdbg2Assemble(cltArray)
-    # outputNotAssembledSeqs(cltArray, segArray, genomeBamFile, args)
-    # outputSomaticSeqs(cltArray, segArray, genomeBamFile, args)
+    outputSomaSeqs(cltArray, segArray, genomeBamFile, args)
 
-cdef outputGermlineSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args, int flankSize=3000):
-
+cdef outputGermSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
     cdef str outputFileName
     cdef BamFile outputFasta
     cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
     cdef bam1_t *destRecord = bam_init1()
-    cdef int i, j, returnValue
-    cdef int start, end
+    cdef int i, j
 
     for i in range(cltArray.shape[0]):
-        if isLowQualGerm(&cltArray[i]):
+        if isLowQualClt(&cltArray[i]) or isSomaClt(&cltArray[i]):
             continue
 
         outputFileName = "tmp.{}_{}.fa".format(args.tid, i)
         outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
-
         for j in range(cltArray[i].startIndex, cltArray[i].endIndex):
             if overhangIsShort(&segArray[j], args.minOverhang):
                 continue
-            returnValue = iterator.cnext3(segArray[j].fileOffset)
-            getTrimRegion(&segArray[j], &start, &end, flankSize)
-            trimSegment(iterator.bamRcord, destRecord, j, start, end)
-            outputFasta.write(destRecord)
+            outputSingleSeq(segArray, outputFasta, iterator, destRecord, j)
         
         outputFasta.close()
 
     bam_destroy1(destRecord); del iterator
 
+cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFasta, Iterator iterator, bam1_t *destRecord, int j, int flankSize=3000):
+    cdef int start, end, returnValue
+
+    returnValue = iterator.cnext3(segArray[j].fileOffset)
+    getTrimRegion(&segArray[j], &start, &end, flankSize)
+    trimSegment(iterator.bamRcord, destRecord, j, start, end)
+    outputFasta.write(destRecord)
+
 cdef wtdbg2Assemble(Cluster[::1] cltArray):
     pass
 
-cdef outputNotAssembledSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args, int flankSize=3000):
-    pass
+cdef outputSomaSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
+    cdef str outputFileName
+    cdef BamFile outputFasta
+    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
+    cdef bam1_t *destRecord = bam_init1()
+    cdef int i, j
 
-cdef outputSomaticSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args, int flankSize=3000):
-    pass
+    for i in range(cltArray.shape[0]):
+        if isLowQualClt(&cltArray[i]):
+            continue
+        
+        # Skip successfully assembled clusters
+        outputFileName = "tmp.{}_{}_assembled.fa".format(args.tid, i)
+        if os.path.isfile(outputFileName):
+            continue
+        
+        outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
+        j = getOuputSegIndex(&cltArray[i], &segArray[0], args)
+        outputSingleSeq(segArray, outputFasta, iterator, destRecord, j)
+        outputFasta.close()
+
+    bam_destroy1(destRecord); del iterator
+    
 
 ############
 ### Main ###

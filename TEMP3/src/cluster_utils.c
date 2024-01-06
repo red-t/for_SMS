@@ -220,3 +220,39 @@ void intersectBlackList(Cluster *cluster, Args args)
 
     cluster->isInBlacklist = (uint8_t)(numOverlap > 0);
 }
+
+
+/**********************
+ *** Local Assembly ***
+ **********************/
+int getOuputSegIndex(Cluster *cluster, Segment *segArray, Args args)
+{
+    int clipIndex = -1;
+    int insIndex = -1;
+    int maxReadLen = 0;
+    int maxClipLen = 0;
+
+    for (int i = cluster->startIndex; i < cluster->endIndex; i++)
+    {
+        Segment *segment = &segArray[i];
+        if (overhangIsShort(segment, args.minOverhang)) continue;
+
+        if (isMidInsert(segment))
+        {
+            if (segment->readLen <= maxReadLen) continue;
+            maxReadLen = segment->readLen;
+            insIndex = i;
+            continue;
+        }
+
+        int clipLen = segment->queryEnd - segment->queryStart;
+        if (clipLen > maxClipLen)
+        {
+            maxClipLen = clipLen;
+            clipIndex = i;
+        }
+    }
+
+    if (insIndex > 0) return insIndex;
+    return clipIndex;
+}
