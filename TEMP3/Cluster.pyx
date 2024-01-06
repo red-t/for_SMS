@@ -404,8 +404,8 @@ cdef assembleClusters(Cluster[::1] cltArray, Segment[::1] segArray, BamFile geno
         return
 
     outputGermSeqs(cltArray, segArray, genomeBamFile, args)
-    # wtdbg2Assemble(cltArray)
-    outputSomaSeqs(cltArray, segArray, genomeBamFile, args)
+    wtdbg2Assemble(cltArray, args)
+    # outputSomaSeqs(cltArray, segArray, genomeBamFile, args)
 
 cdef outputGermSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
     cdef str outputFileName
@@ -418,7 +418,7 @@ cdef outputGermSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genome
         if isLowQualClt(&cltArray[i]) or isSomaClt(&cltArray[i]):
             continue
 
-        outputFileName = "tmp.{}_{}.fa".format(args.tid, i)
+        outputFileName = "tmp_assm/tmp.{}_{}.fa".format(args.tid, i)
         outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
         for j in range(cltArray[i].startIndex, cltArray[i].endIndex):
             if overhangIsShort(&segArray[j], args.minOverhang):
@@ -437,8 +437,27 @@ cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFasta, Iterator iterato
     trimSegment(iterator.bamRcord, destRecord, j, start, end)
     outputFasta.write(destRecord)
 
-cdef wtdbg2Assemble(Cluster[::1] cltArray):
-    pass
+cdef wtdbg2Assemble(Cluster[::1] cltArray, Args args):
+    cdef int i, exitCode
+    cdef str cmd, prefix
+    cdef object subProcess
+
+    for i in range(cltArray.shape[0]):
+        if isLowQualClt(&cltArray[i]) or isSomaClt(&cltArray[i]):
+            continue
+        
+        prefix = "tmp_assm/tmp.{}_{}".format(args.tid, i)
+        cmd = "wtdbg2 -l 256 -e 1 -S 1 --rescue-low-cov-edges --node-len 256 --ctg-min-length 256 " \
+              "--ctg-min-nodes 1 -q -t {} -i {}.fa -fo {}".format(args.numThread, prefix, prefix)
+        subProcess = Popen(cmd, stderr=DEVNULL, shell=True, executable='/bin/bash')
+        exitCode = subProcess.wait()
+
+        if os.path.isfile("{}.ctg.lay.gz".format(prefix)) == False:
+            continue
+        
+        cmd = "wtpoa-cns -q -t {} -i {}.ctg.lay.gz -fo {}_assembled.fa".format(args.numThread, prefix, prefix)
+        subProcess = Popen(cmd, stderr=DEVNULL, shell=True, executable='/bin/bash')
+        exitCode = subProcess.wait()
 
 cdef outputSomaSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
     cdef str outputFileName
@@ -452,7 +471,7 @@ cdef outputSomaSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genome
             continue
         
         # Skip successfully assembled clusters
-        outputFileName = "tmp.{}_{}_assembled.fa".format(args.tid, i)
+        outputFileName = "tmp_assm/tmp.{}_{}_assembled.fa".format(args.tid, i)
         if os.path.isfile(outputFileName):
             continue
         
@@ -503,7 +522,7 @@ cpdef dict buildCluster(int tid, float bgDiv, float bgDepth, float bgReadLen, ob
     cltArrayView = cltArray
     assembleClusters(cltArrayView, segArrayView, genomeBamFile, args)
 
-    # 6. output
+    # 7. output
     outPut(cltArray, segArrayView, genomeBamFile, args)
     genomeBamFile.close(); del genomeBamFile
 

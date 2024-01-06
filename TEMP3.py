@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import os
 import argparse
 from TEMP3.ParallelTemplate import buildClusterParallel
 
@@ -39,11 +40,17 @@ def parseArgs():
 if __name__ == '__main__':
     cmdArgs = parseArgs()
 
-    if not cmdArgs.germModelPath.endswith('/'):
+    if cmdArgs.germModelPath.endswith('/') == False:
         cmdArgs.germModelPath += '/'
     
-    if not cmdArgs.somaModelPath.endswith('/'):
+    if cmdArgs.somaModelPath.endswith('/') == False:
         cmdArgs.somaModelPath += '/'
+    
+    if os.path.exists('tmp_cluster') == False:
+        os.mkdir('tmp_cluster')
+    
+    if os.path.exists('tmp_assm') == False:
+        os.mkdir('tmp_assm')
 
     tidToResult = buildClusterParallel(cmdArgs)
 
