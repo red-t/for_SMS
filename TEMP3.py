@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import os
 import argparse
-from TEMP3.ParallelTemplate import buildClusterParallel
+from TEMP3.ParallelModule import runInParallel
 
 def parseArgs():
     parser = argparse.ArgumentParser(description="Demo of argparse")
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     if os.path.exists('tmp_assm') == False:
         os.mkdir('tmp_assm')
 
-    tidToResult = buildClusterParallel(cmdArgs)
+    tidToResult = runInParallel(cmdArgs)
 
     # Log
     print("当前版本构建的 clusters 总数:")

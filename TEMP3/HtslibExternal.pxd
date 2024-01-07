@@ -8,31 +8,20 @@ from posix.types cimport off_t
 
 
 ########################
-### Global Variables ###
+### htslib/kstring.h ###
 ########################
-
-cdef int MAX_POS
-cdef str TEXT_ENCODING
-cdef str ERROR_HANDLER
-
-# cdef str charptr_to_str(const char* s)
-
-#
-# ---------------------------------------------------------------
-#
 cdef extern from "htslib/kstring.h" nogil:
     ctypedef struct kstring_t:
         size_t l, m
         char *s
-
 #     int kputc(int c, kstring_t *s)
 #     int kputw(int c, kstring_t *s)
 #     int kputl(long c, kstring_t *s)
 #     int ksprintf(kstring_t *s, const char *fmt, ...)
 
-#
-# ---------------------------------------------------------------
-#
+######################
+### htslib/hfile.h ###
+######################
 cdef extern from "htslib/hfile.h" nogil:
     ctypedef struct hFILE
 
@@ -148,9 +137,10 @@ cdef extern from "htslib/hfile.h" nogil:
 #     # @abstract  For writing streams, flush buffered output to the underlying stream
 #     # @return    0 if successful, or EOF if an error occurred.
 #     int hflush(hFILE *fp)
-#
-# ---------------------------------------------------------------
-#
+
+#####################
+### htslib/bgzf.h ###
+#####################
 cdef extern from "htslib/bgzf.h" nogil:
     ctypedef struct bgzf_mtaux_t
     ctypedef struct bgzidx_t
@@ -372,9 +362,9 @@ cdef extern from "htslib/bgzf.h" nogil:
     # #  Returns 0 on success and -1 on error.
     # int bgzf_index_dump(BGZF *fp, const char *bname, const char *suffix)
 
-#
-# ---------------------------------------------------------------
-#
+######################
+### htslib/hts.h ###
+######################
 cdef extern from "htslib/hts.h" nogil:
     # uint32_t kroundup32(uint32_t x)
 
@@ -819,9 +809,10 @@ cdef extern from "htslib/hts.h" nogil:
     # void *ed_swap_4p(void *x)
     # uint64_t ed_swap_8(uint64_t v)
     # void *ed_swap_8p(void *x)
-#
-# ---------------------------------------------------------------
-#
+
+####################
+### htslib/sam.h ###
+####################
 cdef extern from "htslib/sam.h" nogil:
     #**********************
     #*** SAM/BAM header ***

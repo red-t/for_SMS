@@ -1,4 +1,4 @@
-from .htslib_external cimport *
+from .HtslibExternal cimport *
 from libc.stdlib cimport malloc, calloc, realloc, free
 from libc.errno  cimport errno
 from libc.string cimport strerror

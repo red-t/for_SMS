@@ -1,5 +1,5 @@
-from .AlignmentFileIO cimport BamFile, Iterator
-from .htslib_external cimport *
+from .FileIO cimport BamFile, Iterator
+from .HtslibExternal cimport *
 
 cdef extern from "src/cluster_utils.h" nogil:
     ctypedef packed struct Cluster:

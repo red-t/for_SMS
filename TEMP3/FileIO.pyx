@@ -1,5 +1,7 @@
 import os
 
+cdef int MAX_POS = (1 << 31) - 1
+
 cdef class BamFile:
     def __cinit__(self, str filePath, str mode, int numThread=1, BamFile template=None):
         cdef bytes filePathBytes = os.fsencode(filePath)

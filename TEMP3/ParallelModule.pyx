@@ -52,7 +52,7 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
         numAln += 1
 
 
-cpdef dict buildClusterParallel(object cmdArgs):
+cpdef dict runInParallel(object cmdArgs):
     '''call buildCluster in multi-process way'''
     
     cdef set futures
