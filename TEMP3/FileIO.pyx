@@ -1,7 +1,9 @@
 import os
 
+########################
+### Class Definition ###
+########################
 cdef int MAX_POS = (1 << 31) - 1
-
 cdef class BamFile:
     def __cinit__(self, str filePath, str mode, int numThread=1, BamFile template=None):
         cdef bytes filePathBytes = os.fsencode(filePath)
@@ -146,3 +148,99 @@ cdef class Iterator:
             returnValue = bam_read1(self.htsFile.fp.bgzf, self.bamRcord)
         
         return returnValue
+
+
+######################
+### Construct Args ###
+######################
+cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs):
+    cdef Args args
+
+    args.tid = tid
+    args.bgDiv = bgDiv
+    args.bgDepth = bgDepth
+    args.bgReadLen = bgReadLen
+    args.numThread = cmdArgs.numThread
+    args.minSegLen = cmdArgs.minSegLen
+    args.maxDistance = cmdArgs.maxDistance
+    args.minOverhang = cmdArgs.minOverhang
+    return args
+
+
+###########################
+### Segment Sequence IO ###
+###########################
+cdef ouputAllSegSeqs(Segment[::1] segArray, BamFile genomeBamFile, Args args):
+    cdef str outputFileName = "tmp.all_supp_reads.{}.fa".format(args.tid)
+    cdef BamFile outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
+    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
+    cdef bam1_t *destRecord = bam_init1()
+    cdef int i, returnValue
+
+    for i in range(segArray.shape[0]):
+        returnValue = iterator.cnext3(segArray[i].fileOffset)
+        trimSegment(iterator.bamRcord, destRecord, i, segArray[i].queryStart, segArray[i].queryEnd)
+        outputFasta.write(destRecord)
+    
+    bam_destroy1(destRecord); outputFasta.close(); del outputFasta; del iterator
+
+
+cdef outputGermCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
+    cdef str outputFileName
+    cdef BamFile outputFasta
+    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
+    cdef bam1_t *destRecord = bam_init1()
+    cdef int i, j
+
+    for i in range(cltArray.shape[0]):
+        if isLowQualClt(&cltArray[i]) or isSomaClt(&cltArray[i]):
+            continue
+
+        outputFileName = "tmp_assm/tmp.{}_{}.fa".format(args.tid, i)
+        outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
+        for j in range(cltArray[i].startIndex, cltArray[i].endIndex):
+            if overhangIsShort(&segArray[j], args.minOverhang):
+                continue
+            outputSingleSeq(segArray, outputFasta, iterator, destRecord, j)
+        
+        outputFasta.close()
+
+    bam_destroy1(destRecord); del iterator
+
+
+cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmdArgs, int tid):
+    cdef int i, j
+    cdef Args args
+    cdef str outputFileName
+    cdef BamFile outputFasta
+    cdef BamFile genomeBamFile = BamFile(cmdArgs.genomeBamFilePath, "rb", cmdArgs.numThread)
+    cdef Iterator iterator = Iterator(genomeBamFile, tid)
+    cdef bam1_t *destRecord = bam_init1()
+
+    args.minOverhang = cmdArgs.minOverhang
+    for i in range(cltArray.shape[0]):
+        if isLowQualClt(&cltArray[i]):
+            continue
+        
+        # Skip successfully assembled clusters
+        outputFileName = "tmp_assm/tmp.{}_{}_assembled.fa".format(tid, i)
+        if os.path.isfile(outputFileName):
+            if os.path.getsize(outputFileName) != 0:
+                continue
+        
+        outputFasta = BamFile(outputFileName, "wF", cmdArgs.numThread, genomeBamFile)
+        j = getOuputSegIndex(&cltArray[i], &segArray[0], args)
+        outputSingleSeq(segArray, outputFasta, iterator, destRecord, j)
+        outputFasta.close()
+
+    bam_destroy1(destRecord); del iterator
+    genomeBamFile.close(); del genomeBamFile
+
+
+cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFasta, Iterator iterator, bam1_t *destRecord, int j, int flankSize=3000):
+    cdef int start, end, returnValue
+
+    returnValue = iterator.cnext3(segArray[j].fileOffset)
+    getTrimRegion(&segArray[j], &start, &end, flankSize)
+    trimSegment(iterator.bamRcord, destRecord, j, start, end)
+    outputFasta.write(destRecord)

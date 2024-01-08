@@ -1,5 +1,7 @@
 import numpy as np
 from .Cluster import buildCluster
+from .Assemble import wtdbg2Assemble
+from .FileIO import outputSomaCltSeqs
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
@@ -52,20 +54,63 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
         numAln += 1
 
 
-cpdef dict runInParallel(object cmdArgs):
-    '''call buildCluster in multi-process way'''
-    
-    cdef set futures
-    cdef dict result = {}, returnValue
-    cdef dict bgInfo = getBackgroundInfo(cmdArgs.genomeBamFilePath, cmdArgs.numThread)
+cdef tuple divideTasks(int numTasks, int poolSize):
+    cdef int i, taskSize = int(numTasks / poolSize)
+    cdef list startList = []
 
-    print("bg Divergence: {}\nbg coverage: {}\nbg readlen: {}".format(bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
+    if taskSize == 0:
+        taskSize = 1
+    
+    for i in range(0, numTasks, taskSize):
+        startList.append(i)
+    
+    return taskSize, startList
+
+
+cpdef dict runInParallel(object cmdArgs):
+    
+    cdef set subProcTup
+    cdef dict allCltData = {}, chromCltData, bgInfo
+    cdef object subProc, assembleArray
+    cdef int start, taskSize
+    cdef list startList
+
+    # 1. Get Background Info
+    bgInfo = getBackgroundInfo(cmdArgs.genomeBamFilePath, cmdArgs.numThread)
+    print("bg Divergence: {}\nbg coverage: {}\nbg readlen: {}" \
+          "".format(bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
 
     with ProcessPoolExecutor(max_workers=cmdArgs.numProcess) as executor:
-        futures = set([executor.submit(buildCluster, tid, bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"], cmdArgs) for tid in range(bgInfo["numChrom"])])
+        # 2. Get Background Info
+        subProcTup = set([executor.submit(buildCluster, \
+                                          bgInfo["bgDiv"], \
+                                          bgInfo["bgDepth"], \
+                                          bgInfo["bgReadLen"], \
+                                          cmdArgs, tid) for tid in range(bgInfo["numChrom"])])
                                        
-        for future in as_completed(futures):
-            returnValue = future.result()
-            result = {**result, **returnValue}
+        for subProc in as_completed(subProcTup):
+            chromCltData = subProc.result()
+            allCltData = {**allCltData, **chromCltData}
+        
+        # 3. Local Assembly
+        assembleArray = getAssembleArray(allCltData)
+        taskSize, startList = divideTasks(assembleArray.shape[0], cmdArgs.numProcess)
+        subProcTup = set([executor.submit(wtdbg2Assemble, \
+                                          assembleArray, \
+                                          start, \
+                                          taskSize, \
+                                          cmdArgs.numThread) for start in startList])
+
+        for subProc in as_completed(subProcTup):
+            returnValue = subProc.result()
+        
+        # 4. Output sequence for clusters without assembly
+        subProcTup = set([executor.submit(outputSomaCltSeqs, \
+                                          allCltData[tid][0], \
+                                          allCltData[tid][1], \
+                                          cmdArgs, tid) for tid in range(bgInfo["numChrom"])])
+                                       
+        for subProc in as_completed(subProcTup):
+            returnValue = subProc.result()
     
-    return result
+    return allCltData

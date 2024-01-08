@@ -4,7 +4,7 @@ import numpy as np
 
 ext = [
     Extension(name = "TEMP3.FileIO",
-              sources = ["TEMP3/FileIO.pyx"],
+              sources = ["TEMP3/FileIO.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c"],
               libraries = ["hts"]),
 
     Extension(name = "TEMP3.Cluster",
@@ -12,8 +12,12 @@ ext = [
               libraries = ["hts"]),
 
     Extension(name = "TEMP3.ParallelModule",
-              sources = ["TEMP3/ParallelModule.pyx",  "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c"],
-              libraries = ["hts"])
+              sources = ["TEMP3/ParallelModule.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c"],
+              libraries = ["hts"]),
+    
+    Extension(name = "TEMP3.Assemble",
+              sources = ["TEMP3/Assemble.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c"],
+              libraries = ["hts"]),
     ]
 
 setup(ext_modules=cythonize(ext, language_level=3))

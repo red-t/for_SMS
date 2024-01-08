@@ -77,9 +77,9 @@ ClusterDt = np.dtype([
     ('probability',         np.float32),
 ])
 
-##############################
-### Construction Functions ###
-##############################
+#######################
+### Construc AiList ###
+#######################
 cdef AiList* newAiList(str filePath, const char *chrom):
     cdef bytes filePathBytes = filePath.encode()
     cdef AiList *aiList = initAiList()
@@ -87,20 +87,6 @@ cdef AiList* newAiList(str filePath, const char *chrom):
     readBED(aiList, filePathBytes, chrom)
     constructAiList(aiList, 20)
     return aiList
-
-
-cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs):
-    cdef Args args
-
-    args.tid = tid
-    args.bgDiv = bgDiv
-    args.bgDepth = bgDepth
-    args.bgReadLen = bgReadLen
-    args.numThread = cmdArgs.numThread
-    args.minSegLen = cmdArgs.minSegLen
-    args.maxDistance = cmdArgs.maxDistance
-    args.minOverhang = cmdArgs.minOverhang
-    return args
 
 
 ##########################
@@ -170,34 +156,18 @@ cdef object updateSegArrayByTe(Segment[::1] segArray, Args args):
     return teArray
 
 
-##########################
+#########################
 ### Construct TeArray ###
-##########################
-cdef ouputSegmentSeqs(Segment[::1] segArray, BamFile genomeBamFile, Args args):
-
-    cdef str outputFileName = "tmp.all_supp_reads.{}.fa".format(args.tid)
-    cdef BamFile outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
-    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
-    cdef bam1_t *destRecord = bam_init1()
-    cdef int i, returnValue
-
-    for i in range(segArray.shape[0]):
-        returnValue = iterator.cnext3(segArray[i].fileOffset)
-        trimSegment(iterator.bamRcord, destRecord, i, segArray[i].queryStart, segArray[i].queryEnd)
-        outputFasta.write(destRecord)
-    
-    bam_destroy1(destRecord); outputFasta.close(); del outputFasta; del iterator
-
-
+#########################
 cdef mapByMinimap2(str reference, Args args):
 
-    cdef int retval
-    cdef str command = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t {} -aY {} tmp.all_supp_reads.{}.fa | " \
-                      "samtools view -@ {} -bhS -o tmp.all_supp_reads.{}.bam -".format(args.numThread, reference, args.tid, args.numThread, args.tid)
+    cdef int returnValue
+    cdef str cmd = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t {} -aY {} tmp.all_supp_reads.{}.fa | " \
+                   "samtools view -@ {} -bhS -o tmp.all_supp_reads.{}.bam -".format(args.numThread, reference, args.tid, args.numThread, args.tid)
 
-    process = Popen([command], stderr=DEVNULL, shell=True, executable='/bin/bash')
-    retval = process.wait()
-    if retval != 0:
+    process = Popen([cmd], stderr=DEVNULL, shell=True, executable='/bin/bash')
+    returnValue = process.wait()
+    if returnValue != 0:
         raise Exception("Error: minimap2 failed for tmp.all_supp_reads.{}.fa".format(args.tid))
 
 
@@ -394,99 +364,12 @@ cdef outPut(object cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args 
             segOutput.write('\t'.join(cltList) + '\n')
     
     cltOutput.close(); segOutput.close(); del iterator
-
-
-######################
-### Local Assembly ###
-######################
-cdef assembleClusters(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
-    if cltArray.shape[0] == 0:
-        return
-
-    outputGermSeqs(cltArray, segArray, genomeBamFile, args)
-    wtdbg2Assemble(cltArray, args)
-    # outputSomaSeqs(cltArray, segArray, genomeBamFile, args)
-
-cdef outputGermSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
-    cdef str outputFileName
-    cdef BamFile outputFasta
-    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
-    cdef bam1_t *destRecord = bam_init1()
-    cdef int i, j
-
-    for i in range(cltArray.shape[0]):
-        if isLowQualClt(&cltArray[i]) or isSomaClt(&cltArray[i]):
-            continue
-
-        outputFileName = "tmp_assm/tmp.{}_{}.fa".format(args.tid, i)
-        outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
-        for j in range(cltArray[i].startIndex, cltArray[i].endIndex):
-            if overhangIsShort(&segArray[j], args.minOverhang):
-                continue
-            outputSingleSeq(segArray, outputFasta, iterator, destRecord, j)
-        
-        outputFasta.close()
-
-    bam_destroy1(destRecord); del iterator
-
-cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFasta, Iterator iterator, bam1_t *destRecord, int j, int flankSize=3000):
-    cdef int start, end, returnValue
-
-    returnValue = iterator.cnext3(segArray[j].fileOffset)
-    getTrimRegion(&segArray[j], &start, &end, flankSize)
-    trimSegment(iterator.bamRcord, destRecord, j, start, end)
-    outputFasta.write(destRecord)
-
-cdef wtdbg2Assemble(Cluster[::1] cltArray, Args args):
-    cdef int i, exitCode
-    cdef str cmd, prefix
-    cdef object subProcess
-
-    for i in range(cltArray.shape[0]):
-        if isLowQualClt(&cltArray[i]) or isSomaClt(&cltArray[i]):
-            continue
-        
-        prefix = "tmp_assm/tmp.{}_{}".format(args.tid, i)
-        cmd = "wtdbg2 -l 256 -e 1 -S 1 --rescue-low-cov-edges --node-len 256 --ctg-min-length 256 " \
-              "--ctg-min-nodes 1 -q -t {} -i {}.fa -fo {}".format(args.numThread, prefix, prefix)
-        subProcess = Popen(cmd, stderr=DEVNULL, shell=True, executable='/bin/bash')
-        exitCode = subProcess.wait()
-
-        if os.path.isfile("{}.ctg.lay.gz".format(prefix)) == False:
-            continue
-        
-        cmd = "wtpoa-cns -q -t {} -i {}.ctg.lay.gz -fo {}_assembled.fa".format(args.numThread, prefix, prefix)
-        subProcess = Popen(cmd, stderr=DEVNULL, shell=True, executable='/bin/bash')
-        exitCode = subProcess.wait()
-
-cdef outputSomaSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
-    cdef str outputFileName
-    cdef BamFile outputFasta
-    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
-    cdef bam1_t *destRecord = bam_init1()
-    cdef int i, j
-
-    for i in range(cltArray.shape[0]):
-        if isLowQualClt(&cltArray[i]):
-            continue
-        
-        # Skip successfully assembled clusters
-        outputFileName = "tmp_assm/tmp.{}_{}_assembled.fa".format(args.tid, i)
-        if os.path.isfile(outputFileName):
-            continue
-        
-        outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
-        j = getOuputSegIndex(&cltArray[i], &segArray[0], args)
-        outputSingleSeq(segArray, outputFasta, iterator, destRecord, j)
-        outputFasta.close()
-
-    bam_destroy1(destRecord); del iterator
     
 
 ############
 ### Main ###
 ############
-cpdef dict buildCluster(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs):
+cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdArgs, int tid):
     # 1. construct segments
     cdef Args args = newArgs(tid, bgDiv, bgDepth, bgReadLen, cmdArgs)
     cdef BamFile genomeBamFile = BamFile(cmdArgs.genomeBamFilePath, "rb", cmdArgs.numThread)
@@ -500,13 +383,13 @@ cpdef dict buildCluster(int tid, float bgDiv, float bgDepth, float bgReadLen, ob
 
     updateSegArray(segArrayView, args)
     segArray.sort(order='refPosition')
-    ouputSegmentSeqs(segArrayView, genomeBamFile, args)
+    ouputAllSegSeqs(segArrayView, genomeBamFile, args)
 
     mapByMinimap2(cmdArgs.referenceTe, args)
     teArray = updateSegArrayByTe(segArrayView, args)
     
     # 3. construct cluster
-    cdef ResultDict = {}
+    cdef chromCltData = {}
     cdef object cltArray = getCltArray(segArray, args)
     cdef Cluster[::1] cltArrayView = cltArray
 
@@ -517,14 +400,11 @@ cpdef dict buildCluster(int tid, float bgDiv, float bgDepth, float bgReadLen, ob
     args.blackAiList = newAiList(cmdArgs.blackListPath, chrom)
     filterByBlacklist(cltArrayView, args)
     cltArray = filterByModel(cltArray, cmdArgs)
-
-    # 6. local assembly
     cltArrayView = cltArray
-    assembleClusters(cltArrayView, segArrayView, genomeBamFile, args)
 
-    # 7. output
-    outPut(cltArray, segArrayView, genomeBamFile, args)
+    # 6. output sequences for local assembly
+    outputGermCltSeqs(cltArrayView, segArrayView, genomeBamFile, args)
+
+    chromCltData[tid] = (cltArray, segArray, teArray)
     genomeBamFile.close(); del genomeBamFile
-
-    ResultDict[tid] = (cltArray, segArray, teArray)
-    return ResultDict
+    return chromCltData
