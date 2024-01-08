@@ -105,43 +105,6 @@ void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numL
     else if (directionIsInconsistent(segment)) cluster->directionFlag += 256;
 }
 
-static inline void countDifferentSeg(int *numLeft, int *numMiddle, int *numRight, Segment *segment)
-{
-    switch (segment->segType)
-    {
-        case LEFT_CLIP:
-            *numLeft += 1; break;
-        case RIGHT_CLIP:
-            *numRight += 1; break;
-        case MID_INSERT:
-            *numMiddle += 1; break;
-        default:
-            break;
-    }
-}
-
-static inline void countAlnFracs(Cluster *cluster, Segment *segment)
-{
-    switch (segment->alnLocationType)
-    {
-        case 1:
-            cluster->alnFrac1 += 1; break;
-        case 2:
-            cluster->alnFrac2 += 1; break;
-        case 4:
-            cluster->alnFrac4 += 1; break;
-        case 8:
-            cluster->alnFrac8 += 1; break;
-        case 16:
-            cluster->alnFrac16 += 1; break;
-        default:
-            break;
-    }
-}
-
-static inline void setEntropy(Cluster *cluster, int numLeft, int numMiddle, int numRight)
-{ cluster->entropy = getEntropy(numLeft, numMiddle, numRight, cluster->numSeg); }
-
 float getEntropy(int numLeft, int numMiddle, int numRight, int numSeg)
 {
     float entropy = 0;
@@ -154,11 +117,6 @@ float getEntropy(int numLeft, int numMiddle, int numRight, int numSeg)
     return entropy;
 }
 
-static inline void setBalanceRatio(Cluster *cluster, int numLeft, int numRight)
-{ cluster->balanceRatio = (MIN(numLeft, numRight) + 0.01) / (MAX(numLeft, numRight) + 0.01); }
-
-static inline void setNumSegType(Cluster *cluster)
-{ cluster->numSegType = (cluster->numSegType&1) + ((cluster->numSegType&2)>>1) + ((cluster->numSegType&4)>>2); }
 
 /*********************************
  *** Update By Background Info ***
@@ -172,41 +130,6 @@ void setCltLocationType(Cluster *cluster, Args args)
     if (numOverlap == 0) { cluster->locationType = 1; return; }
     if (minDistanceToOverlap < 50) { cluster->locationType = 2; return; }
     cluster->locationType = 4;
-}
-
-static inline void divideValuesByNumSeg(Cluster *cluster)
-{
-    if (cluster->alnFrac1 > 0) cluster->alnFrac1 = cluster->alnFrac1 / cluster->numSeg;
-    if (cluster->alnFrac2 > 0) cluster->alnFrac2 = cluster->alnFrac2 / cluster->numSeg;
-    if (cluster->alnFrac4 > 0) cluster->alnFrac4 = cluster->alnFrac4 / cluster->numSeg;
-    if (cluster->alnFrac8 > 0) cluster->alnFrac8 = cluster->alnFrac8 / cluster->numSeg;
-    if (cluster->alnFrac16 > 0) cluster->alnFrac16 = cluster->alnFrac16 / cluster->numSeg;
-
-    cluster->dualClipFrac = cluster->dualClipFrac / cluster->numSeg;
-    cluster->lowMapQualFrac = cluster->lowMapQualFrac / cluster->numSeg;
-    cluster->meanQueryMapFrac = cluster->meanQueryMapFrac / cluster->numSeg;
-    cluster->meanDivergence = cluster->meanDivergence / cluster->numSeg;
-    cluster->meanMapQual = cluster->meanMapQual / cluster->numSeg;
-    cluster->meanAlnScore = cluster->meanAlnScore / cluster->numSeg;
-}
-
-static inline void divideValuesByBackbg(Cluster *cluster, Args args)
-{
-    cluster->meanDivergence = cluster->meanDivergence / args.bgDiv;
-    cluster->numSeg = cluster->numSeg / args.bgDepth;
-}
-
-static inline void setDirection(Cluster *cluster)
-{
-    if (directionIsConsistent(cluster)) cluster->directionFlag = 1;
-    else if (directionIsInconsistent(cluster)) cluster->directionFlag = 2;
-}
-
-static inline void setBackbgInfo(Cluster *cluster, Args args)
-{
-    cluster->bgDiv = args.bgDiv;
-    cluster->bgDepth = args.bgDepth;
-    cluster->bgReadLen = args.bgReadLen;
 }
 
 

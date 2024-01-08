@@ -149,8 +149,14 @@ uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType);
 #define isSameDirection(segment, teAlignment) (((segment)->flag & BAM_FREVERSE) == ((teAlignment)->flag & BAM_FREVERSE))
 
 void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIndex);
-static inline int getQueryMapLen(TeAlignment *teAlignment);
-static inline int getOverlapQueryMapLen(TeAlignment *teAlignment, TeAlignment *prevTeAlignment);
+
+static inline int getQueryMapLen(TeAlignment *teAlignment) { return teAlignment->queryEnd - teAlignment->queryStart; }
+
+static inline int getOverlapQueryMapLen(TeAlignment *teAlignment, TeAlignment *prevTeAlignment)
+{
+    return teAlignment->queryEnd - prevTeAlignment->queryEnd;
+}
+
 void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIndex, int queryMapLen);
 void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, int numTeTid);
 
@@ -164,8 +170,11 @@ void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, 
 
 void fillTeArray(bam1_t *bamRecord, TeAlignment *teArray);
 void initQueryPosition(int *queryStartPtr, int *queryEndPtr, bam1_t *bamRecord);
-static inline int firstCigarIsClip(uint32_t *cigarArray);
-static inline int lastCigarIsClip(uint32_t *cigarArray, int numCigar);
+
+static inline int firstCigarIsClip(uint32_t *cigarArray) { return bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP; }
+
+static inline int lastCigarIsClip(uint32_t *cigarArray, int numCigar) { return bam_cigar_op(cigarArray[numCigar - 1]) == BAM_CSOFT_CLIP; }
+
 void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bamRecord);
 float getDivergence(bam1_t *bamRecord, int mapLen);
 void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart, int queryEnd, int mapLen, float divergence);
@@ -177,13 +186,22 @@ void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart
 #define isOdd(number) ((number) & 1)
 
 int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIndex, int sourceStart, int sourceEnd);
-static inline int reallocBamData(bam1_t *bamRecord, size_t desired);
 int samReallocBamData(bam1_t *bamRecord, size_t desired);
-static inline uint32_t bamGetMemPolicy(bam1_t *bamRecord);
-static inline void bamSetMemPolicy(bam1_t *bamRecord, uint32_t policy);
+
+static inline int reallocBamData(bam1_t *bamRecord, size_t desired)
+{
+    if (desired <= bamRecord->m_data) return 0;
+    return samReallocBamData(bamRecord, desired);
+}
+
+static inline uint32_t bamGetMemPolicy(bam1_t *bamRecord) { return bamRecord->mempolicy; }
+
+static inline void bamSetMemPolicy(bam1_t *bamRecord, uint32_t policy) { bamRecord->mempolicy = policy; }
+
 void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen);
 uint8_t *setDestName(bam1_t *destRecord, char *destName, int destNameLen, int numNulls);
 void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr, int sourceStart, int destSeqLen);
+
 
 /**********************
  *** Local Assembly ***

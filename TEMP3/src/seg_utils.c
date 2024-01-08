@@ -193,12 +193,6 @@ void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIndex)
     updateSegByTeAlignment(segment, teAlignment, teIndex, queryMapLen);
 }
 
-static inline int getQueryMapLen(TeAlignment *teAlignment)
-{ return teAlignment->queryEnd - teAlignment->queryStart; }
-
-static inline int getOverlapQueryMapLen(TeAlignment *teAlignment, TeAlignment *prevTeAlignment)
-{ return teAlignment->queryEnd - prevTeAlignment->queryEnd; }
-
 void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIndex, int queryMapLen)
 {
     segment->endIndex = teIndex + 1;
@@ -262,12 +256,6 @@ void initQueryPosition(int *queryStartPtr, int *queryEndPtr, bam1_t *bamRecord)
         *queryEndPtr = bamRecord->core.l_qseq - bam_cigar_oplen(cigarArray[0]);
 }
 
-static inline int firstCigarIsClip(uint32_t *cigarArray)
-{ return bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP; }
-
-static inline int lastCigarIsClip(uint32_t *cigarArray, int numCigar)
-{ return bam_cigar_op(cigarArray[numCigar-1]) == BAM_CSOFT_CLIP; }
-
 void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bamRecord)
 {
     uint32_t *cigarArray = bam_get_cigar(bamRecord);
@@ -322,12 +310,6 @@ int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIndex, int sour
     return (int)destDataLen;
 }
 
-static inline int reallocBamData(bam1_t *bamRecord, size_t desired)
-{
-    if (desired <= bamRecord->m_data) return 0;
-    return samReallocBamData(bamRecord, desired);
-}
-
 int samReallocBamData(bam1_t *bamRecord, size_t desired)
 {
     // similar to sam_realloc_bam_data in htslib sam.c
@@ -351,12 +333,6 @@ int samReallocBamData(bam1_t *bamRecord, size_t desired)
     bamRecord->m_data = newDataMem;
     return 0;
 }
-
-static inline uint32_t bamGetMemPolicy(bam1_t *bamRecord)
-{ return bamRecord->mempolicy; }
-
-static inline void bamSetMemPolicy(bam1_t *bamRecord, uint32_t policy)
-{ bamRecord->mempolicy = policy; }
 
 void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen)
 {

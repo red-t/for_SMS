@@ -5,7 +5,6 @@ from .FileIO import outputSomaCltSeqs
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
-    
     cdef BamFile genomeBamFile = BamFile(genomeBamFilePath, "rb", numThread)
     cdef int i, tid=0, maxChromLen=0
 
@@ -15,9 +14,7 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
             tid = i
     
     cdef Iterator iterator = Iterator(genomeBamFile, tid)
-    cdef int numAln = 0, maxNumAln = 499980
-    cdef object templatei = np.zeros(500000, dtype=np.int32)
-    cdef object templatef = np.zeros(500000, dtype=np.float32)
+    cdef int numAln = 0, maxNumAln = 499900
     cdef object readLenArray = np.zeros(500000, dtype=np.int32)
     cdef object divArray = np.zeros(500000, dtype=np.float32)
     cdef float[::1] divArrayView = divArray
@@ -40,12 +37,13 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
         if bamIsInvalid(iterator.bamRcord):
             continue
 
-        if numAln > maxNumAln:
-            divArray = np.concatenate((divArray, templatef))
-            readLenArray = np.concatenate((readLenArray, templatei))
+        if numAln >= maxNumAln:
+            maxNumAln = divArray.shape[0] + 500000
+            divArray.resize((maxNumAln,), refcheck=False)
+            readLenArray.resize((maxNumAln,), refcheck=False)
             divArrayView = divArray
             readLenArrayView = readLenArray
-            maxNumAln = divArray.shape[0] - 20
+            maxNumAln -= 100
             
         getMapLenAndDiv(&alnLen, &divergence, iterator.bamRcord)
         sumAlnLen += alnLen
@@ -67,11 +65,10 @@ cdef tuple divideTasks(int numTasks, int poolSize):
     return taskSize, startList
 
 
-cpdef dict runInParallel(object cmdArgs):
-    
+cpdef dict runInParallel(object cmdArgs):    
     cdef set subProcTup
     cdef dict allCltData = {}, chromCltData, bgInfo
-    cdef object subProc, assembleArray
+    cdef object subProc, assembleArray, returnValue
     cdef int start, taskSize
     cdef list startList
 
@@ -81,7 +78,7 @@ cpdef dict runInParallel(object cmdArgs):
           "".format(bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
 
     with ProcessPoolExecutor(max_workers=cmdArgs.numProcess) as executor:
-        # 2. Get Background Info
+        # 2. Build Cluster
         subProcTup = set([executor.submit(buildCluster, \
                                           bgInfo["bgDiv"], \
                                           bgInfo["bgDepth"], \
