@@ -46,8 +46,10 @@ TeAlignmentDt = np.dtype([
 ])
 
 ClusterDt = np.dtype([
+    ('tid',                 np.int32),
     ('refStart',            np.int32),
     ('refEnd',              np.int32),
+    ('idx',                 np.int32),
     ('startIndex',          np.int32),
     ('endIndex',            np.int32),
     ('numSeg',              np.float32),
@@ -204,9 +206,11 @@ cdef object getCltArray(Segment[::1] segArray, Args args):
             maxNum -= 100
         
         # Initialize numClt-th cluster
-        cltArrayView[numClt].startIndex = start
+        cltArrayView[numClt].tid = args.tid
         cltArrayView[numClt].refStart = segArray[start].refPosition - 1
         cltArrayView[numClt].refEnd = segArray[start].refPosition + args.maxDistance
+        cltArrayView[numClt].idx = numClt
+        cltArrayView[numClt].startIndex = start
 
         end = start + 1
         while end < segArray.shape[0]:
@@ -351,9 +355,9 @@ cdef outPut(object cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args 
     cltOutput.close(); segOutput.close(); del iterator
     
 
-############
-### Main ###
-############
+#####################
+### Build Cluster ###
+#####################
 cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdArgs, int tid):
     # 1. construct segments
     cdef Args args = newArgs(tid, bgDiv, bgDepth, bgReadLen, cmdArgs)
@@ -390,3 +394,31 @@ cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdA
     chromCltData[tid] = (cltArray, segArray, teArray)
     genomeBamFile.close(); del genomeBamFile
     return chromCltData
+
+
+cdef object getAnnoArray(dict chromCltData):
+    cdef int i, tid, numClt = 0, maxNum = 1900
+    cdef object annoArray = np.zeros(2000, dtype=ClusterDt)
+    cdef Cluster[::1] arrayView = annoArray
+    cdef Cluster[::1] cltArray
+
+    for tid in chromCltData.keys():
+        cltArray = chromCltData[tid][0]
+        if cltArray.shape[0] == 0:
+            continue
+        
+        for i in range(cltArray.shape[0]):
+            if isLowQualClt(&cltArray[i]):
+                continue
+            
+            if numClt >= maxNum:
+                maxNum = annoArray.shape[0] + 2000
+                annoArray.resize((maxNum,), refcheck=False)
+                arrayView = annoArray
+                maxNum -= 100
+            
+            arrayView[numClt] = cltArray[i]
+            numClt += 1
+
+    annoArray.resize((numClt,), refcheck=False)
+    return annoArray

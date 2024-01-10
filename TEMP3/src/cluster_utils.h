@@ -14,8 +14,10 @@
  ******************/
 /*! @typedef
  @abstract Structure cluster merged from segments.
+ @field  tid                target id of corresponding chromosome
  @field  refStart           cluster start on reference sequence (0-based, included)
  @field  refEnd             cluster end on reference sequence (0-based, not-included)
+ @field  idx                cluster index in clusters array (0-based)
  @field  startIndex         start index in segments array (0-based, include)
  @field  endIndex           end index in segments array (0-based, not-include)
  @field  numSeg             number of segments in the cluster (normalized by bg depth)
@@ -53,8 +55,10 @@
  @field  probability        the probability of the cluster to be a positive insertion
  */
 typedef struct {
+    int         tid;
     int         refStart;
     int         refEnd;
+    int         idx;
     int         startIndex;
     int         endIndex;
     float       numSeg;

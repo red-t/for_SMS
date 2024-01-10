@@ -1,9 +1,13 @@
 import numpy as np
 from .Cluster import buildCluster
 from .Assemble import wtdbg2Assemble
-from .FileIO import outputSomaCltSeqs
+from .FileIO import outputSomaCltSeqs, outputRefFlank
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+
+###########################
+### Get Background Info ###
+###########################
 cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
     cdef BamFile genomeBamFile = BamFile(genomeBamFilePath, "rb", numThread)
     cdef int i, tid=0, maxChromLen=0
@@ -52,6 +56,9 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
         numAln += 1
 
 
+#######################
+### Parallel Module ###
+#######################
 cdef tuple divideTasks(int numTasks, int poolSize):
     cdef int i, taskSize = int(numTasks / poolSize)
     cdef list startList = []
@@ -107,6 +114,18 @@ cpdef dict runInParallel(object cmdArgs):
                                           allCltData[tid][1], \
                                           cmdArgs, tid) for tid in range(bgInfo["numChrom"])])
                                        
+        for subProc in as_completed(subProcTup):
+            returnValue = subProc.result()
+        
+        # 5. Output reference flank sequence for high-qual clusters
+        annoArray = getAnnoArray(allCltData)
+        taskSize, startList = divideTasks(annoArray.shape[0], cmdArgs.numProcess)
+        subProcTup = set([executor.submit(outputRefFlank, \
+                                          annoArray, \
+                                          start, \
+                                          taskSize, \
+                                          cmdArgs) for start in startList])
+
         for subProc in as_completed(subProcTup):
             returnValue = subProc.result()
     

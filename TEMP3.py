@@ -16,6 +16,8 @@ def parseArgs():
                                  help='blacklist BED file', default='')
     parser.add_argument('-T', '--refte', dest='referenceTe', type=str,
                                  help='transposon reference fasta file', default='')
+    parser.add_argument('-R', '--refFa', dest='refFn', type=str,
+                                 help='reference genome fasta file', default='')
     parser.add_argument('--germ', dest='germModelPath', type=str,
                                  help='path of germline insertion model', default='')
     parser.add_argument('--soma', dest='somaModelPath', type=str,
@@ -46,11 +48,14 @@ if __name__ == '__main__':
     if cmdArgs.somaModelPath.endswith('/') == False:
         cmdArgs.somaModelPath += '/'
     
-    if os.path.exists('tmp_cluster') == False:
-        os.mkdir('tmp_cluster')
+    if os.path.exists('tmp_build') == False:
+        os.mkdir('tmp_build')
     
     if os.path.exists('tmp_assm') == False:
         os.mkdir('tmp_assm')
+    
+    if os.path.exists('tmp_anno') == False:
+        os.mkdir('tmp_anno')
 
     tidToResult = runInParallel(cmdArgs)
 
