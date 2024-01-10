@@ -1,5 +1,4 @@
 from .FileIO cimport *
-from .Cluster cimport bamIsInvalid, getMapLenAndDiv, getAnnoArray
-from .Assemble cimport getAssembleArray
+from .Cluster cimport bamIsInvalid, getMapLenAndDiv, getHighQualClts
 
 cpdef dict runInParallel(object cmdArgs)

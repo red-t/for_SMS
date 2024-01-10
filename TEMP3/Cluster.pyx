@@ -125,7 +125,7 @@ cdef updateSegArray(Segment[::1] segArray, Args args):
         updateSegment(&segArray[i], args.repeatAiList, args.gapAiList)
 
 
-cdef object updateSegArrayByTe(Segment[::1] segArray, Args args):
+cdef updateSegArrayByTe(Segment[::1] segArray, Args args):
     cdef BamFile teBamFile = BamFile("tmp.all_supp_reads.{}.bam".format(args.tid), "rb", args.numThread)
     cdef Iterator iterator = Iterator(teBamFile)
     cdef object teArray = getTeArray(iterator)
@@ -147,7 +147,6 @@ cdef object updateSegArrayByTe(Segment[::1] segArray, Args args):
             segArray[i].teTid = np.argmax(teTidCountTable)
 
     del iterator; teBamFile.close(); del teBamFile; del teTidCountTable
-    return teArray
 
 
 #########################
@@ -374,7 +373,7 @@ cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdA
     ouputAllSegSeqs(segArray, genomeBamFile, args)
 
     mapByMinimap2(cmdArgs.referenceTe, args)
-    teArray = updateSegArrayByTe(segArray, args)
+    updateSegArrayByTe(segArray, args)
     
     # 3. construct cluster
     cdef chromCltData = {}
@@ -391,15 +390,18 @@ cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdA
     # 6. output sequences for local assembly
     outputGermCltSeqs(cltArray, segArray, genomeBamFile, args)
 
-    chromCltData[tid] = (cltArray, segArray, teArray)
+    chromCltData[tid] = (cltArray, segArray)
     genomeBamFile.close(); del genomeBamFile
     return chromCltData
 
 
-cdef object getAnnoArray(dict chromCltData):
+##############################
+### Get High-Qual Clusters ###
+##############################
+cdef object getHighQualClts(dict chromCltData):
     cdef int i, tid, numClt = 0, maxNum = 1900
-    cdef object annoArray = np.zeros(2000, dtype=ClusterDt)
-    cdef Cluster[::1] arrayView = annoArray
+    cdef object highQualArray = np.zeros(2000, dtype=ClusterDt)
+    cdef Cluster[::1] arrayView = highQualArray
     cdef Cluster[::1] cltArray
 
     for tid in chromCltData.keys():
@@ -412,13 +414,13 @@ cdef object getAnnoArray(dict chromCltData):
                 continue
             
             if numClt >= maxNum:
-                maxNum = annoArray.shape[0] + 2000
-                annoArray.resize((maxNum,), refcheck=False)
-                arrayView = annoArray
+                maxNum = highQualArray.shape[0] + 2000
+                highQualArray.resize((maxNum,), refcheck=False)
+                arrayView = highQualArray
                 maxNum -= 100
             
             arrayView[numClt] = cltArray[i]
             numClt += 1
 
-    annoArray.resize((numClt,), refcheck=False)
-    return annoArray
+    highQualArray.resize((numClt,), refcheck=False)
+    return highQualArray

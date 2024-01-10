@@ -1,6 +1,6 @@
 import numpy as np
 from .Cluster import buildCluster
-from .Assemble import wtdbg2Assemble
+from .Assemble import assembleCluster
 from .FileIO import outputSomaCltSeqs, outputRefFlank
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -91,20 +91,18 @@ cpdef dict runInParallel(object cmdArgs):
                                           bgInfo["bgDepth"], \
                                           bgInfo["bgReadLen"], \
                                           cmdArgs, tid) for tid in range(bgInfo["numChrom"])])
-                                       
         for subProc in as_completed(subProcTup):
             chromCltData = subProc.result()
             allCltData = {**allCltData, **chromCltData}
         
         # 3. Local Assembly
-        assembleArray = getAssembleArray(allCltData)
-        taskSize, startList = divideTasks(assembleArray.shape[0], cmdArgs.numProcess)
-        subProcTup = set([executor.submit(wtdbg2Assemble, \
-                                          assembleArray, \
+        highQualArray = getHighQualClts(allCltData)
+        taskSize, startList = divideTasks(highQualArray.shape[0], cmdArgs.numProcess)
+        subProcTup = set([executor.submit(assembleCluster, \
+                                          highQualArray, \
                                           start, \
                                           taskSize, \
                                           cmdArgs.numThread) for start in startList])
-
         for subProc in as_completed(subProcTup):
             returnValue = subProc.result()
         
@@ -113,19 +111,15 @@ cpdef dict runInParallel(object cmdArgs):
                                           allCltData[tid][0], \
                                           allCltData[tid][1], \
                                           cmdArgs, tid) for tid in range(bgInfo["numChrom"])])
-                                       
         for subProc in as_completed(subProcTup):
             returnValue = subProc.result()
         
         # 5. Output reference flank sequence for high-qual clusters
-        annoArray = getAnnoArray(allCltData)
-        taskSize, startList = divideTasks(annoArray.shape[0], cmdArgs.numProcess)
         subProcTup = set([executor.submit(outputRefFlank, \
-                                          annoArray, \
+                                          highQualArray, \
                                           start, \
                                           taskSize, \
                                           cmdArgs) for start in startList])
-
         for subProc in as_completed(subProcTup):
             returnValue = subProc.result()
     

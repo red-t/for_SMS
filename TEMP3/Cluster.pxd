@@ -44,4 +44,4 @@ cdef extern from "src/AIList.h" nogil:
     void constructAiList(AiList *ail, int minCoverageLen)
 
 cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdArgs, int tid)
-cdef object getAnnoArray(dict chromCltData)
+cdef object getHighQualClts(dict chromCltData)
