@@ -166,14 +166,25 @@ cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object c
     args.minOverhang = cmdArgs.minOverhang
     return args
 
+#######################
+### Construc AiList ###
+#######################
+cdef AiList* newAiList(str bedFn, const char *chrom):
+    cdef bytes bedFnBytes = bedFn.encode()
+    cdef AiList *aiList = initAiList()
+
+    readBED(aiList, bedFnBytes, chrom)
+    constructAiList(aiList, 20)
+    return aiList
+
 
 ###########################
 ### Segment Sequence IO ###
 ###########################
-cdef ouputAllSegSeqs(Segment[::1] segArray, BamFile genomeBamFile, Args args):
-    cdef str outputFileName = "tmp.all_supp_reads.{}.fa".format(args.tid)
-    cdef BamFile outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
-    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
+cdef ouputAllSegSeqs(Segment[::1] segArray, BamFile genomeBam, Args args):
+    cdef str outputFileName = "tmp_build/all_seg_{}.fa".format(args.tid)
+    cdef BamFile outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBam)
+    cdef Iterator iterator = Iterator(genomeBam, args.tid)
     cdef bam1_t *destRecord = bam_init1()
     cdef int i, returnValue
 
@@ -185,10 +196,10 @@ cdef ouputAllSegSeqs(Segment[::1] segArray, BamFile genomeBamFile, Args args):
     bam_destroy1(destRecord); outputFasta.close(); del outputFasta; del iterator
 
 
-cdef outputGermCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args):
+cdef outputGermCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBam, Args args):
     cdef str outputFileName
     cdef BamFile outputFasta
-    cdef Iterator iterator = Iterator(genomeBamFile, args.tid)
+    cdef Iterator iterator = Iterator(genomeBam, args.tid)
     cdef bam1_t *destRecord = bam_init1()
     cdef int i, j
 
@@ -197,8 +208,8 @@ cdef outputGermCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile gen
             continue
 
         outputFileName = "tmp_assm/tmp.{}_{}.fa".format(args.tid, i)
-        outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBamFile)
-        for j in range(cltArray[i].startIndex, cltArray[i].endIndex):
+        outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBam)
+        for j in range(cltArray[i].startIdx, cltArray[i].endIdx):
             if overhangIsShort(&segArray[j], args.minOverhang):
                 continue
             outputSingleSeq(segArray, outputFasta, iterator, destRecord, j)
@@ -213,8 +224,8 @@ cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmd
     cdef Args args
     cdef str outputFileName
     cdef BamFile outputFasta
-    cdef BamFile genomeBamFile = BamFile(cmdArgs.genomeBamFilePath, "rb", cmdArgs.numThread)
-    cdef Iterator iterator = Iterator(genomeBamFile, tid)
+    cdef BamFile genomeBam = BamFile(cmdArgs.genomeBamFilePath, "rb", cmdArgs.numThread)
+    cdef Iterator iterator = Iterator(genomeBam, tid)
     cdef bam1_t *destRecord = bam_init1()
 
     args.minOverhang = cmdArgs.minOverhang
@@ -228,13 +239,13 @@ cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmd
             if os.path.getsize(outputFileName) != 0:
                 continue
         
-        outputFasta = BamFile(outputFileName, "wF", cmdArgs.numThread, genomeBamFile)
-        j = getOuputSegIndex(&cltArray[i], &segArray[0], args)
+        outputFasta = BamFile(outputFileName, "wF", cmdArgs.numThread, genomeBam)
+        j = getOuputSegIdx(&cltArray[i], &segArray[0], args)
         outputSingleSeq(segArray, outputFasta, iterator, destRecord, j)
         outputFasta.close()
 
     bam_destroy1(destRecord); del iterator
-    genomeBamFile.close(); del genomeBamFile
+    genomeBam.close(); del genomeBam
 
 
 cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFasta, Iterator iterator, bam1_t *destRecord, int j, int flankSize=3000):
@@ -249,10 +260,10 @@ cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFasta, Iterator iterato
 #########################
 ### Flank Sequence IO ###
 #########################
-cpdef outputRefFlank(Cluster[::1] cltArray, int start, int taskSize, object cmdArgs):
-    cdef int end = start + taskSize
-    if end > cltArray.shape[0]:
-        end = cltArray.shape[0]
+cpdef outputRefFlank(Cluster[::1] cltArray, int startIdx, int taskSize, object cmdArgs):
+    cdef int endIdx = startIdx + taskSize
+    if endIdx > cltArray.shape[0]:
+        endIdx = cltArray.shape[0]
     
     cdef bytes refFn = cmdArgs.refFn.encode('utf-8')
-    outputRefFlankSeqs(refFn, &cltArray[0], start, end)
+    outputRefFlankSeqs(refFn, &cltArray[0], startIdx, endIdx)

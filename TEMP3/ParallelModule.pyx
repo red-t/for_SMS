@@ -9,15 +9,15 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 ### Get Background Info ###
 ###########################
 cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
-    cdef BamFile genomeBamFile = BamFile(genomeBamFilePath, "rb", numThread)
+    cdef BamFile genomeBam = BamFile(genomeBamFilePath, "rb", numThread)
     cdef int i, tid=0, maxChromLen=0
 
-    for i in range(genomeBamFile.header.n_targets):
-        if maxChromLen < sam_hdr_tid2len(genomeBamFile.header, i):
-            maxChromLen = sam_hdr_tid2len(genomeBamFile.header, i)
+    for i in range(genomeBam.header.n_targets):
+        if maxChromLen < sam_hdr_tid2len(genomeBam.header, i):
+            maxChromLen = sam_hdr_tid2len(genomeBam.header, i)
             tid = i
     
-    cdef Iterator iterator = Iterator(genomeBamFile, tid)
+    cdef Iterator iterator = Iterator(genomeBam, tid)
     cdef int numAln = 0, maxNumAln = 499900
     cdef object readLenArray = np.zeros(500000, dtype=np.int32)
     cdef object divArray = np.zeros(500000, dtype=np.float32)
@@ -31,12 +31,12 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
     while True:
         returnValue = iterator.cnext1()
         if returnValue < 0:
-            bgInfo["numChrom"] = genomeBamFile.header.n_targets
+            bgInfo["numChrom"] = genomeBam.header.n_targets
             bgInfo["bgDiv"] = np.mean(divArray[:numAln])
             bgInfo["bgDepth"] = float(sumAlnLen) / maxChromLen
             bgInfo["bgReadLen"] = np.median(readLenArray[:numAln])
 
-            genomeBamFile.close(); del iterator; del genomeBamFile; return bgInfo
+            genomeBam.close(); del iterator; del genomeBam; return bgInfo
 
         if bamIsInvalid(iterator.bamRcord):
             continue
@@ -74,9 +74,9 @@ cdef tuple divideTasks(int numTasks, int poolSize):
 
 cpdef dict runInParallel(object cmdArgs):    
     cdef set subProcTup
-    cdef dict allCltData = {}, chromCltData, bgInfo
+    cdef dict allCltData = {}, tidToCltData, bgInfo
     cdef object subProc, assembleArray, returnValue
-    cdef int start, taskSize
+    cdef int startIdx, taskSize
     cdef list startList
 
     # 1. Get Background Info
@@ -92,17 +92,17 @@ cpdef dict runInParallel(object cmdArgs):
                                           bgInfo["bgReadLen"], \
                                           cmdArgs, tid) for tid in range(bgInfo["numChrom"])])
         for subProc in as_completed(subProcTup):
-            chromCltData = subProc.result()
-            allCltData = {**allCltData, **chromCltData}
+            tidToCltData = subProc.result()
+            allCltData = {**allCltData, **tidToCltData}
         
         # 3. Local Assembly
         highQualArray = getHighQualClts(allCltData)
         taskSize, startList = divideTasks(highQualArray.shape[0], cmdArgs.numProcess)
         subProcTup = set([executor.submit(assembleCluster, \
                                           highQualArray, \
-                                          start, \
+                                          startIdx, \
                                           taskSize, \
-                                          cmdArgs.numThread) for start in startList])
+                                          cmdArgs.numThread) for startIdx in startList])
         for subProc in as_completed(subProcTup):
             returnValue = subProc.result()
         
@@ -117,9 +117,9 @@ cpdef dict runInParallel(object cmdArgs):
         # 5. Output reference flank sequence for high-qual clusters
         subProcTup = set([executor.submit(outputRefFlank, \
                                           highQualArray, \
-                                          start, \
+                                          startIdx, \
                                           taskSize, \
-                                          cmdArgs) for start in startList])
+                                          cmdArgs) for startIdx in startList])
         for subProc in as_completed(subProcTup):
             returnValue = subProc.result()
     

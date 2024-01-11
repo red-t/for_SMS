@@ -27,7 +27,7 @@ void setTeAlignedFrac(Cluster *cluster, Segment *segArray, Args args)
 {
     float numTeAlignedSeg = 0;
 
-    for (int i = cluster->startIndex; i < cluster->endIndex; i++) {
+    for (int i = cluster->startIdx; i < cluster->endIdx; i++) {
         if (segArray[i].overhang < args.minOverhang) continue;
         if (segArray[i].numTeAlignment > 0) numTeAlignedSeg += 1;
         cluster->numSeg += 1;
@@ -41,17 +41,17 @@ void setCltType(Cluster *cluster, Segment *segArray, Args args)
     if (cluster->numSeg == 1) { cluster->cltType = 1; return; }
 
     int isFirst = 1;
-    for (int i = cluster->startIndex; i < cluster->endIndex; i++) {
+    for (int i = cluster->startIdx; i < cluster->endIdx; i++) {
         Segment *segment = &segArray[i];
         if (overhangIsShort(segment, args.minOverhang)) continue;
         if (isFirst) {
-            bgzf_seek(args.genomeBamFile->fp.bgzf, segment->fileOffset, SEEK_SET);
-            bam_read1(args.genomeBamFile->fp.bgzf, args.firstBamRecord);
+            bgzf_seek(args.genomeBam->fp.bgzf, segment->fileOffset, SEEK_SET);
+            bam_read1(args.genomeBam->fp.bgzf, args.firstBamRecord);
             isFirst = 0;
             continue;
         }
-        bgzf_seek(args.genomeBamFile->fp.bgzf, segment->fileOffset, SEEK_SET);
-        bam_read1(args.genomeBamFile->fp.bgzf, args.secondBamRecord);
+        bgzf_seek(args.genomeBam->fp.bgzf, segment->fileOffset, SEEK_SET);
+        bam_read1(args.genomeBam->fp.bgzf, args.secondBamRecord);
     }
     
     if (nameIsSame(args.firstBamRecord, args.secondBamRecord)) cluster->cltType = 2;
@@ -65,7 +65,7 @@ void updateBySegArray(Cluster *cluster, Segment *segArray, Args args)
     int numLeft = 0, numMiddle = 0, numRight = 0;
     memset(args.teTidCountTable, 0, args.numTeTid * sizeof(int));
 
-    for (int i = cluster->startIndex; i < cluster->endIndex; i++)
+    for (int i = cluster->startIdx; i < cluster->endIdx; i++)
     {
         Segment *segment = &segArray[i];
         if (overhangIsShort(segment, args.minOverhang)) continue;
@@ -148,14 +148,14 @@ void intersectBlackList(Cluster *cluster, Args args)
 /**********************
  *** Local Assembly ***
  **********************/
-int getOuputSegIndex(Cluster *cluster, Segment *segArray, Args args)
+int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
 {
-    int clipIndex = -1;
-    int insIndex = -1;
+    int clipIdx = -1;
+    int insIdx = -1;
     int maxReadLen = 0;
     int maxClipLen = 0;
 
-    for (int i = cluster->startIndex; i < cluster->endIndex; i++)
+    for (int i = cluster->startIdx; i < cluster->endIdx; i++)
     {
         Segment *segment = &segArray[i];
         if (overhangIsShort(segment, args.minOverhang)) continue;
@@ -164,7 +164,7 @@ int getOuputSegIndex(Cluster *cluster, Segment *segArray, Args args)
         {
             if (segment->readLen <= maxReadLen) continue;
             maxReadLen = segment->readLen;
-            insIndex = i;
+            insIdx = i;
             continue;
         }
 
@@ -172,10 +172,10 @@ int getOuputSegIndex(Cluster *cluster, Segment *segArray, Args args)
         if (clipLen > maxClipLen)
         {
             maxClipLen = clipLen;
-            clipIndex = i;
+            clipIdx = i;
         }
     }
 
-    if (insIndex > 0) return insIndex;
-    return clipIndex;
+    if (insIdx > 0) return insIdx;
+    return clipIdx;
 }

@@ -8,13 +8,13 @@ def parseArgs():
 
     parser.add_argument('-b', '--bam', dest='genomeBamFilePath', type=str,
                                  help='path of input BAM file, mapped by minimap2 -Y', default='')
-    parser.add_argument('-r', '--repeat', dest='repeatPath', type=str,
+    parser.add_argument('-r', '--repeat', dest='repeatFn', type=str,
                                  help='repeat annotation file', default='')
-    parser.add_argument('-g', '--gap', dest='gapPath', type=str,
+    parser.add_argument('-g', '--gap', dest='gapFn', type=str,
                                  help='gap annotation file', default='')
     parser.add_argument('-B', '--blacklist', dest='blackListPath', type=str,
                                  help='blacklist BED file', default='')
-    parser.add_argument('-T', '--refte', dest='referenceTe', type=str,
+    parser.add_argument('-T', '--refTe', dest='teFn', type=str,
                                  help='transposon reference fasta file', default='')
     parser.add_argument('-R', '--refFa', dest='refFn', type=str,
                                  help='reference genome fasta file', default='')

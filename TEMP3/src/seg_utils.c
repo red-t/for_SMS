@@ -13,7 +13,7 @@ int fillSegmentArray(bam1_t *bamRecord, Segment *segArray, int64_t fileOffset, i
 SegValues initSegmentsFromCigar(bam1_t *bamRecord, Segment *segArray, int64_t fileOffset, int minSegLen)
 {
     int numCigar = bamRecord->core.n_cigar;
-    int lastCigarIndex = numCigar - 1;
+    int lastCigarIdx = numCigar - 1;
     uint32_t *cigarArray = bam_get_cigar(bamRecord);
 
     SegValues segValues;
@@ -42,7 +42,7 @@ SegValues initSegmentsFromCigar(bam1_t *bamRecord, Segment *segArray, int64_t fi
                 if (cigarLen < minSegLen) { segValues.queryPosition += cigarLen; break; }
 
                 if (i == 0) segValues.segType = LEFT_CLIP;
-                else if (i == lastCigarIndex) segValues.segType = RIGHT_CLIP;
+                else if (i == lastCigarIdx) segValues.segType = RIGHT_CLIP;
                 else segValues.segType = MID_INSERT;
                 
                 initSegment(&segArray[segValues.numSeg], segValues, cigarLen);
@@ -144,15 +144,15 @@ uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType)
     {
         case 1:
         case 5:
-            return 1;   // at least one end inside normal region
+            return 1;   // at least one side inside normal region
         case 4:
             return 2;   // both ends inside repeat/gap region
         case 2:
             return 4;   // both ends at repeat/gap boundary
         case 3:
-            return 8;   // one end at repeat/gap boundary, the other inside normal region
+            return 8;   // one side at repeat/gap boundary, the other inside normal region
         case 6:
-            return 16;  // one end at repeat/gap boundary, the other inside repeat/gap
+            return 16;  // one side at repeat/gap boundary, the other inside repeat/gap
         default:
             return 0;
     }
@@ -162,25 +162,25 @@ uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType)
 /***************************************
  *** Update Segments By TeAlignments ***
  ***************************************/
-void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIndex)
+void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx)
 {
-    TeAlignment *teAlignment = &teArray[teIndex];
-    int segIndex = teAlignment->segIndex;
-    Segment *segment = &segArray[segIndex];
+    TeAlignment *teAlignment = &teArray[teIdx];
+    int segIdx = teAlignment->segIdx;
+    Segment *segment = &segArray[segIdx];
 
     if (isFirstTeAlign(segment)) {
-        segment->startIndex = teIndex;
+        segment->startIdx = teIdx;
         int queryMapLen = getQueryMapLen(teAlignment);
-        updateSegByTeAlignment(segment, teAlignment, teIndex, queryMapLen);
+        updateSegByTeAlignment(segment, teAlignment, teIdx, queryMapLen);
         return;
     }
 
-    int prevIndex = teIndex - 1;
-    TeAlignment *prevTeAlignment = &teArray[prevIndex];
+    int prevIdx = teIdx - 1;
+    TeAlignment *prevTeAlignment = &teArray[prevIdx];
     
     if (!isOverlap(teAlignment, prevTeAlignment)) {
         int queryMapLen = getQueryMapLen(teAlignment);
-        updateSegByTeAlignment(segment, teAlignment, teIndex, queryMapLen);
+        updateSegByTeAlignment(segment, teAlignment, teIdx, queryMapLen);
         return;
     }
 
@@ -190,12 +190,12 @@ void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIndex)
     }
 
     int queryMapLen = getOverlapQueryMapLen(teAlignment, prevTeAlignment);
-    updateSegByTeAlignment(segment, teAlignment, teIndex, queryMapLen);
+    updateSegByTeAlignment(segment, teAlignment, teIdx, queryMapLen);
 }
 
-void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIndex, int queryMapLen)
+void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIdx, int queryMapLen)
 {
-    segment->endIndex = teIndex + 1;
+    segment->endIdx = teIdx + 1;
     segment->numTeAlignment += 1;
     segment->sumQueryMapLen += queryMapLen;
     segment->sumDivergence += teAlignment->divergence;
@@ -215,7 +215,7 @@ void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, 
     Segment *segment = &segArray[0];
     memset(teTidCountTable, 0, numTeTid * sizeof(int));
 
-    for (int i = segment->startIndex; i < segment->endIndex; i++)
+    for (int i = segment->startIdx; i < segment->endIdx; i++)
         teTidCountTable[teArray[i].teTid] += 1;
 }
 
@@ -274,7 +274,7 @@ float getDivergence(bam1_t *bamRecord, int mapLen)
 
 void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart, int queryEnd, int mapLen, float divergence)
 {
-    teAlignment->segIndex = atoi(bam_get_qname(bamRecord));
+    teAlignment->segIdx = atoi(bam_get_qname(bamRecord));
     teAlignment->AlnScore = bam_aux2i(bam_aux_get(bamRecord, "AS"));
     teAlignment->queryStart = queryStart;
     teAlignment->queryEnd = queryEnd;
@@ -288,11 +288,11 @@ void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart
 /********************
  *** Trim Segment ***
  ********************/
-int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIndex, int sourceStart, int sourceEnd)
+int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIdx, int sourceStart, int sourceEnd)
 {
-    // use segIndex as destName
+    // use segIdx as destName
     char destName[12];
-    sprintf(destName, "%d", segIndex);
+    sprintf(destName, "%d", segIdx);
     
     int destNameLen = strlen(destName);
     int numNulls = 4 - destNameLen % 4;

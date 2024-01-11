@@ -18,8 +18,8 @@
  @field  refStart           cluster start on reference sequence (0-based, included)
  @field  refEnd             cluster end on reference sequence (0-based, not-included)
  @field  idx                cluster index in clusters array (0-based)
- @field  startIndex         start index in segments array (0-based, include)
- @field  endIndex           end index in segments array (0-based, not-include)
+ @field  startIdx           start index in segments array (0-based, include)
+ @field  endIdx             end index in segments array (0-based, not-include)
  @field  numSeg             number of segments in the cluster (normalized by bg depth)
  @field  directionFlag      bitwise flag representing cluster direction
                                 1: forward
@@ -59,8 +59,8 @@ typedef struct {
     int         refStart;
     int         refEnd;
     int         idx;
-    int         startIndex;
-    int         endIndex;
+    int         startIdx;
+    int         endIdx;
     float       numSeg;
     uint16_t    directionFlag;
     uint8_t     cltType;
@@ -99,7 +99,7 @@ typedef struct {
     float       bgDiv;
     float       bgDepth;
     float       bgReadLen;
-    htsFile     *genomeBamFile;
+    htsFile     *genomeBam;
     bam1_t      *firstBamRecord;
     bam1_t      *secondBamRecord;
     AiList      *repeatAiList;
@@ -244,6 +244,6 @@ void intersectBlackList(Cluster *cluster, Args args);
 #define isGermClt(cluster) ((cluster)->cltType == 0)
 #define isSomaClt(cluster) ((cluster)->cltType != 0)
 
-int getOuputSegIndex(Cluster *cluster, Segment *segArray, Args args);
+int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args);
 
 #endif // CLUSTER_UTILS_H

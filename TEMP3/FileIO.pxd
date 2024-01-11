@@ -40,6 +40,11 @@ cdef extern from "src/AIList.h" nogil:
     ##############
     ctypedef struct AiList:
         pass
+    
+    AiList *initAiList()
+    void destroyAiList(AiList *ail)
+    void readBED(AiList *ail, const char* bedFileName, const char* targetChrom)
+    void constructAiList(AiList *ail, int minCoverageLen)
 
 
 cdef extern from "src/cluster_utils.h" nogil:
@@ -48,8 +53,8 @@ cdef extern from "src/cluster_utils.h" nogil:
         int         refStart
         int         refEnd
         int         idx
-        int         startIndex
-        int         endIndex
+        int         startIdx
+        int         endIdx
         float       numSeg
         uint16_t    directionFlag
         uint8_t     cltType
@@ -87,7 +92,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       bgDiv
         float       bgDepth
         float       bgReadLen
-        htsFile     *genomeBamFile
+        htsFile     *genomeBam
         bam1_t      *firstBamRecord
         bam1_t      *secondBamRecord
         AiList      *repeatAiList
@@ -98,7 +103,7 @@ cdef extern from "src/cluster_utils.h" nogil:
     int isLowQualClt(Cluster *cluster)
     int isGermClt(Cluster *cluster)
     int isSomaClt(Cluster *cluster)
-    int getOuputSegIndex(Cluster *cluster, Segment *segArray, Args args)
+    int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
 
 
 cdef extern from "src/seg_utils.h" nogil:
@@ -127,18 +132,21 @@ cdef extern from "src/seg_utils.h" nogil:
         float       sumAlnScore
         float       sumDivergence
         uint16_t    directionFlag
-        int         startIndex
-        int         endIndex
+        int         startIdx
+        int         endIdx
         int         teTid
 
     void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
-    int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIndex, int sourceStart, int sourceEnd)
+    int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIdx, int sourceStart, int sourceEnd)
+
 
 cdef extern from "src/io_utils.h" nogil:
     int outputRefFlankSeqs(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
 
+
 cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs)
-cdef ouputAllSegSeqs(Segment[::1] segArray, BamFile genomeBamFile, Args args)
-cdef outputGermCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBamFile, Args args)
+cdef AiList* newAiList(str bedFn, const char *chrom)
+cdef ouputAllSegSeqs(Segment[::1] segArray, BamFile genomeBam, Args args)
+cdef outputGermCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBam, Args args)
 cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmdArgs, int tid)
-cpdef outputRefFlank(Cluster[::1] cltArray, int start, int taskSize, object cmdArgs)
+cpdef outputRefFlank(Cluster[::1] cltArray, int startIdx, int taskSize, object cmdArgs)

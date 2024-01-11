@@ -41,8 +41,8 @@
  @field  sumAlnScore        summary per base alignment score of the TE alignments
  @field  sumDivergence      summary per base divergence of the TE alignments
  @field  directionFlag      flag representing segment direction
- @field  startIndex         start index in TE alignments array (0-based, include)
- @field  endIndex           end index in TE alignments array (0-based, not-include)
+ @field  startIdx           start index in TE alignments array (0-based, include)
+ @field  endIdx             end index in TE alignments array (0-based, not-include)
  @field  teTid              majority TE-tid of the segment
  */
 typedef struct {
@@ -67,8 +67,8 @@ typedef struct {
     float       sumAlnScore;
     float       sumDivergence;
     uint16_t    directionFlag;
-    int         startIndex;
-    int         endIndex;
+    int         startIdx;
+    int         endIdx;
     int         teTid;
 } __attribute__((packed)) Segment;
 
@@ -88,7 +88,7 @@ typedef struct {
 
 /*! @typedef
  @abstract Structure for TE alignment.
- @field  segIndex       index of corresponding segment in segments array
+ @field  segIdx         index of corresponding segment in segments array
  @field  AlnScore       alignment score
  @field  queryStart     query start (original direction of segment)
  @field  queryEnd       query end (original direction of segment)
@@ -98,7 +98,7 @@ typedef struct {
  @field  teTid          tid of the TE alignment
  */
 typedef struct {
-    int     segIndex;
+    int     segIdx;
     int     AlnScore;
     int     queryStart;
     int     queryEnd;
@@ -148,7 +148,7 @@ uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType);
 #define isCover(teAlignment, prevTeAlignment) ((teAlignment)->queryEnd <= (prevTeAlignment)->queryEnd)
 #define isSameDirection(segment, teAlignment) (((segment)->flag & BAM_FREVERSE) == ((teAlignment)->flag & BAM_FREVERSE))
 
-void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIndex);
+void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx);
 
 static inline int getQueryMapLen(TeAlignment *teAlignment) { return teAlignment->queryEnd - teAlignment->queryStart; }
 
@@ -157,7 +157,7 @@ static inline int getOverlapQueryMapLen(TeAlignment *teAlignment, TeAlignment *p
     return teAlignment->queryEnd - prevTeAlignment->queryEnd;
 }
 
-void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIndex, int queryMapLen);
+void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIdx, int queryMapLen);
 void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, int numTeTid);
 
 
@@ -185,7 +185,7 @@ void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart
  ********************/
 #define isOdd(number) ((number) & 1)
 
-int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIndex, int sourceStart, int sourceEnd);
+int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIdx, int sourceStart, int sourceEnd);
 int samReallocBamData(bam1_t *bamRecord, size_t desired);
 
 static inline int reallocBamData(bam1_t *bamRecord, size_t desired)

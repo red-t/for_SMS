@@ -5,16 +5,16 @@ from subprocess import Popen, DEVNULL
 ######################
 ### Local Assembly ###
 ######################
-cpdef assembleCluster(Cluster[::1] cltArray, int start, int taskSize, int numThread):
-    cdef int i, exitCode, end
+cpdef assembleCluster(Cluster[::1] cltArray, int startIdx, int taskSize, int numThread):
+    cdef int i, exitCode, endIdx
     cdef str cmd, prefix
     cdef object subProcess
 
-    end = start + taskSize
-    if end > cltArray.shape[0]:
-        end = cltArray.shape[0]
+    endIdx = startIdx + taskSize
+    if endIdx > cltArray.shape[0]:
+        endIdx = cltArray.shape[0]
 
-    for i in range(start, end):
+    for i in range(startIdx, endIdx):
         if isSomaClt(&cltArray[i]):
             continue
 
