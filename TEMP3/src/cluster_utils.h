@@ -9,6 +9,15 @@
 #include "AIList.h"
 //-------------------------------------------------------------------------------------
 
+/******************************
+ *** Cluster related macros ***
+ ******************************/
+#define CLT_REVERSED            1
+#define CLT_IN_BLACKLIST        2
+#define CLT_ASSEMBLED           4
+#define CLT_SINGLE_FLANK_MAP    8
+#define CLT_BOTH_FLANK_MAP      16
+
 /******************
  *** Structures ***
  ******************/
@@ -53,6 +62,9 @@
  @field  teTid              majority TE-tid of cluster
  @field  isInBlacklist      whether cluster intersects with blacklist
  @field  probability        the probability of the cluster to be a positive insertion
+ @field  insStart           insertion sequence start-pos on assembly (0-based, included)
+ @field  insEnd             insertion sequence end-pos on assembly (0-based, not-included)
+ @field  probability        bitwise flag representing cluster 
  */
 typedef struct {
     int         tid;
@@ -86,6 +98,9 @@ typedef struct {
     int         teTid;
     uint8_t     isInBlacklist;
     float       probability;
+    int         insStart;
+    int         insEnd;
+    uint16_t    flag;
 } __attribute__((packed)) Cluster;
 
 typedef struct {

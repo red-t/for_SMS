@@ -1,5 +1,4 @@
 from .FileIO cimport *
-from .HtslibExternal cimport *
 
 cdef extern from "src/cluster_utils.h" nogil:
     int isValidCandidate(Cluster *cluster)
@@ -29,7 +28,6 @@ cdef extern from "src/seg_utils.h" nogil:
     #########################
     ### Alignment records ###
     #########################
-    int bamIsInvalid(bam1_t *bamRecord)
     void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bamRecord)
     void fillTeArray(bam1_t *bamRecord, TeAlignment *teArray)
     

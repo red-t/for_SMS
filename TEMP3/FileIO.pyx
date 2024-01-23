@@ -237,6 +237,7 @@ cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmd
         outputFileName = "tmp_assm/tmp.{}_{}_assembled.fa".format(tid, i)
         if os.path.isfile(outputFileName):
             if os.path.getsize(outputFileName) != 0:
+                cltArray[i].flag |= CLT_ASSEMBLED
                 continue
         
         outputFasta = BamFile(outputFileName, "wF", cmdArgs.numThread, genomeBam)

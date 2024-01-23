@@ -48,6 +48,18 @@ cdef extern from "src/AIList.h" nogil:
 
 
 cdef extern from "src/cluster_utils.h" nogil:
+    ##############################
+    ### Cluster related macros ###
+    ##############################
+    int CLT_REVERSED
+    int CLT_IN_BLACKLIST
+    int CLT_ASSEMBLED
+    int CLT_SINGLE_FLANK_MAP
+    int CLT_BOTH_FLANK_MAP
+
+    ##################
+    ### Structures ###
+    ##################
     ctypedef packed struct Cluster:
         int         tid
         int         refStart
@@ -80,6 +92,9 @@ cdef extern from "src/cluster_utils.h" nogil:
         int         teTid
         uint8_t     isInBlacklist
         float       probability
+        int         insStart
+        int         insEnd
+        uint16_t    flag
     
     ctypedef struct Args:
         int         numThread
@@ -99,7 +114,14 @@ cdef extern from "src/cluster_utils.h" nogil:
         AiList      *gapAiList
         AiList      *blackAiList
     
+    ########################
+    ### Define Candidate ###
+    ########################
     int overhangIsShort(Segment *segment, int minOverhang)
+
+    ######################
+    ### Local Assembly ###
+    ######################
     int isLowQualClt(Cluster *cluster)
     int isGermClt(Cluster *cluster)
     int isSomaClt(Cluster *cluster)
@@ -107,9 +129,9 @@ cdef extern from "src/cluster_utils.h" nogil:
 
 
 cdef extern from "src/seg_utils.h" nogil:
-    #######################
-    ### Segment records ###
-    #######################
+    ##################
+    ### Structures ###
+    ##################
     ctypedef packed struct Segment:
         uint16_t    flag
         uint8_t     mapQual
@@ -135,13 +157,33 @@ cdef extern from "src/seg_utils.h" nogil:
         int         startIdx
         int         endIdx
         int         teTid
-
-    void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
+    
+    ###############################
+    ### Initialize TeAlignments ###
+    ###############################
+    int bamIsInvalid(bam1_t *bamRecord)
+    
+    ####################
+    ### Trim Segment ###
+    ####################
     int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIdx, int sourceStart, int sourceEnd)
+
+    ######################
+    ### Local Assembly ###
+    ######################
+    void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
 
 
 cdef extern from "src/io_utils.h" nogil:
+    #########################
+    ### Flank Sequence IO ###
+    #########################
     int outputRefFlankSeqs(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
+
+    #############################
+    ### Insertion Sequence IO ###
+    #############################
+    int outputInsSeq(Cluster *cluster)
 
 
 cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs)

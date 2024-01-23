@@ -1,7 +1,8 @@
 import numpy as np
+from .FileIO import outputSomaCltSeqs, outputRefFlank
 from .Cluster import buildCluster
 from .Assemble import assembleCluster
-from .FileIO import outputSomaCltSeqs, outputRefFlank
+from .Annotate import annotateCluster
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
@@ -116,6 +117,15 @@ cpdef dict runInParallel(object cmdArgs):
         
         # 5. Output reference flank sequence for high-qual clusters
         subProcTup = set([executor.submit(outputRefFlank, \
+                                          highQualArray, \
+                                          startIdx, \
+                                          taskSize, \
+                                          cmdArgs) for startIdx in startList])
+        for subProc in as_completed(subProcTup):
+            returnValue = subProc.result()
+        
+        # 6. Annotate clusters
+        subProcTup = set([executor.submit(annotateCluster, \
                                           highQualArray, \
                                           startIdx, \
                                           taskSize, \

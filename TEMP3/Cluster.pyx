@@ -77,6 +77,9 @@ ClusterDt = np.dtype([
     ('teTid',               np.int32),
     ('isInBlacklist',       np.uint8),
     ('probability',         np.float32),
+    ('insEnd',              np.int32),
+    ('insStart',            np.int32),
+    ('flag',                np.uint16),
 ])
 
 
