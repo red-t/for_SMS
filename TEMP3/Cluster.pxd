@@ -20,10 +20,10 @@ cdef extern from "src/seg_utils.h" nogil:
         int16_t flag
         int     teTid
     
-    int fillSegmentArray(bam1_t *bamRecord, Segment *segmentArray, int64_t fileOffset, int minSegmentLength)
+    int fillSegmentArray(bam1_t *bamRecord, Segment *segArray, int64_t fileOffset, int minSegmentLength)
     void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList)
     void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx)
-    void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, int numTeTid)
+    void countTeTids(Segment *segment, TeAlignment *teArray, int *teTidCountTable, int numTeTid)
 
     #########################
     ### Alignment records ###

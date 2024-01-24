@@ -96,7 +96,8 @@ cdef object getSegArray(BamFile genomeBam, Args args):
         returnValue = iterator.cnext1()
         if returnValue < 0:
             del iterator
-            return segArray[:numSeg]
+            segArray.resize((numSeg,), refcheck=False)
+            return segArray
 
         if bamIsInvalid(iterator.bamRcord):
             continue
@@ -156,26 +157,27 @@ cdef mapSegToTE(str teFn, Args args):
 
 
 cdef object getTeArray(Iterator iterator):
-    cdef int returnValue, numTeAlignments=0, maxNum=9900
+    cdef int returnValue, numTeAln=0, maxNum=9900
     cdef object teArray = np.zeros(10000, dtype=TeAlignmentDt)
     cdef TeAlignment[::1] teArrayView = teArray
     
     while True:
         returnValue = iterator.cnext2()
         if returnValue < 0:
-            return teArray[:numTeAlignments]
+            teArray.resize((numTeAln,), refcheck=False)
+            return teArray
 
         if bamIsInvalid(iterator.bamRcord):
             continue
 
-        if numTeAlignments >= maxNum:
+        if numTeAln >= maxNum:
             maxNum = teArray.shape[0] + 10000
             teArray.resize((maxNum,), refcheck=False)
             teArrayView = teArray
             maxNum -= 100
 
-        fillTeArray(iterator.bamRcord, &teArrayView[numTeAlignments])
-        numTeAlignments += 1
+        fillTeArray(iterator.bamRcord, &teArrayView[numTeAln])
+        numTeAln += 1
 
 
 ##########################
@@ -217,7 +219,8 @@ cdef object getCltArray(Segment[::1] segArray, Args args):
         cltArrayView[numClt].refEnd = cltArrayView[numClt].refEnd - args.maxDistance
         startIdx = endIdx; numClt += 1
     
-    return cltArray[:numClt]
+    cltArray.resize((numClt,), refcheck=False)
+    return cltArray
 
 
 cdef updateCltArray(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBam, Args args):

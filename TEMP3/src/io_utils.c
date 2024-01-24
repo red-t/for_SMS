@@ -1,5 +1,57 @@
 #include "io_utils.h"
 
+/****************************
+ *** Segment Sequence IO  ***
+ ****************************/
+
+/// @brief select a segment to output from cluster
+int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
+{
+    int clipIdx = -1;
+    int insIdx = -1;
+    int maxReadLen = 0;
+    int maxClipLen = 0;
+
+    for (int i = cluster->startIdx; i < cluster->endIdx; i++)
+    {
+        Segment *segment = &segArray[i];
+        if (overhangIsShort(segment, args.minOverhang))
+            continue;
+
+        if (isMidInsert(segment)) {
+            if (segment->readLen <= maxReadLen)
+                continue;
+
+            maxReadLen = segment->readLen;
+            insIdx = i;
+            continue;
+        }
+
+        int clipLen = segment->queryEnd - segment->queryStart;
+        if (clipLen > maxClipLen) {
+            maxClipLen = clipLen;
+            clipIdx = i;
+        }
+    }
+
+    if (insIdx > 0)
+        return insIdx;
+        
+    return clipIdx;
+}
+
+/// @brief get extended region of the segment
+void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
+{
+    *startPtr = 0;
+    *endPtr = segment->readLen;
+
+    if (segment->queryStart - flankSize > 0)
+        *startPtr = segment->queryStart - flankSize;
+    if (segment->queryEnd + flankSize < segment->readLen)
+        *endPtr = segment->queryEnd + flankSize;
+}
+
 /*************************
  *** Flank Sequence IO ***
  *************************/
@@ -55,6 +107,7 @@ int outputRefFlankSeqs(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
  *** Insertion Sequence IO ***
  *****************************/
 
+/// @brief adjust insertion sequence region
 int adjustInsRegion(Cluster *cluster, int leftTid, int rightTid, uint32_t leftCigar, uint32_t rightCigar, int leftLen)
 {
     // Only right-flank mapped

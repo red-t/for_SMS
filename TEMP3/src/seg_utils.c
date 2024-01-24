@@ -210,11 +210,9 @@ void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teId
     segment->directionFlag += (1 << 8);
 }
 
-void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, int numTeTid)
+void countTeTids(Segment *segment, TeAlignment *teArray, int *teTidCountTable, int numTeTid)
 {
-    Segment *segment = &segArray[0];
     memset(teTidCountTable, 0, numTeTid * sizeof(int));
-
     for (int i = segment->startIdx; i < segment->endIdx; i++)
         teTidCountTable[teArray[i].teTid] += 1;
 }
@@ -379,16 +377,16 @@ void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr
     destRecord->core.l_qseq = (int)destSeqLen + 1;
 }
 
-/**********************
- *** Local Assembly ***
- **********************/
-void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
-{
-    *startPtr = 0;
-    *endPtr = segment->readLen;
+// /**********************
+//  *** Local Assembly ***
+//  **********************/
+// void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
+// {
+//     *startPtr = 0;
+//     *endPtr = segment->readLen;
 
-    if (segment->queryStart - flankSize > 0)
-        *startPtr = segment->queryStart - flankSize;
-    if (segment->queryEnd + flankSize < segment->readLen)
-        *endPtr = segment->queryEnd + flankSize;
-}
+//     if (segment->queryStart - flankSize > 0)
+//         *startPtr = segment->queryStart - flankSize;
+//     if (segment->queryEnd + flankSize < segment->readLen)
+//         *endPtr = segment->queryEnd + flankSize;
+// }

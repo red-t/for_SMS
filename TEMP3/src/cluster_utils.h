@@ -21,6 +21,7 @@
 /******************
  *** Structures ***
  ******************/
+
 /*! @typedef
  @abstract Structure cluster merged from segments.
  @field  tid                target id of corresponding chromosome
@@ -66,7 +67,8 @@
  @field  insEnd             insertion sequence end-pos on assembly (0-based, not-included)
  @field  probability        bitwise flag representing cluster 
  */
-typedef struct {
+typedef struct Cluster
+{
     int         tid;
     int         refStart;
     int         refEnd;
@@ -103,7 +105,8 @@ typedef struct {
     uint16_t    flag;
 } __attribute__((packed)) Cluster;
 
-typedef struct {
+typedef struct Args
+{
     int         numThread;
     int         tid;
     int         minSegLen;
@@ -250,15 +253,5 @@ static inline void setBackbgInfo(Cluster *cluster, Args args)
  *** Filtering ***
  *****************/
 void intersectBlackList(Cluster *cluster, Args args);
-
-
-/**********************
- *** Local Assembly ***
- **********************/
-#define isLowQualClt(cluster) (((cluster)->isInBlacklist) || ((cluster)->probability <= 0.5))
-#define isGermClt(cluster) ((cluster)->cltType == 0)
-#define isSomaClt(cluster) ((cluster)->cltType != 0)
-
-int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args);
 
 #endif // CLUSTER_UTILS_H

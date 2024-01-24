@@ -10,6 +10,7 @@
 /******************
  *** Structures ***
  ******************/
+
 /*! @typedef
  @abstract Structure for segment extracted from CIGAR.
  @field  flag               alignment flag
@@ -45,7 +46,8 @@
  @field  endIdx             end index in TE alignments array (0-based, not-include)
  @field  teTid              majority TE-tid of the segment
  */
-typedef struct {
+typedef struct Segment
+{
     uint16_t    flag;
     uint8_t     mapQual;
     int         queryStart;
@@ -72,7 +74,8 @@ typedef struct {
     int         teTid;
 } __attribute__((packed)) Segment;
 
-typedef struct {
+typedef struct SegValues
+{
     uint8_t     mapQual;
     uint8_t     numSeg;
     uint8_t     segType;
@@ -97,7 +100,8 @@ typedef struct {
  @field  flag           bitwise flag of the alignment
  @field  teTid          tid of the TE alignment
  */
-typedef struct {
+typedef struct TeAlignment
+{
     int     segIdx;
     int     AlnScore;
     int     queryStart;
@@ -107,7 +111,6 @@ typedef struct {
     int16_t flag;
     int     teTid;
 } __attribute__((packed)) TeAlignment;
-
 
 /***************************
  *** Initialize Segments ***
@@ -158,7 +161,7 @@ static inline int getOverlapQueryMapLen(TeAlignment *teAlignment, TeAlignment *p
 }
 
 void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIdx, int queryMapLen);
-void countTeTids(Segment *segArray, TeAlignment *teArray, int *teTidCountTable, int numTeTid);
+void countTeTids(Segment *segment, TeAlignment *teArray, int *teTidCountTable, int numTeTid);
 
 
 /*******************************
@@ -201,11 +204,5 @@ static inline void bamSetMemPolicy(bam1_t *bamRecord, uint32_t policy) { bamReco
 void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen);
 uint8_t *setDestName(bam1_t *destRecord, char *destName, int destNameLen, int numNulls);
 void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr, int sourceStart, int destSeqLen);
-
-
-/**********************
- *** Local Assembly ***
- **********************/
-void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize);
 
 #endif // SEG_UTILS_H

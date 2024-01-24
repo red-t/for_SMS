@@ -119,14 +119,6 @@ cdef extern from "src/cluster_utils.h" nogil:
     ########################
     int overhangIsShort(Segment *segment, int minOverhang)
 
-    ######################
-    ### Local Assembly ###
-    ######################
-    int isLowQualClt(Cluster *cluster)
-    int isGermClt(Cluster *cluster)
-    int isSomaClt(Cluster *cluster)
-    int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
-
 
 cdef extern from "src/seg_utils.h" nogil:
     ##################
@@ -168,13 +160,17 @@ cdef extern from "src/seg_utils.h" nogil:
     ####################
     int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIdx, int sourceStart, int sourceEnd)
 
-    ######################
-    ### Local Assembly ###
-    ######################
-    void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
-
 
 cdef extern from "src/io_utils.h" nogil:
+    ###########################
+    ### Segment Sequence IO ###
+    ###########################
+    int isLowQualClt(Cluster *cluster)
+    int isSomaClt(Cluster *cluster)
+
+    int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
+    void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
+
     #########################
     ### Flank Sequence IO ###
     #########################

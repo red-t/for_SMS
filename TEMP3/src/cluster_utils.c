@@ -145,37 +145,37 @@ void intersectBlackList(Cluster *cluster, Args args)
 }
 
 
-/**********************
- *** Local Assembly ***
- **********************/
-int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
-{
-    int clipIdx = -1;
-    int insIdx = -1;
-    int maxReadLen = 0;
-    int maxClipLen = 0;
+// /**********************
+//  *** Local Assembly ***
+//  **********************/
+// int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
+// {
+//     int clipIdx = -1;
+//     int insIdx = -1;
+//     int maxReadLen = 0;
+//     int maxClipLen = 0;
 
-    for (int i = cluster->startIdx; i < cluster->endIdx; i++)
-    {
-        Segment *segment = &segArray[i];
-        if (overhangIsShort(segment, args.minOverhang)) continue;
+//     for (int i = cluster->startIdx; i < cluster->endIdx; i++)
+//     {
+//         Segment *segment = &segArray[i];
+//         if (overhangIsShort(segment, args.minOverhang)) continue;
 
-        if (isMidInsert(segment))
-        {
-            if (segment->readLen <= maxReadLen) continue;
-            maxReadLen = segment->readLen;
-            insIdx = i;
-            continue;
-        }
+//         if (isMidInsert(segment))
+//         {
+//             if (segment->readLen <= maxReadLen) continue;
+//             maxReadLen = segment->readLen;
+//             insIdx = i;
+//             continue;
+//         }
 
-        int clipLen = segment->queryEnd - segment->queryStart;
-        if (clipLen > maxClipLen)
-        {
-            maxClipLen = clipLen;
-            clipIdx = i;
-        }
-    }
+//         int clipLen = segment->queryEnd - segment->queryStart;
+//         if (clipLen > maxClipLen)
+//         {
+//             maxClipLen = clipLen;
+//             clipIdx = i;
+//         }
+//     }
 
-    if (insIdx > 0) return insIdx;
-    return clipIdx;
-}
+//     if (insIdx > 0) return insIdx;
+//     return clipIdx;
+// }
