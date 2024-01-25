@@ -135,6 +135,7 @@ int adjustInsRegion(Cluster *cluster, int leftTid, int rightTid, uint32_t leftCi
 
     // Two flanks map to same contig, but only right is qualified
     if (bam_cigar_op(leftCigar) == BAM_CSOFT_CLIP && bam_cigar_oplen(leftCigar) > 400) {
+        cluster->insStart = 0;
         cluster->flag |= CLT_SINGLE_FLANK_MAP;
         return rightTid;
     }
