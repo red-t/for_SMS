@@ -7,12 +7,12 @@ from subprocess import Popen, DEVNULL
 ##################
 AnnoDt = np.dtype([
     ('idx',         np.int32),
-    ('refStart',    np.int32),
-    ('refEnd',      np.int32),
-    ('tid',         np.int32),
-    ('strand',      np.uint8),
     ('queryStart',  np.int32),
     ('queryEnd',    np.int32),
+    ('strand',      np.uint8),
+    ('tid',         np.int32),
+    ('refStart',    np.int32),
+    ('refEnd',      np.int32),
 ])
 
 
@@ -60,23 +60,28 @@ cdef mapInsToTE(int tid, int idx, object cmdArgs):
 ##########################
 ### Annotate Insertion ###
 ##########################
-# cdef annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
-#     cdef int i, returnValue, numAnno=0, maxNum=9900
-#     cdef object annoArray = np.zeros(10000, dtype=AnnoDt)
-#     cdef Anno[::1] annoArrayView = annoArray
+cdef annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
+    cdef int i, returnValue, numAnno=0, maxNum=9900
+    cdef object annoArray = np.zeros(10000, dtype=AnnoDt)
+    cdef Anno[::1] annoArrayView = annoArray
+    cdef str bamFn
 
-#     for i in range(startIdx, endIdx):
-#         if numAnno >= maxNum:
-#             maxNum = annoArrayView.shape[0] + 10000
-#             annoArray.resize((maxNum,), refcheck=False)
-#             annoArrayView = annoArray
-#             maxNum -= 100
+    for i in range(startIdx, endIdx):
+        bamFn = "tmp_anno/{}_{}_InsToTE.bam".format(cltArray[i].tid, cltArray[i].idx)
+        if os.path.isfile(bamFn) == False:
+            continue
 
-#         returnValue = fillAnnoArray(&cltArray[i], &annoArrayView[0])
-#         numAnno += returnValue
+        if numAnno >= maxNum:
+            maxNum = annoArrayView.shape[0] + 10000
+            annoArray.resize((maxNum,), refcheck=False)
+            annoArrayView = annoArray
+            maxNum -= 100
+
+        returnValue = fillAnnoArray(&cltArray[i], &annoArrayView[numAnno], i)
+        numAnno += returnValue
     
-#     annoArray.resize((numAnno,), refcheck=False)
-#     annoArray.sort(order=['idx', 'queryStart', 'queryEnd'])
+    annoArray.resize((numAnno,), refcheck=False)
+    annoArray.sort(order=['idx', 'queryStart', 'queryEnd'])
 
 
 ###################################
@@ -88,3 +93,4 @@ cpdef annotateCluster(Cluster[::1] cltArray, int startIdx, int taskSize, object 
         endIdx = cltArray.shape[0]
     
     annotateAssm(cltArray, startIdx, endIdx, cmdArgs)
+    annotateIns(cltArray, startIdx, endIdx)

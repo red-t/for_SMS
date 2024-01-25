@@ -16,11 +16,11 @@ ext = [
               libraries = ["hts"]),
     
     Extension(name = "TEMP3.Annotate",
-              sources = ["TEMP3/Annotate.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c", "TEMP3/src/io_utils.c"],
+              sources = ["TEMP3/Annotate.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c", "TEMP3/src/io_utils.c", "TEMP3/src/anno_utils.c"],
               libraries = ["hts"]),
     
     Extension(name = "TEMP3.ParallelModule",
-              sources = ["TEMP3/ParallelModule.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c", "TEMP3/src/io_utils.c"],
+              sources = ["TEMP3/ParallelModule.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c", "TEMP3/src/io_utils.c", "TEMP3/src/anno_utils.c"],
               libraries = ["hts"]),
     ]
 

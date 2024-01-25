@@ -376,17 +376,3 @@ void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr
     memcpy(destDataPtr, sourceSeqPtr, (destSeqLen+1) >> 1);
     destRecord->core.l_qseq = (int)destSeqLen + 1;
 }
-
-// /**********************
-//  *** Local Assembly ***
-//  **********************/
-// void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
-// {
-//     *startPtr = 0;
-//     *endPtr = segment->readLen;
-
-//     if (segment->queryStart - flankSize > 0)
-//         *startPtr = segment->queryStart - flankSize;
-//     if (segment->queryEnd + flankSize < segment->readLen)
-//         *endPtr = segment->queryEnd + flankSize;
-// }

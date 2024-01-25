@@ -73,7 +73,7 @@ cdef tuple divideTasks(int numTasks, int poolSize):
     return taskSize, startList
 
 
-cpdef dict runInParallel(object cmdArgs):    
+cpdef object runInParallel(object cmdArgs):    
     cdef set subProcTup
     cdef dict allCltData = {}, tidToCltData, bgInfo
     cdef object subProc, assembleArray, returnValue
