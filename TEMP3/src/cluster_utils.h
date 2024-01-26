@@ -18,7 +18,7 @@
 #define CLT_SINGLE_FLANK_MAP    8
 #define CLT_BOTH_FLANK_MAP      16
 #define CLT_TE_MAP              32
-#define CLT_POLY_A              64
+#define CLT_POLYA               64
 
 /******************
  *** Structures ***
