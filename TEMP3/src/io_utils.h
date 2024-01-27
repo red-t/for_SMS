@@ -16,14 +16,28 @@
 int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args);
 
 /// @brief get extended region of the segment
-void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize);
+void setTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize);
 
 /*************************
  *** Flank Sequence IO ***
  *************************/
 
+typedef struct FlankRegion
+{
+    int start1;
+    int start2;
+    int end1;
+    int end2;
+} FlankRegion;
+
 /// @brief extract and output flank sequence for all clusters
-int outputRefFlankSeqs(char *refFn, Cluster *cltArray, int startIdx, int endIdx);
+void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx);
+
+/// @brief define flank region on ref-genome
+void setFlankRegion(Cluster *cluster, FlankRegion *region);
+
+/// @brief output flank-seq for single cluster
+void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region);
 
 /*****************************
  *** Insertion Sequence IO ***
@@ -46,7 +60,7 @@ typedef struct InsRegion
 } InsRegion;
 
 /// @brief extract and output insertion-seq and flank-seq
-int extractIns(Cluster *cluster);
+void extractIns(Cluster *cluster);
 
 /// @brief define insertion sequence region
 void setInsRegion(int cltTid, int cltIdx, InsRegion *region);

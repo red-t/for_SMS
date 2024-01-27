@@ -253,7 +253,7 @@ cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFasta, Iterator iterato
     cdef int start, end, returnValue
 
     returnValue = iterator.cnext3(segArray[j].fileOffset)
-    getTrimRegion(&segArray[j], &start, &end, flankSize)
+    setTrimRegion(&segArray[j], &start, &end, flankSize)
     trimSegment(iterator.bamRcord, destRecord, j, start, end)
     outputFasta.write(destRecord)
 
@@ -267,4 +267,4 @@ cpdef outputRefFlank(Cluster[::1] cltArray, int startIdx, int taskSize, object c
         endIdx = cltArray.shape[0]
     
     cdef bytes refFn = cmdArgs.refFn.encode('utf-8')
-    outputRefFlankSeqs(refFn, &cltArray[0], startIdx, endIdx)
+    extractRefFlanks(refFn, &cltArray[0], startIdx, endIdx)

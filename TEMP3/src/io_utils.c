@@ -41,7 +41,7 @@ int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
 }
 
 /// @brief get extended region of the segment
-void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
+void setTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
 {
     *startPtr = 0;
     *endPtr = segment->readLen;
@@ -56,51 +56,70 @@ void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
  *** Flank Sequence IO ***
  *************************/
 
-/// @brief define flank region on ref-genome
-int getFlankRegion(Cluster *cluster, int *leftStart, int *leftEnd, int *rightStart, int *rightEnd)
+FlankRegion initFlankRegion()
 {
-    if (cluster->refEnd - cluster->refStart == 1)
-    {
-        *leftStart = cluster->refEnd - 450;
-        *leftEnd = cluster->refEnd + 50;
-        *rightStart = cluster->refStart - 50;
-        *rightEnd = cluster->refStart + 450;
-        return 0;
-    }
-
-    *leftStart = cluster->refEnd - 500;
-    *leftEnd = cluster->refEnd;
-    *rightStart = cluster->refStart;
-    *rightEnd = cluster->refStart + 500;
-    return 0;
+    FlankRegion region;
+    region.start1 = 0;
+    region.start2 = 0;
+    region.end1 = 0;
+    region.end2 = 0;
+    return region;
 }
 
-/// @brief extract and output flank sequence for all clusters
-int outputRefFlankSeqs(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
+/// @brief extract and output flank-seq for all clusters from genome
+void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
 {
-    hts_pos_t seqLen;
-    int leftStart, leftEnd, rightStart, rightEnd;
-    faidx_t *refFa = fai_load((const char*)refFn);
-    char *outFn = (char *)malloc(100 * sizeof(char));
+    FlankRegion region = initFlankRegion();
+    faidx_t *refFa = fai_load((const char *)refFn);
 
     for (int i = startIdx; i < endIdx; i++)
     {
         Cluster *cluster = &cltArray[i];
-        getFlankRegion(cluster, &leftStart, &leftEnd, &rightStart, &rightEnd);
-        const char *chrom = faidx_iseq(refFa, cluster->tid);
-        char *leftSeq = faidx_fetch_seq64(refFa, chrom, leftStart, leftEnd, &seqLen);
-        char *rightSeq = faidx_fetch_seq64(refFa, chrom, rightStart, rightEnd, &seqLen);
-
-        sprintf(outFn, "tmp_anno/%d_%d_flank.fa", cluster->tid, cluster->idx);
-        FILE *fp = fopen(outFn, "w");
-        fprintf(fp, ">0\n%s\n", leftSeq);
-        fprintf(fp, ">1\n%s\n", rightSeq);
-        fclose(fp);
+        setFlankRegion(cluster, &region);
+        outputFlank(cluster, refFa, region);
     }
 
     if (refFa != NULL) {fai_destroy(refFa); refFa=NULL;}
+}
+
+/// @brief define flank region on ref-genome
+void setFlankRegion(Cluster *cluster, FlankRegion *region)
+{
+    // cluster position is a point
+    if (cluster->refEnd - cluster->refStart == 1) {
+        region->start1 = cluster->refEnd - 450;
+        region->end1 = cluster->refEnd + 50;
+        region->start2 = cluster->refStart - 50;
+        region->end2 = cluster->refStart + 450;
+        return;
+    }
+
+    // cluster position is a region
+    region->start1 = cluster->refEnd - 500;
+    region->end1 = cluster->refEnd;
+    region->start2 = cluster->refStart;
+    region->end2 = cluster->refStart + 500;
+    return;
+}
+
+/// @brief output flank-seq for single cluster
+void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region)
+{
+    hts_pos_t seqLen;
+    const char *chrom = faidx_iseq(refFa, cluster->tid);
+    char *leftSeq = faidx_fetch_seq64(refFa, chrom, region.start1, region.end1, &seqLen);
+    char *rightSeq = faidx_fetch_seq64(refFa, chrom, region.start2, region.end2, &seqLen);
+
+    char *outFn = (char *)malloc(100 * sizeof(char));
+    sprintf(outFn, "tmp_anno/%d_%d_flank.fa", cluster->tid, cluster->idx);
+    FILE *fp = fopen(outFn, "w");
+    fprintf(fp, ">0\n%s\n", leftSeq);
+    fprintf(fp, ">1\n%s\n", rightSeq);
+    fclose(fp);
+
+    if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
+    if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
     if (outFn != NULL) {free(outFn); outFn=NULL;}
-    return 0;
 }
 
 /*****************************
@@ -121,14 +140,14 @@ InsRegion initInsRegion()
     return region;
 }
 
-/// @brief extract and output insertion-seq and flank-seq
-int extractIns(Cluster *cluster)
+/// @brief extract and output insertion-seq and flank-seq from assembly
+void extractIns(Cluster *cluster)
 {
     InsRegion region = initInsRegion();
     setInsRegion(cluster->tid, cluster->idx, &region);
     cluster->flag |= region.flag;
     if (!isFlankMapped(region.flag))
-        return 0;
+        return;
 
     char *assmFn = (char *)malloc(100 * sizeof(char));
     sprintf(assmFn, "tmp_assm/tmp.%d_%d_assembled.fa", cluster->tid, cluster->idx);
@@ -139,7 +158,7 @@ int extractIns(Cluster *cluster)
 
     if (assmFn != NULL) {free(assmFn); assmFn=NULL;}
     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
-    return 0;
+    return;
 }
 
 /// @brief define insertion sequence region

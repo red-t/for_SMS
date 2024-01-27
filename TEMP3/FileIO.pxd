@@ -167,17 +167,17 @@ cdef extern from "src/io_utils.h" nogil:
     int isSomaClt(Cluster *cluster)
 
     int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
-    void getTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
+    void setTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
 
     #########################
     ### Flank Sequence IO ###
     #########################
-    int outputRefFlankSeqs(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
+    void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
 
     #############################
     ### Insertion Sequence IO ###
     #############################
-    int extractIns(Cluster *cluster)
+    void extractIns(Cluster *cluster)
 
 
 cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs)
