@@ -77,6 +77,7 @@ void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
         Cluster *cluster = &cltArray[i];
         setFlankRegion(cluster, &region);
         outputFlank(cluster, refFa, region);
+        outputRefLocal(cluster, refFa, region);
     }
 
     if (refFa != NULL) {fai_destroy(refFa); refFa=NULL;}
@@ -119,6 +120,24 @@ void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region)
 
     if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
     if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
+    if (outFn != NULL) {free(outFn); outFn=NULL;}
+}
+
+/// @brief output +-500bp around cluster position for tsd annotation
+void outputRefLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region)
+{
+    hts_pos_t seqLen;
+    int start = (region.start1 < 0) ? 0 : region.start1;
+    const char *chrom = faidx_iseq(refFa, cluster->tid);
+    char *localSeq = faidx_fetch_seq64(refFa, chrom, start, region.end2, &seqLen);
+
+    char *outFn = (char *)malloc(100 * sizeof(char));
+    sprintf(outFn, "tmp_anno/%d_%d_refLocal.fa", cluster->tid, cluster->idx);
+    FILE *fp = fopen(outFn, "w");
+    fprintf(fp, ">%d\n%s\n", start, localSeq);
+    fclose(fp);
+
+    if (localSeq != NULL) {free(localSeq); localSeq=NULL;}
     if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
 

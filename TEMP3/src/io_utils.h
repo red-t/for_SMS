@@ -39,6 +39,9 @@ void setFlankRegion(Cluster *cluster, FlankRegion *region);
 /// @brief output flank-seq for single cluster
 void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region);
 
+/// @brief output +-500bp around cluster position for tsd annotation
+void outputRefLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region);
+
 /*****************************
  *** Insertion Sequence IO ***
  *****************************/
@@ -48,7 +51,7 @@ void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region);
 #define isFlankMapped(flag) (((flag) & 120) != 0)
 #define isBothFlankMapped(flag) (((flag) & 96) != 0)
 
-typedef struct InsRegion
+    typedef struct InsRegion
 {
     int start2;
     int end1;
