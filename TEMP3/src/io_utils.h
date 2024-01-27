@@ -30,8 +30,34 @@ int outputRefFlankSeqs(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
  *****************************/
 #define bamIsSup(bamRecord) (((bamRecord)->core.flag & BAM_FSUPPLEMENTARY) != 0)
 #define isLeftFlank(bamRecord) (strcmp(bam_get_qname((bamRecord)), "0") == 0)
+#define isClipInFlank(cigar) (bam_cigar_op((cigar)) == BAM_CSOFT_CLIP && bam_cigar_oplen((cigar)) > 400)
+#define isFlankMapped(flag) (((flag) & 120) != 0)
 
-/// @brief extract and output insertion sequence for single cluster
-int outputInsSeq(Cluster *cluster);
+typedef struct InsRegion
+{
+    int start2;
+    int end1;
+    int tid1;
+    int tid2;
+    int len1;
+    uint32_t cigar1;
+    uint32_t cigar2;
+    uint16_t flag;
+} InsRegion;
+
+/// @brief extract and output insertion-seq and flank-seq
+int extractIns(Cluster *cluster);
+
+/// @brief define insertion sequence region
+void setInsRegion(int cltTid, int cltIdx, InsRegion *region);
+
+/// @brief adjust region->flag
+void adjustInsRegion(InsRegion *region);
+
+/// @brief output insertion sequence in FASTA format
+void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region);
+
+/// @brief get insertion sequence
+char *getInsSeq(faidx_t *assmFa, InsRegion region);
 
 #endif // IO_UTILS_H

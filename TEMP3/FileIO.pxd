@@ -92,8 +92,6 @@ cdef extern from "src/cluster_utils.h" nogil:
         int         teTid
         uint8_t     isInBlacklist
         float       probability
-        int         insStart
-        int         insEnd
         uint16_t    flag
     
     ctypedef struct Args:
@@ -179,7 +177,7 @@ cdef extern from "src/io_utils.h" nogil:
     #############################
     ### Insertion Sequence IO ###
     #############################
-    int outputInsSeq(Cluster *cluster)
+    int extractIns(Cluster *cluster)
 
 
 cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs)

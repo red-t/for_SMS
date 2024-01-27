@@ -24,7 +24,7 @@ cdef annotateAssm(Cluster[::1] cltArray, int startIdx, int endIdx, object cmdArg
 
     for i in range(startIdx, endIdx):
         mapFlankToAssm(cltArray[i].tid, cltArray[i].idx)
-        outputInsSeq(&cltArray[i])
+        extractIns(&cltArray[i])
         mapInsToTE(cltArray[i].tid, cltArray[i].idx, cmdArgs)
         
 
@@ -60,7 +60,7 @@ cdef mapInsToTE(int tid, int idx, object cmdArgs):
 ##########################
 ### Annotate Insertion ###
 ##########################
-cdef annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
+cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
     cdef int i, returnValue, numAnno=0, maxNum=9900
     cdef object annoArray = np.zeros(10000, dtype=AnnoDt)
     cdef Anno[::1] annoArrayView = annoArray
@@ -83,6 +83,10 @@ cdef annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
     annoArray.resize((numAnno,), refcheck=False)
     annoArray.sort(order=['idx', 'queryStart', 'queryEnd'])
 
+    ##
+    return annoArray
+    ##
+
 
 ###################################
 ### Annotate Insertion Sequence ###
@@ -93,4 +97,8 @@ cpdef annotateCluster(Cluster[::1] cltArray, int startIdx, int taskSize, object 
         endIdx = cltArray.shape[0]
     
     annotateAssm(cltArray, startIdx, endIdx, cmdArgs)
-    annotateIns(cltArray, startIdx, endIdx)
+
+    ##
+    annoArray = annotateIns(cltArray, startIdx, endIdx)
+    np.savetxt('tmp_anno_{}.txt'.format(startIdx), annoArray, fmt='%d\t%d\t%d\t%d\t%d\t%d\t%d')
+    ##
