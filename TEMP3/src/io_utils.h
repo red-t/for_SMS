@@ -46,6 +46,7 @@ void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region);
 #define isLeftFlank(bamRecord) (strcmp(bam_get_qname((bamRecord)), "0") == 0)
 #define isClipInFlank(cigar) (bam_cigar_op((cigar)) == BAM_CSOFT_CLIP && bam_cigar_oplen((cigar)) > 400)
 #define isFlankMapped(flag) (((flag) & 120) != 0)
+#define isBothFlankMapped(flag) (((flag) & 96) != 0)
 
 typedef struct InsRegion
 {
@@ -73,5 +74,8 @@ void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region);
 
 /// @brief get insertion sequence
 char *getInsSeq(faidx_t *assmFa, InsRegion region);
+
+/// @brief output flank sequences from assembly for tsd annotation
+void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region);
 
 #endif // IO_UTILS_H

@@ -154,7 +154,7 @@ void extractIns(Cluster *cluster)
     faidx_t *assmFa = fai_load((const char *)assmFn);
 
     outputInsSeq(cluster, assmFa, region);
-    // outputTsdSeq(cluster, assmFa, region);
+    outputTsdSeq(cluster, assmFa, region);
 
     if (assmFn != NULL) {free(assmFn); assmFn=NULL;}
     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
@@ -286,4 +286,26 @@ char *getInsSeq(faidx_t *assmFa, InsRegion region)
     }
 
     return NULL;
+}
+
+/// @brief output flank sequences from assembly for tsd annotation
+void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
+{
+    if (!isBothFlankMapped(region.flag))
+        return;
+
+    hts_pos_t seqLen;
+    char *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), (region.end1-100), region.end1, &seqLen);
+    char *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), region.start2, (region.start2+100), &seqLen);
+
+    char *outFn = (char *)malloc(100 * sizeof(char));
+    sprintf(outFn, "tmp_anno/%d_%d_tsd.fa", cluster->tid, cluster->idx);
+    FILE *fp = fopen(outFn, "w");
+    fprintf(fp, ">0\n%s\n", leftSeq);
+    fprintf(fp, ">1\n%s\n", rightSeq);
+    fclose(fp);
+
+    if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
+    if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
+    if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
