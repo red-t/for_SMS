@@ -287,17 +287,17 @@ char *getInsSeq(faidx_t *assmFa, InsRegion region)
         return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, region.start2, &seqLen);
 
     if ((region.flag & CLT_DIFF_FLANK_MAP) != 0) {
-        hts_pos_t len1, len2;
-        char *seq1 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, region.len1, &len1);
-        char *seq2 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), 0, region.start2, &len2);
+        char *seq1 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, region.len1, &seqLen);
+        char *seq2 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), 0, region.start2, &seqLen);
 
-        seqLen = len1 + len2 + 100;
-        char *temp = (char *)malloc((seqLen + 1) * sizeof(char));
-        char *insSeq = temp;
+        int len1 = strlen(seq1), len2 = strlen(seq2);
+        seqLen = len1 + len2 + 200;
+        char *insSeq = (char *)malloc((seqLen + 1) * sizeof(char));
+        char *temp = insSeq;
         memcpy(temp, seq1, len1); temp += len1;
-        memset(temp, 'N', 100); temp += 100;
+        memset(temp, 'N', 200); temp += 200;
         memcpy(temp, seq2, len2);
-        temp[seqLen] = '\0';
+        insSeq[seqLen] = '\0';
 
         if (seq1 != NULL) {free(seq1); seq1=NULL;}
         if (seq2 != NULL) {free(seq2); seq2=NULL;}
