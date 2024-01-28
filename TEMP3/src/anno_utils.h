@@ -2,7 +2,7 @@
 #define ANNO_UTILS_H
 
 #include "htslib/faidx.h"
-#include "cluster_utils.h"
+#include "io_utils.h"
 
 /******************
  *** Data Types ***
@@ -34,5 +34,11 @@ int annoPolyA(Cluster *cluster, int idx, Anno *annoArray, int numAnno, int leftM
 
 /// @brief find polyA/polyT region and init single annotate records
 int getPolyA(char *flankSeq, int seqLen, int idx, int isA, Anno *annoArray, int numAnno, int rightMost, int leftIdx, int rightIdx);
+
+/// @brief annotate TSD and refine breakpoint for cluster for single cluster
+void annoTsd(Cluster *cluster);
+
+/// @brief set TSD and refine breakpoint for cluster
+void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart);
 
 #endif // ANNO_UTILS_H

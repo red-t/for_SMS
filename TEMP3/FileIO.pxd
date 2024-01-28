@@ -93,6 +93,8 @@ cdef extern from "src/cluster_utils.h" nogil:
         uint8_t     isInBlacklist
         float       probability
         uint16_t    flag
+        int         tsdStart
+        int         tsdEnd
     
     ctypedef struct Args:
         int         numThread

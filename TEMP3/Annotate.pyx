@@ -26,6 +26,7 @@ cdef annotateAssm(Cluster[::1] cltArray, int startIdx, int endIdx, object cmdArg
         mapFlankToAssm(cltArray[i].tid, cltArray[i].idx)
         extractIns(&cltArray[i])
         mapInsToTE(cltArray[i].tid, cltArray[i].idx, cmdArgs)
+        mapTsdToRefLocal(cltArray[i].tid, cltArray[i].idx)
         
 
 cdef mapFlankToAssm(int tid, int idx):
@@ -57,6 +58,22 @@ cdef mapInsToTE(int tid, int idx, object cmdArgs):
         raise Exception("Error: minimap2 failed for {}".format(queryFn))
 
 
+cdef mapTsdToRefLocal(int tid, int idx):
+    cdef int exitCode
+    cdef str targetFn = "tmp_anno/{}_{}_refLocal.fa".format(tid, idx)
+    cdef str queryFn = "tmp_anno/{}_{}_tsd.fa".format(tid, idx)
+    cdef str outFn = "tmp_anno/{}_{}_TsdToRefLocal.bam".format(tid, idx)
+    cdef str cmd = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t 1 -aY {} {} | " \
+                   "samtools view -bhS -o {} -".format(targetFn, queryFn, outFn)
+    if os.path.isfile(queryFn) == False:
+        return
+
+    process = Popen([cmd], stderr=DEVNULL, shell=True, executable='/bin/bash')
+    exitCode = process.wait()
+    if exitCode != 0:
+        raise Exception("Error: minimap2 failed for {}".format(queryFn))
+
+
 ##########################
 ### Annotate Insertion ###
 ##########################
@@ -78,6 +95,7 @@ cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
             maxNum -= 100
 
         returnValue = fillAnnoArray(&cltArray[i], &annoArrayView[numAnno], i)
+        annoTsd(&cltArray[i])
         numAnno += returnValue
     
     annoArray.resize((numAnno,), refcheck=False)
@@ -101,4 +119,11 @@ cpdef annotateCluster(Cluster[::1] cltArray, int startIdx, int taskSize, object 
     ##
     annoArray = annotateIns(cltArray, startIdx, endIdx)
     np.savetxt('tmp_anno_{}.txt'.format(startIdx), annoArray, fmt='%d\t%d\t%d\t%d\t%d\t%d\t%d')
+
+    cdef int numTsd = 0
+    for i in range(cltArray.shape[0]):
+        if (cltArray[i].flag & 512) != 0:
+            numTsd += 1
+    
+    print("numTsd:\t{}".format(numTsd))
     ##

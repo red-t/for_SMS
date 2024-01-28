@@ -166,3 +166,71 @@ int getPolyA(char *flankSeq, int seqLen, int idx, int isA, Anno *annoArray, int 
     numAnno++;
     return numAnno;
 }
+
+/// @brief annotate TSD and refine breakpoint for cluster for single cluster
+void annoTsd(Cluster *cluster)
+{
+    if (!isBothFlankMapped(cluster->flag))
+        return;
+
+    char *inputFn = (char *)malloc(100 * sizeof(char));
+    sprintf(inputFn, "tmp_anno/%d_%d_TsdToRefLocal.bam", cluster->tid, cluster->idx);
+    htsFile *inputBam = sam_open(inputFn, "rb");
+    sam_hdr_t *header = sam_hdr_read(inputBam);
+    bam1_t *bamRecord = bam_init1();
+
+    int leftEnd = -1, rightStart = -1;
+    while (1)
+    {
+        int returnValue = bam_read1(inputBam->fp.bgzf, bamRecord);
+        if (returnValue < 0)
+            break;
+        if (bamIsInvalid(bamRecord) || bamIsSup(bamRecord) || bam_is_rev(bamRecord))
+            continue;
+
+        if (isLeftFlank(bamRecord))
+            leftEnd = bam_endpos(bamRecord);
+        else
+            rightStart = bamRecord->core.pos;
+    }
+
+    setTsd(cluster, atoi(sam_hdr_tid2name(header, 0)), leftEnd, rightStart);
+
+    if (bamRecord != NULL) {bam_destroy1(bamRecord); bamRecord=NULL;}
+    if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
+    if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
+    if (inputFn != NULL) {free(inputFn); inputFn=NULL;}
+}
+
+/// @brief set TSD and refine breakpoint for cluster
+void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
+{
+    if (leftEnd < 0 && rightStart < 0)
+        return;
+    
+    if (leftEnd < 0) {
+        cluster->refEnd = localStart + rightStart;
+        cluster->refStart = cluster->refEnd - 1;
+        return;
+    }
+
+    if (rightStart < 0) {
+        cluster->refStart = localStart + leftEnd;
+        cluster->refEnd = cluster->refStart + 1;
+        return;
+    }
+
+    if (rightStart < leftEnd && (leftEnd - rightStart) < 50) {
+        cluster->flag |= CLT_TSD;
+        cluster->refStart = localStart + rightStart;
+        cluster->refEnd = cluster->refStart + 1;
+        cluster->tsdStart = localStart + rightStart;
+        cluster->tsdEnd = localStart + leftEnd;
+        return;
+    }
+
+    if (rightStart > leftEnd) {
+        cluster->refStart = localStart + leftEnd;
+        cluster->refEnd = localStart + rightStart;
+    }
+}

@@ -21,6 +21,7 @@
 #define CLT_SAME_FLANK_MAP      64
 #define CLT_TE_MAP              128
 #define CLT_POLYA               256
+#define CLT_TSD                 512
 
 /******************
  *** Structures ***
@@ -103,6 +104,8 @@ typedef struct Cluster
     uint8_t     isInBlacklist;
     float       probability;
     uint16_t    flag;
+    int         tsdStart;
+    int         tsdEnd;
 } __attribute__((packed)) Cluster;
 
 typedef struct Args

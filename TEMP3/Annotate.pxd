@@ -17,5 +17,6 @@ cdef extern from "src/anno_utils.h" nogil:
     ### Annotate Insertion sequence ###
     ###################################
     int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
+    void annoTsd(Cluster *cluster)
 
 cpdef annotateCluster(Cluster[::1] cltArray, int startIdx, int taskSize, object cmdArgs)
