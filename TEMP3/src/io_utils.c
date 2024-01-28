@@ -169,7 +169,7 @@ void extractIns(Cluster *cluster)
         return;
 
     char *assmFn = (char *)malloc(100 * sizeof(char));
-    sprintf(assmFn, "tmp_assm/tmp.%d_%d_assembled.fa", cluster->tid, cluster->idx);
+    sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", cluster->tid, cluster->idx);
     faidx_t *assmFa = fai_load((const char *)assmFn);
 
     outputInsSeq(cluster, assmFa, region);

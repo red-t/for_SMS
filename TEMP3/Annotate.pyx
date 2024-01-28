@@ -30,7 +30,7 @@ cdef annotateAssm(Cluster[::1] cltArray, int startIdx, int endIdx, object cmdArg
 
 cdef mapFlankToAssm(int tid, int idx):
     cdef int exitCode
-    cdef str targetFn = "tmp_assm/tmp.{}_{}_assembled.fa".format(tid, idx)
+    cdef str targetFn = "tmp_assm/{}_{}_assembled.fa".format(tid, idx)
     cdef str queryFn = "tmp_anno/{}_{}_flank.fa".format(tid, idx)
     cdef str outFn = "tmp_anno/{}_{}_FlankToAssm.bam".format(tid, idx)
     cdef str cmd = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t 1 -aY {} {} | " \

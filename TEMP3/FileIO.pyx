@@ -207,7 +207,7 @@ cdef outputGermCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile gen
         if isLowQualClt(&cltArray[i]) or isSomaClt(&cltArray[i]):
             continue
 
-        outputFileName = "tmp_assm/tmp.{}_{}.fa".format(args.tid, i)
+        outputFileName = "tmp_assm/{}_{}.fa".format(args.tid, i)
         outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBam)
         for j in range(cltArray[i].startIdx, cltArray[i].endIdx):
             if overhangIsShort(&segArray[j], args.minOverhang):
@@ -234,7 +234,7 @@ cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmd
             continue
         
         # Skip successfully assembled clusters
-        outputFileName = "tmp_assm/tmp.{}_{}_assembled.fa".format(tid, i)
+        outputFileName = "tmp_assm/{}_{}_assembled.fa".format(tid, i)
         if os.path.isfile(outputFileName):
             if os.path.getsize(outputFileName) != 0:
                 cltArray[i].flag |= CLT_ASSEMBLED
