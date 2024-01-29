@@ -1,5 +1,6 @@
 #ifndef CLUSTER_UTILS_H
 #define CLUSTER_UTILS_H
+
 #include <stdint.h>
 #include <math.h>
 #include "htslib/bgzf.h"
@@ -7,7 +8,6 @@
 #include "htslib/sam.h"
 #include "seg_utils.h"
 #include "AIList.h"
-//-------------------------------------------------------------------------------------
 
 /******************************
  *** Cluster related macros ***
@@ -23,15 +23,15 @@
 #define CLT_POLYA               256
 #define CLT_TSD                 512
 
+
 /******************
  *** Structures ***
  ******************/
 
-/*! @typedef
- @abstract Structure cluster merged from segments.
+/*! @brief Data container for cluster merged from segments.
  @field  tid                target id of corresponding chromosome
- @field  refStart           cluster start on reference sequence (0-based, included)
- @field  refEnd             cluster end on reference sequence (0-based, not-included)
+ @field  refStart           cluster start on reference genome (0-based, included)
+ @field  refEnd             cluster end on reference genome (0-based, not-included)
  @field  idx                cluster index in clusters array (0-based)
  @field  startIdx           start index in segments array (0-based, include)
  @field  endIdx             end index in segments array (0-based, not-include)
@@ -68,7 +68,9 @@
  @field  teTid              majority TE-tid of cluster
  @field  isInBlacklist      whether cluster intersects with blacklist
  @field  probability        the probability of the cluster to be a positive insertion
- @field  probability        bitwise flag representing cluster 
+ @field  flag               bitwise flag representing cluster features
+ @field  tsdStart           TSD start on reference genome (0-based, included)
+ @field  tsdEnd             TSD end on reference genome (0-based, not-included)
  */
 typedef struct Cluster
 {
@@ -108,6 +110,7 @@ typedef struct Cluster
     int         tsdEnd;
 } __attribute__((packed)) Cluster;
 
+/// @brief Data container for arguments
 typedef struct Args
 {
     int         numThread;
@@ -132,6 +135,8 @@ typedef struct Args
 /**********************
  *** Update Cluster ***
  **********************/
+
+/// @brief Update cluster values by segments features and background info
 void updateCluster(Cluster *cltArray, Segment *segArray, Args args);
 
 
@@ -142,7 +147,10 @@ void updateCluster(Cluster *cltArray, Segment *segArray, Args args);
 #define nameIsSame(record1, record2) (strcmp(bam_get_qname((record1)), bam_get_qname((record2))) == 0)
 #define isValidCandidate(cluster) ((cluster)->teAlignedFrac >= 0.8)
 
+/// @brief Compute TE-aligned-fraction of a cluster
 void setTeAlignedFrac(Cluster *cluster, Segment *segArray, Args args);
+
+/// @brief Set cluster's cltType, which represent the cluster is germ/soma
 void setCltType(Cluster *cluster, Segment *segArray, Args args);
 
 
@@ -154,107 +162,56 @@ void setCltType(Cluster *cluster, Segment *segArray, Args args);
 #define directionIsConsistent(record) (((record)->directionFlag & 255) > ((record)->directionFlag >> 8))
 #define directionIsInconsistent(record) (((record)->directionFlag & 255) < ((record)->directionFlag >> 8))
 
+/// @brief Update cluster values by all segments
 void updateBySegArray(Cluster *cluster, Segment *segArray, Args args);
+
+/// @brief Update cluster values by single segment
 void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numLeft, int *numMiddle, int *numRight);
 
-static inline void countDifferentSeg(int *numLeft, int *numMiddle, int *numRight, Segment *segment)
-{
-    switch (segment->segType)
-    {
-        case LEFT_CLIP:
-            *numLeft += 1; break;
-        case RIGHT_CLIP:
-            *numRight += 1; break;
-        case MID_INSERT:
-            *numMiddle += 1; break;
-        default:
-            break;
-    }
-}
+/// @brief Count number of different type segments
+void countDifferentSeg(int *numLeft, int *numMiddle, int *numRight, Segment *segment);
 
-static inline void countAlnFracs(Cluster *cluster, Segment *segment)
-{
-    switch (segment->alnLocationType)
-    {
-        case 1:
-            cluster->alnFrac1 += 1; break;
-        case 2:
-            cluster->alnFrac2 += 1; break;
-        case 4:
-            cluster->alnFrac4 += 1; break;
-        case 8:
-            cluster->alnFrac8 += 1; break;
-        case 16:
-            cluster->alnFrac16 += 1; break;
-        default:
-            break;
-    }
-}
+/// @brief Count the number of segments with different alnLocationType
+void countAlnFracs(Cluster *cluster, Segment *segment);
 
+/// @brief Compute entropy based on the number of different type segments
 float getEntropy(int numLeft, int numMiddle, int numRight, int numSeg);
 
-static inline void setEntropy(Cluster *cluster, int numLeft, int numMiddle, int numRight)
-{
-    cluster->entropy = getEntropy(numLeft, numMiddle, numRight, cluster->numSeg);
-}
+/// @brief Set entropy of the cluster
+void setEntropy(Cluster *cluster, int numLeft, int numMiddle, int numRight);
 
-static inline void setBalanceRatio(Cluster *cluster, int numLeft, int numRight)
-{
-    cluster->balanceRatio = (MIN(numLeft, numRight) + 0.01) / (MAX(numLeft, numRight) + 0.01);
-}
+/// @brief Compute BalanceRatio of the cluster
+void setBalanceRatio(Cluster *cluster, int numLeft, int numRight);
 
-static inline void setNumSegType(Cluster *cluster)
-{
-    cluster->numSegType = (cluster->numSegType & 1) + ((cluster->numSegType & 2) >> 1) + ((cluster->numSegType & 4) >> 2);
-}
+/// @brief Compute the numer of segment type of the cluster
+void setNumSegType(Cluster *cluster);
 
 
 /*********************************
  *** Update By Background Info ***
  *********************************/
+
+/// @brief Set location type of a cluster
 void setCltLocationType(Cluster *cluster, Args args);
 
-static inline void divideValuesByNumSeg(Cluster *cluster)
-{
-    if (cluster->alnFrac1 > 0) cluster->alnFrac1 = cluster->alnFrac1 / cluster->numSeg;
-    if (cluster->alnFrac2 > 0) cluster->alnFrac2 = cluster->alnFrac2 / cluster->numSeg;
-    if (cluster->alnFrac4 > 0) cluster->alnFrac4 = cluster->alnFrac4 / cluster->numSeg;
-    if (cluster->alnFrac8 > 0) cluster->alnFrac8 = cluster->alnFrac8 / cluster->numSeg;
-    if (cluster->alnFrac16 > 0) cluster->alnFrac16 = cluster->alnFrac16 / cluster->numSeg;
+/// @brief Divide cluster values by numSeg
+void divideByNumSeg(Cluster *cluster);
 
-    cluster->dualClipFrac = cluster->dualClipFrac / cluster->numSeg;
-    cluster->lowMapQualFrac = cluster->lowMapQualFrac / cluster->numSeg;
-    cluster->meanQueryMapFrac = cluster->meanQueryMapFrac / cluster->numSeg;
-    cluster->meanDivergence = cluster->meanDivergence / cluster->numSeg;
-    cluster->meanMapQual = cluster->meanMapQual / cluster->numSeg;
-    cluster->meanAlnScore = cluster->meanAlnScore / cluster->numSeg;
-}
+/// @brief Divide cluster values by background info
+void divideByBgInfo(Cluster *cluster, Args args);
 
-static inline void divideValuesByBackbg(Cluster *cluster, Args args)
-{
-    cluster->meanDivergence = cluster->meanDivergence / args.bgDiv;
-    cluster->numSeg = cluster->numSeg / args.bgDepth;
-}
+/// @brief Set cluster strand
+void setDirection(Cluster *cluster);
 
-static inline void setDirection(Cluster *cluster)
-{
-    if (directionIsConsistent(cluster))
-        cluster->directionFlag = 1;
-    else if (directionIsInconsistent(cluster))
-        cluster->directionFlag = 2;
-}
-
-static inline void setBackbgInfo(Cluster *cluster, Args args)
-{
-    cluster->bgDiv = args.bgDiv;
-    cluster->bgDepth = args.bgDepth;
-    cluster->bgReadLen = args.bgReadLen;
-}
+/// @brief Set background info of a cluster
+void setBackbgInfo(Cluster *cluster, Args args);
 
 
 /*****************
  *** Filtering ***
  *****************/
+
+/// @brief Check if the cluster inersect with blacklist
 void intersectBlackList(Cluster *cluster, Args args);
 
 #endif // CLUSTER_UTILS_H

@@ -4,7 +4,7 @@
  *** Segment Sequence IO  ***
  ****************************/
 
-/// @brief select a segment to output from cluster
+/// @brief select a segment to output as assembled contig
 int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
 {
     int clipIdx = -1;
@@ -34,28 +34,30 @@ int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
         }
     }
 
-    if (insIdx > 0)
+    if (insIdx > 0) // select longest spanning read
         return insIdx;
-        
-    return clipIdx;
+
+    return clipIdx; // or clip read with largest clipSize
 }
 
 /// @brief get extended region of the segment
-void setTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
+void setTrimRegion(Segment *segment, int *start, int *end, int flankSize)
 {
-    *startPtr = 0;
-    *endPtr = segment->readLen;
+    *start = 0;
+    *end = segment->readLen;
 
     if (segment->queryStart - flankSize > 0)
-        *startPtr = segment->queryStart - flankSize;
+        *start = segment->queryStart - flankSize;
     if (segment->queryEnd + flankSize < segment->readLen)
-        *endPtr = segment->queryEnd + flankSize;
+        *end = segment->queryEnd + flankSize;
 }
+
 
 /*************************
  *** Flank Sequence IO ***
  *************************/
 
+/// @brief Initiate FlankRegion
 FlankRegion initFlankRegion()
 {
     FlankRegion region;
@@ -66,7 +68,7 @@ FlankRegion initFlankRegion()
     return region;
 }
 
-/// @brief extract and output flank-seq for all clusters from genome
+/// @brief output flank-seq and local-seq for all clusters
 void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
 {
     FlankRegion region = initFlankRegion();
@@ -77,7 +79,7 @@ void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
         Cluster *cluster = &cltArray[i];
         setFlankRegion(cluster, &region);
         outputFlank(cluster, refFa, region);
-        outputRefLocal(cluster, refFa, region);
+        outputLocal(cluster, refFa, region);
     }
 
     if (refFa != NULL) {fai_destroy(refFa); refFa=NULL;}
@@ -123,8 +125,8 @@ void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region)
     if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
 
-/// @brief output +-500bp around cluster position for tsd annotation
-void outputRefLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region)
+/// @brief output +-500bp local-seq around cluster position for tsd annotation
+void outputLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region)
 {
     hts_pos_t seqLen;
     int start = (region.start1 < 0) ? 0 : region.start1;
@@ -132,7 +134,7 @@ void outputRefLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region)
     char *localSeq = faidx_fetch_seq64(refFa, chrom, start, region.end2, &seqLen);
 
     char *outFn = (char *)malloc(100 * sizeof(char));
-    sprintf(outFn, "tmp_anno/%d_%d_refLocal.fa", cluster->tid, cluster->idx);
+    sprintf(outFn, "tmp_anno/%d_%d_local.fa", cluster->tid, cluster->idx);
     FILE *fp = fopen(outFn, "w");
     fprintf(fp, ">%d\n%s\n", start, localSeq);
     fclose(fp);
@@ -141,10 +143,12 @@ void outputRefLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region)
     if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
 
+
 /*****************************
  *** Insertion Sequence IO ***
  *****************************/
 
+/// @brief Initiate InsRegion
 InsRegion initInsRegion()
 {
     InsRegion region;
@@ -159,7 +163,7 @@ InsRegion initInsRegion()
     return region;
 }
 
-/// @brief extract and output insertion-seq and flank-seq from assembly
+/// @brief output insertion-seq and tsd-containing-seq from contig
 void extractIns(Cluster *cluster)
 {
     InsRegion region = initInsRegion();
@@ -180,7 +184,7 @@ void extractIns(Cluster *cluster)
     return;
 }
 
-/// @brief define insertion sequence region
+/// @brief define insertion-seq region by Flank-To-Assm alignments
 void setInsRegion(int cltTid, int cltIdx, InsRegion *region)
 {
     char *inputFn = (char *)malloc(100 * sizeof(char));
@@ -226,7 +230,8 @@ void adjustInsRegion(InsRegion *region)
     if (region->tid1 < 0 && region->tid2 < 0) // No flank mapped
         return;
 
-    if (isClipInFlank(region->cigar1) && isClipInFlank(region->cigar2)) // Large clip in both flank
+    // Large clip in both flank
+    if (isClipInFlank(region->cigar1) && isClipInFlank(region->cigar2))
         return;
 
     if (region->tid2 < 0) { // Only left lank mapped
@@ -249,7 +254,8 @@ void adjustInsRegion(InsRegion *region)
         return;
     }
 
-    if (region->tid1 == region->tid2 && region->end1 <= (region->start2-100)) { // Two flanks map to same contig
+    // Two flanks map to same contig
+    if (region->tid1 == region->tid2 && region->end1 <= (region->start2-100)) {
         region->flag |= CLT_SAME_FLANK_MAP;
         return;
     }
@@ -258,7 +264,7 @@ void adjustInsRegion(InsRegion *region)
         region->flag |= CLT_DIFF_FLANK_MAP;
 }
 
-/// @brief output insertion sequence in FASTA format
+/// @brief output insertion-seq in FASTA format
 void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
 {
     char *insSeq = getInsSeq(assmFa, region);
@@ -273,7 +279,7 @@ void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
     if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
 
-/// @brief get insertion sequence
+/// @brief get insertion-seq
 char *getInsSeq(faidx_t *assmFa, InsRegion region)
 {
     hts_pos_t seqLen;
@@ -307,7 +313,7 @@ char *getInsSeq(faidx_t *assmFa, InsRegion region)
     return NULL;
 }
 
-/// @brief output flank sequences from assembly for tsd annotation
+/// @brief output tsd-containing-seq for tsd annotation
 void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
 {
     if (!isBothFlankMapped(region.flag))

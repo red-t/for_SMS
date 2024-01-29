@@ -87,14 +87,14 @@ ClusterDt = np.dtype([
 ### Construct SegArray ###
 ##########################
 cdef object getSegArray(BamFile genomeBam, Args args):
-    cdef int returnValue, numSeg=0, maxNum=9900
+    cdef int retValue, numSeg=0, maxNum=9900
     cdef object segArray = np.zeros(10000, dtype=SegmentDt)
     cdef Segment[::1] segArrayView = segArray
     cdef Iterator iterator = Iterator(genomeBam, args.tid)
     
     while True:
-        returnValue = iterator.cnext1()
-        if returnValue < 0:
+        retValue = iterator.cnext1()
+        if retValue < 0:
             del iterator
             segArray.resize((numSeg,), refcheck=False)
             return segArray
@@ -108,8 +108,8 @@ cdef object getSegArray(BamFile genomeBam, Args args):
             segArrayView = segArray
             maxNum -= 100
 
-        returnValue = fillSegmentArray(iterator.bamRcord, &segArrayView[numSeg], iterator.offset, args.minSegLen)
-        numSeg += returnValue
+        retValue = fillSegmentArray(iterator.bamRcord, &segArrayView[numSeg], iterator.offset, args.minSegLen)
+        numSeg += retValue
 
 
 cdef updateSegArray(Segment[::1] segArray, Args args):
@@ -143,7 +143,7 @@ cdef updateSegArrayByTe(Segment[::1] segArray, Args args):
 
 
 #########################
-### Construct TeArray ###
+### Construct TeArray ###z
 #########################
 cdef mapSegToTE(str teFn, Args args):
     cdef int exitCode
@@ -157,13 +157,13 @@ cdef mapSegToTE(str teFn, Args args):
 
 
 cdef object getTeArray(Iterator iterator):
-    cdef int returnValue, numTeAln=0, maxNum=9900
+    cdef int retValue, numTeAln=0, maxNum=9900
     cdef object teArray = np.zeros(10000, dtype=TeAlignmentDt)
     cdef TeAlignment[::1] teArrayView = teArray
     
     while True:
-        returnValue = iterator.cnext2()
-        if returnValue < 0:
+        retValue = iterator.cnext2()
+        if retValue < 0:
             teArray.resize((numTeAln,), refcheck=False)
             return teArray
 

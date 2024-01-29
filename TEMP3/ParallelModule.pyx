@@ -24,14 +24,14 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
     cdef object divArray = np.zeros(500000, dtype=np.float32)
     cdef float[::1] divArrayView = divArray
     cdef int[::1] readLenArrayView = readLenArray
-    cdef int returnValue, alnLen
+    cdef int retValue, alnLen
     cdef int64_t sumAlnLen = 0
     cdef float divergence
     cdef dict bgInfo = {}
 
     while True:
-        returnValue = iterator.cnext1()
-        if returnValue < 0:
+        retValue = iterator.cnext1()
+        if retValue < 0:
             bgInfo["numChrom"] = genomeBam.header.n_targets
             bgInfo["bgDiv"] = np.mean(divArray[:numAln])
             bgInfo["bgDepth"] = float(sumAlnLen) / maxChromLen
@@ -60,14 +60,14 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
 #######################
 ### Parallel Module ###
 #######################
-cdef tuple divideTasks(int numTasks, int poolSize):
-    cdef int i, taskSize = int(numTasks / poolSize)
+cdef tuple divideTask(int numTask, int poolSize):
+    cdef int i, taskSize = int(numTask / poolSize)
     cdef list startList = []
 
     if taskSize == 0:
         taskSize = 1
     
-    for i in range(0, numTasks, taskSize):
+    for i in range(0, numTask, taskSize):
         startList.append(i)
     
     return taskSize, startList
@@ -76,7 +76,7 @@ cdef tuple divideTasks(int numTasks, int poolSize):
 cpdef object runInParallel(object cmdArgs):    
     cdef set subProcTup
     cdef dict allCltData = {}, tidToCltData, bgInfo
-    cdef object subProc, assembleArray, returnValue
+    cdef object subProc, assembleArray, retValue
     cdef int startIdx, taskSize
     cdef list startList
 
@@ -98,14 +98,14 @@ cpdef object runInParallel(object cmdArgs):
         
         # 3. Local Assembly
         highQualArray = getHighQualClts(allCltData)
-        taskSize, startList = divideTasks(highQualArray.shape[0], cmdArgs.numProcess)
+        taskSize, startList = divideTask(highQualArray.shape[0], cmdArgs.numProcess)
         subProcTup = set([executor.submit(assembleCluster, \
                                           highQualArray, \
                                           startIdx, \
                                           taskSize, \
                                           cmdArgs.numThread) for startIdx in startList])
         for subProc in as_completed(subProcTup):
-            returnValue = subProc.result()
+            retValue = subProc.result()
         
         # 4. Output sequence for clusters without assembly
         subProcTup = set([executor.submit(outputSomaCltSeqs, \
@@ -113,7 +113,7 @@ cpdef object runInParallel(object cmdArgs):
                                           allCltData[tid][1], \
                                           cmdArgs, tid) for tid in range(bgInfo["numChrom"])])
         for subProc in as_completed(subProcTup):
-            returnValue = subProc.result()
+            retValue = subProc.result()
         
         # 5. Output reference flank sequence for high-qual clusters
         subProcTup = set([executor.submit(outputRefFlank, \
@@ -122,7 +122,7 @@ cpdef object runInParallel(object cmdArgs):
                                           taskSize, \
                                           cmdArgs) for startIdx in startList])
         for subProc in as_completed(subProcTup):
-            returnValue = subProc.result()
+            retValue = subProc.result()
         
         # 6. Annotate clusters
         subProcTup = set([executor.submit(annotateCluster, \
@@ -131,6 +131,6 @@ cpdef object runInParallel(object cmdArgs):
                                           taskSize, \
                                           cmdArgs) for startIdx in startList])
         for subProc in as_completed(subProcTup):
-            returnValue = subProc.result()
+            retValue = subProc.result()
     
     return allCltData

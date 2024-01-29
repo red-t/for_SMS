@@ -53,12 +53,12 @@ cdef class BamFile:
                 hts_set_threads(htsFile, self.numThread)
             return htsFile
     
-    cdef void write(self, bam1_t *bamRecord):
-        cdef int returnValue
+    cdef void write(self, bam1_t *bam):
+        cdef int retValue
         with nogil:
-            returnValue = sam_write1(self.htsFile, self.header, bamRecord)
-        if returnValue < 0:
-            raise IOError("sam_write1 failed with error code {}".format(returnValue))
+            retValue = sam_write1(self.htsFile, self.header, bam)
+        if retValue < 0:
+            raise IOError("sam_write1 failed with error code {}".format(retValue))
     
     def __enter__(self):
         return self
@@ -114,8 +114,8 @@ cdef class Iterator:
         return self
 
     cdef int cnext1(self):
-        '''cversion of iterator. returnValue>=0 if success.'''
-        cdef int returnValue
+        '''cversion of iterator. retValue>=0 if success.'''
+        cdef int retValue
 
         with nogil:
             if self.iter.curr_off == 0:
@@ -126,28 +126,28 @@ cdef class Iterator:
             else:
                 self.offset = self.iter.curr_off
 
-            returnValue = hts_itr_next(self.htsFile.fp.bgzf, self.iter, self.bamRcord, self.htsFile)
+            retValue = hts_itr_next(self.htsFile.fp.bgzf, self.iter, self.bamRcord, self.htsFile)
 
-        return returnValue
+        return retValue
     
     cdef int cnext2(self):
         '''directly read a alignment record'''
-        cdef int returnValue
+        cdef int retValue
 
         with nogil:
-            returnValue = bam_read1(self.htsFile.fp.bgzf, self.bamRcord)
+            retValue = bam_read1(self.htsFile.fp.bgzf, self.bamRcord)
         
-        return returnValue
+        return retValue
 
     cdef int cnext3(self, int64_t offset):
         '''read a alignment record with specified offset'''
-        cdef int returnValue
+        cdef int retValue
 
         with nogil:
             bgzf_seek(self.htsFile.fp.bgzf, offset, SEEK_SET)
-            returnValue = bam_read1(self.htsFile.fp.bgzf, self.bamRcord)
+            retValue = bam_read1(self.htsFile.fp.bgzf, self.bamRcord)
         
-        return returnValue
+        return retValue
 
 
 ######################
@@ -165,6 +165,7 @@ cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object c
     args.maxDistance = cmdArgs.maxDistance
     args.minOverhang = cmdArgs.minOverhang
     return args
+
 
 #######################
 ### Construc AiList ###
@@ -186,10 +187,10 @@ cdef ouputAllSegSeqs(Segment[::1] segArray, BamFile genomeBam, Args args):
     cdef BamFile outputFasta = BamFile(outputFileName, "wF", args.numThread, genomeBam)
     cdef Iterator iterator = Iterator(genomeBam, args.tid)
     cdef bam1_t *destRecord = bam_init1()
-    cdef int i, returnValue
+    cdef int i, retValue
 
     for i in range(segArray.shape[0]):
-        returnValue = iterator.cnext3(segArray[i].fileOffset)
+        retValue = iterator.cnext3(segArray[i].fileOffset)
         trimSegment(iterator.bamRcord, destRecord, i, segArray[i].queryStart, segArray[i].queryEnd)
         outputFasta.write(destRecord)
     
@@ -250,9 +251,9 @@ cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmd
 
 
 cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFasta, Iterator iterator, bam1_t *destRecord, int j, int flankSize=3000):
-    cdef int start, end, returnValue
+    cdef int start, end, retValue
 
-    returnValue = iterator.cnext3(segArray[j].fileOffset)
+    retValue = iterator.cnext3(segArray[j].fileOffset)
     setTrimRegion(&segArray[j], &start, &end, flankSize)
     trimSegment(iterator.bamRcord, destRecord, j, start, end)
     outputFasta.write(destRecord)

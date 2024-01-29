@@ -11,8 +11,7 @@
  *** Structures ***
  ******************/
 
-/*! @typedef
- @abstract Structure for segment extracted from CIGAR.
+/*! @brief Data container for segment extracted from CIGAR.
  @field  flag               alignment flag
  @field  mapQual            alignment mapping quality
  @field  queryStart         segment start on query sequence (0-based, include)
@@ -74,6 +73,7 @@ typedef struct Segment
     int         teTid;
 } __attribute__((packed)) Segment;
 
+/// @brief Data container used in constrcuting Segment
 typedef struct SegValues
 {
     uint8_t     mapQual;
@@ -89,8 +89,7 @@ typedef struct SegValues
     int64_t     fileOffset;
 } SegValues;
 
-/*! @typedef
- @abstract Structure for TE alignment.
+/*! @brief Data container for TE alignment.
  @field  segIdx         index of corresponding segment in segments array
  @field  AlnScore       alignment score
  @field  queryStart     query start (original direction of segment)
@@ -112,6 +111,7 @@ typedef struct TeAlignment
     int     teTid;
 } __attribute__((packed)) TeAlignment;
 
+
 /***************************
  *** Initialize Segments ***
  ***************************/
@@ -120,9 +120,16 @@ typedef struct TeAlignment
 #define RIGHT_CLIP  4
 #define DUAL_CLIP   5
 
-int fillSegmentArray(bam1_t *bamRecord, Segment *segArray, int64_t fileOffset, int minSegLen);
-SegValues initSegmentsFromCigar(bam1_t *bamRecord, Segment *segArray, int64_t fileOffset, int minSegLen);
+/// @brief Extract all segments from CIGAR, record in segArray
+int fillSegmentArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen);
+
+/// @brief Init all segments from CIGAR
+SegValues initSegmentsFromCigar(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen);
+
+/// @brief Init single segment from CIGAR
 void initSegment(Segment *segment, SegValues segValues, int cigarLen);
+
+/// @brief Set same values for segments extracted from the same alignment
 void setSameSegValues(Segment *segArray, SegValues segValues);
 
 
@@ -136,10 +143,19 @@ void setSameSegValues(Segment *segArray, SegValues segValues);
 #define isSingleSegment(segment) ((segment)->numSeg == 1)
 #define isReverse(segment) (((segment)->flag & BAM_FREVERSE) != 0)
 
+/// @brief Update segment's overhang and location type
 void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList);
+
+/// @brief Get length of the shorter ref-anchor part as overhang
 int getOverhang(int overhang, int matchLen);
+
+/// @brief Set location type of the alignment
 void setAlnLocationType(AiList *repeatAiList, AiList *gapAiList, Segment *segment);
+
+/// @brief Get location type of a single point
 uint8_t getPointLocationType(AiList *repeatAiList, AiList *gapAiList, int point);
+
+/// @brief Get location type of a alignment
 uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType);
 
 
@@ -151,16 +167,19 @@ uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType);
 #define isCover(teAlignment, prevTeAlignment) ((teAlignment)->queryEnd <= (prevTeAlignment)->queryEnd)
 #define isSameDirection(segment, teAlignment) (((segment)->flag & BAM_FREVERSE) == ((teAlignment)->flag & BAM_FREVERSE))
 
+/// @brief Update segment values using Seg-To-TE alignments
 void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx);
 
-static inline int getQueryMapLen(TeAlignment *teAlignment) { return teAlignment->queryEnd - teAlignment->queryStart; }
+/// @brief Compute query-map-len of a Seg-To-TE alignment
+int getQueryMapLen(TeAlignment *teAlignment);
 
-static inline int getOverlapQueryMapLen(TeAlignment *teAlignment, TeAlignment *prevTeAlignment)
-{
-    return teAlignment->queryEnd - prevTeAlignment->queryEnd;
-}
+/// @brief Compute query-map-len of the non-verlap part between two alignments
+int getOverlapQueryMapLen(TeAlignment *teAlignment, TeAlignment *prevTeAlignment);
 
+/// @brief Update segment values using single Seg-To-TE alignment
 void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIdx, int queryMapLen);
+
+/// @brief Count occurrences of all TEs, to which the segment map
 void countTeTids(Segment *segment, TeAlignment *teArray, int *teTidCountTable, int numTeTid);
 
 
@@ -168,19 +187,29 @@ void countTeTids(Segment *segment, TeAlignment *teArray, int *teTidCountTable, i
  *** Initialize TeAlignments ***
  *******************************/
 #define alingnedBits 0x3c03f
-#define bamIsInvalid(bamRecord) (((bamRecord)->core.flag & BAM_FSECONDARY) != 0 || ((bamRecord)->core.flag & BAM_FUNMAP) != 0)
+#define bamIsInvalid(bam) (((bam)->core.flag & BAM_FSECONDARY) != 0 || ((bam)->core.flag & BAM_FUNMAP) != 0)
 #define isCigarAligned(cigar) ((alingnedBits >> (bam_cigar_op((cigar))<<1) & 3) & 1)
 
-void fillTeArray(bam1_t *bamRecord, TeAlignment *teArray);
-void initQueryPosition(int *queryStartPtr, int *queryEndPtr, bam1_t *bamRecord);
+/// @brief Parsing and record a Seg-To-TE alignment
+void fillTeArray(bam1_t *bam, TeAlignment *teArray);
 
-static inline int firstCigarIsClip(uint32_t *cigarArray) { return bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP; }
+/// @brief Get query map region on the original segment sequence
+void getQueryPosition(int *queryStartPtr, int *queryEndPtr, bam1_t *bam);
 
-static inline int lastCigarIsClip(uint32_t *cigarArray, int numCigar) { return bam_cigar_op(cigarArray[numCigar - 1]) == BAM_CSOFT_CLIP; }
+/// @brief Check if first cigar is clip
+int firstCigarIsClip(uint32_t *cigarArray);
 
-void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bamRecord);
-float getDivergence(bam1_t *bamRecord, int mapLen);
-void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart, int queryEnd, int mapLen, float divergence);
+/// @brief Check if final cigar is clip
+int lastCigarIsClip(uint32_t *cigarArray, int numCigar);
+
+/// @brief Compute map length and divergence of the alignment
+void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bam);
+
+/// @brief Compute divergence of the alignment
+float getDivergence(bam1_t *bam, int mapLen);
+
+/// @brief Record a Seg-To-TE alignment
+void initTeAlignment(TeAlignment *teAlignment, bam1_t *bam, int queryStart, int queryEnd, int mapLen, float divergence);
 
 
 /********************
@@ -188,21 +217,31 @@ void initTeAlignment(TeAlignment *teAlignment, bam1_t *bamRecord, int queryStart
  ********************/
 #define isOdd(number) ((number) & 1)
 
+/// @brief Trim sourceRecord from sourceStart to sourceEnd, record in destRecord
 int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIdx, int sourceStart, int sourceEnd);
-int samReallocBamData(bam1_t *bamRecord, size_t desired);
 
-static inline int reallocBamData(bam1_t *bamRecord, size_t desired)
+/// @brief Reallocate memory for bam record
+int samReallocBamData(bam1_t *bam, size_t desired);
+
+static inline int reallocBamData(bam1_t *bam, size_t desired)
 {
-    if (desired <= bamRecord->m_data) return 0;
-    return samReallocBamData(bamRecord, desired);
+    if (desired <= bam->m_data) return 0;
+    return samReallocBamData(bam, desired);
 }
 
-static inline uint32_t bamGetMemPolicy(bam1_t *bamRecord) { return bamRecord->mempolicy; }
+static inline uint32_t bamGetMemPolicy(bam1_t *bam)
+{ return bam->mempolicy; }
 
-static inline void bamSetMemPolicy(bam1_t *bamRecord, uint32_t policy) { bamRecord->mempolicy = policy; }
+static inline void bamSetMemPolicy(bam1_t *bam, uint32_t policy)
+{ bam->mempolicy = policy; }
 
+/// @brief Set values of destRecord
 void setDestValues(bam1_t *destRecord, int destNameLen, int numNulls, int destDataLen);
+
+/// @brief Set name of destRecord
 uint8_t *setDestName(bam1_t *destRecord, char *destName, int destNameLen, int numNulls);
+
+/// @brief Copy sequence from sourceRecord to destRecord
 void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr, int sourceStart, int destSeqLen);
 
 #endif // SEG_UTILS_H

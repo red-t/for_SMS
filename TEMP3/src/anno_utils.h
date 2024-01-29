@@ -5,9 +5,10 @@
 #include "io_utils.h"
 
 /******************
- *** Data Types ***
+ *** Structures ***
  ******************/
 
+/// @brief Data container for annotation record
 typedef struct Anno
 {
     int     idx;
@@ -19,26 +20,39 @@ typedef struct Anno
     int     refEnd;
 } __attribute__((packed)) Anno;
 
+
 /***********************************
  *** Annotate Insertion sequence ***
  ***********************************/
 
-/// @brief get all annotate records by parsing Ins-To-TE alignments
+/// @brief Data container for tsd-containing-region
+typedef struct TsdRegion
+{
+    int idx;
+    int leftMost;
+    int leftIdx;
+    int rightMost;
+    int rightIdx;
+    int isA;
+    int seqLen;
+} TsdRegion;
+
+/// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
 int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx);
 
-/// @brief init single annotate record
-void initAnno(bam1_t *bamRecord, Anno *anno, int idx);
+/// @brief Record single TE annotation
+void initAnno(bam1_t *bam, Anno *anno, int idx);
 
-/// @brief annotate polyA/polyT
-int annoPolyA(Cluster *cluster, int idx, Anno *annoArray, int numAnno, int leftMost, int rightMost, int leftIdx, int rightIdx);
+/// @brief Find and record all polyA/polyT
+int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, TsdRegion region);
 
-/// @brief find polyA/polyT region and init single annotate records
-int getPolyA(char *flankSeq, int seqLen, int idx, int isA, Anno *annoArray, int numAnno, int rightMost, int leftIdx, int rightIdx);
+/// @brief Find and record single polyA/polyT
+int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, TsdRegion region);
 
-/// @brief annotate TSD and refine breakpoint for cluster for single cluster
+/// @brief Annotate TSD and refine breakpoint by parsing Tsd-To-Local alignments
 void annoTsd(Cluster *cluster);
 
-/// @brief set TSD and refine breakpoint for cluster
+/// @brief Find TSD and refine breakpoint
 void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart);
 
 #endif // ANNO_UTILS_H

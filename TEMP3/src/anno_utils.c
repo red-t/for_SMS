@@ -1,33 +1,44 @@
 #include "anno_utils.h"
 
-/// @brief get all annotate records by parsing Ins-To-TE alignments
+/// @brief Initiate TsdRegion
+TsdRegion initTsdRegion()
+{
+    TsdRegion region;
+    region.leftMost = INT_MAX;
+    region.rightMost = 0;
+    region.leftIdx = 0;
+    region.rightIdx = 0;
+    return region;
+}
+
+/// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
 int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
 {
     char *inputFn = (char *)malloc(100 * sizeof(char));
     sprintf(inputFn, "tmp_anno/%d_%d_InsToTE.bam", cluster->tid, cluster->idx);
     htsFile *inputBam = sam_open(inputFn, "rb");
     sam_hdr_t *header = sam_hdr_read(inputBam);
-    bam1_t *bamRecord = bam_init1();
+    bam1_t *bam = bam_init1();
 
     int numAnno = 0;
-    int leftMost = INT_MAX, rightMost = 0;
-    int leftIdx = 0, rightIdx = 0;
+    TsdRegion region = initTsdRegion();
+    region.idx = idx;
     while (1)
     {
-        int returnValue = bam_read1(inputBam->fp.bgzf, bamRecord);
-        if (returnValue < 0)
+        int retValue = bam_read1(inputBam->fp.bgzf, bam);
+        if (retValue < 0)
             break;
-        if (bamIsInvalid(bamRecord))
+        if (bamIsInvalid(bam))
             continue;
 
-        initAnno(bamRecord, &annoArray[numAnno], idx);
-        if (annoArray[numAnno].queryStart < leftMost) {
-            leftMost = annoArray[numAnno].queryStart;
-            leftIdx = numAnno;
+        initAnno(bam, &annoArray[numAnno], idx);
+        if (annoArray[numAnno].queryStart < region.leftMost) {
+            region.leftMost = annoArray[numAnno].queryStart;
+            region.leftIdx = numAnno;
         }
-        if (annoArray[numAnno].queryEnd > rightMost) {
-            rightMost = annoArray[numAnno].queryEnd;
-            rightIdx = numAnno;
+        if (annoArray[numAnno].queryEnd > region.rightMost) {
+            region.rightMost = annoArray[numAnno].queryEnd;
+            region.rightIdx = numAnno;
         }
         numAnno++;
     }
@@ -35,29 +46,29 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
     if (numAnno > 0)
         cluster->flag |= CLT_TE_MAP;
 
-    int prevNumAnno = numAnno;
-    numAnno = annoPolyA(cluster, idx, annoArray, numAnno, leftMost, rightMost, leftIdx, rightIdx);
-    if (numAnno - prevNumAnno > 0)
+    int numTE = numAnno;
+    numAnno = annoPolyA(cluster, annoArray, numAnno, region);
+    if (numAnno - numTE > 0)
         cluster->flag |= CLT_POLYA;
 
-    if (bamRecord != NULL) {bam_destroy1(bamRecord); bamRecord=NULL;}
+    if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
     if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
     if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
     if (inputFn != NULL) {free(inputFn); inputFn=NULL;}
     return numAnno;
 }
 
-/// @brief init single annotate record from bamRecord
-void initAnno(bam1_t *bamRecord, Anno *anno, int idx)
+/// @brief Record single TE annotation
+void initAnno(bam1_t *bam, Anno *anno, int idx)
 {
-    int numCigar = bamRecord->core.n_cigar;
-    uint32_t *cigarArray = bam_get_cigar(bamRecord);
+    int numCigar = bam->core.n_cigar;
+    uint32_t *cigarArray = bam_get_cigar(bam);
 
     int queryStart = 0;
     if (bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP)
         queryStart = bam_cigar_oplen(cigarArray[0]);
 
-    int queryEnd = bamRecord->core.l_qseq;
+    int queryEnd = bam->core.l_qseq;
     if (bam_cigar_op(cigarArray[numCigar - 1]) == BAM_CSOFT_CLIP)
         queryEnd -= bam_cigar_oplen(cigarArray[numCigar - 1]);
 
@@ -69,37 +80,41 @@ void initAnno(bam1_t *bamRecord, Anno *anno, int idx)
     anno->idx = idx;
     anno->queryStart = queryStart;
     anno->queryEnd = queryEnd;
-    anno->strand = bam_is_rev(bamRecord);
-    anno->tid = bamRecord->core.tid;
-    anno->refStart = bamRecord->core.pos;
-    anno->refEnd = bamRecord->core.pos + refLen;
+    anno->strand = bam_is_rev(bam);
+    anno->tid = bam->core.tid;
+    anno->refStart = bam->core.pos;
+    anno->refEnd = bam->core.pos + refLen;
 
-    if (bam_is_rev(bamRecord))
+    if (bam_is_rev(bam))
     {
-        anno->queryStart = bamRecord->core.l_qseq - queryEnd;
-        anno->queryEnd = bamRecord->core.l_qseq - queryStart;
+        anno->queryStart = bam->core.l_qseq - queryEnd;
+        anno->queryEnd = bam->core.l_qseq - queryStart;
     }
 }
 
-/// @brief annotate polyA/polyT
-int annoPolyA(Cluster *cluster, int idx, Anno *annoArray, int numAnno, int leftMost, int rightMost, int leftIdx, int rightIdx)
+/// @brief Find and record all polyA/polyT
+int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, TsdRegion region)
 {
     char *insFn = (char *)malloc(100 * sizeof(char));
     sprintf(insFn, "tmp_anno/%d_%d_insertion.fa", cluster->tid, cluster->idx);
     faidx_t *insFa = fai_load((const char *)insFn);
     const char *insID = faidx_iseq(insFa, 0);
-    int insLen = faidx_seq_len64(insFa, insID);
     char *flankSeq = NULL;
     hts_pos_t seqLen;
 
-    if (leftMost > 10) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, 0, leftMost, &seqLen);
-        numAnno = getPolyA(flankSeq, seqLen, idx, 0, annoArray, numAnno, rightMost, leftIdx, rightIdx);
+    if (region.leftMost > 10) {
+        flankSeq = faidx_fetch_seq64(insFa, insID, 0, region.leftMost, &seqLen);
+        region.isA = 0;
+        region.seqLen = seqLen;
+        numAnno = getPolyA(flankSeq, annoArray, numAnno, region);
     }
 
-    if ((insLen - rightMost) > 10) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, rightMost, insLen, &seqLen);
-        numAnno = getPolyA(flankSeq, seqLen, idx, 1, annoArray, numAnno, rightMost, leftIdx, rightIdx);
+    int insLen = faidx_seq_len64(insFa, insID);
+    if ((insLen - region.rightMost) > 10) {
+        flankSeq = faidx_fetch_seq64(insFa, insID, region.rightMost, insLen, &seqLen);
+        region.isA = 1;
+        region.seqLen = seqLen;
+        numAnno = getPolyA(flankSeq, annoArray, numAnno, region);
     }
 
     if (insFn != NULL) {free(insFn); insFn=NULL;}
@@ -108,16 +123,16 @@ int annoPolyA(Cluster *cluster, int idx, Anno *annoArray, int numAnno, int leftM
     return numAnno;
 }
 
-/// @brief find polyA/polyT region and init single annotate records
-int getPolyA(char *flankSeq, int seqLen, int idx, int isA, Anno *annoArray, int numAnno, int rightMost, int leftIdx, int rightIdx)
+/// @brief Find and record single polyA/polyT
+int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, TsdRegion region)
 {
-    uint8_t targetChar = (isA) ? 65 : 84; // A OR T
+    uint8_t targetChar = (region.isA) ? 65 : 84; // A OR T
     int thisLen = 0, maxLen = 0;
     int thisSum = 0, maxSum = 0;
     int thisNum = 0, maxNum = 0;
     int end = 0;
 
-    for (int i = 0; i < seqLen; i++)
+    for (int i = 0; i < region.seqLen; i++)
     {
         thisLen++;
         // Is a/A OR t/T
@@ -143,11 +158,11 @@ int getPolyA(char *flankSeq, int seqLen, int idx, int isA, Anno *annoArray, int 
     }
 
     // polyA at the end, but right-most TE is reverse
-    if (isA && annoArray[rightIdx].strand)
+    if (region.isA && annoArray[region.rightIdx].strand)
         return numAnno;
 
     // polyT at the start, but left-most TE is forward
-    if ((!isA) && (!annoArray[rightIdx].strand))
+    if ((!region.isA) && (!annoArray[region.rightIdx].strand))
         return numAnno;
 
     if(maxLen < 10)
@@ -157,52 +172,52 @@ int getPolyA(char *flankSeq, int seqLen, int idx, int isA, Anno *annoArray, int 
     if (fracA < 0.8)
         return numAnno;
 
-    end = (isA) ? (end + rightMost) : end;
-    annoArray[numAnno].idx = idx;
+    end = (region.isA) ? (end + region.rightMost) : end;
+    annoArray[numAnno].idx = region.idx;
     annoArray[numAnno].queryStart = end - maxLen;
     annoArray[numAnno].queryEnd = end;
-    annoArray[numAnno].strand = (isA) ? 0 : 1;
-    annoArray[numAnno].tid = (isA) ? -1 : -2;
+    annoArray[numAnno].strand = (region.isA) ? 0 : 1;
+    annoArray[numAnno].tid = (region.isA) ? -1 : -2;
     numAnno++;
     return numAnno;
 }
 
-/// @brief annotate TSD and refine breakpoint for cluster for single cluster
+/// @brief Annotate TSD and refine breakpoint by parsing Tsd-To-Local alignments
 void annoTsd(Cluster *cluster)
 {
     if (!isBothFlankMapped(cluster->flag))
         return;
 
     char *inputFn = (char *)malloc(100 * sizeof(char));
-    sprintf(inputFn, "tmp_anno/%d_%d_TsdToRefLocal.bam", cluster->tid, cluster->idx);
+    sprintf(inputFn, "tmp_anno/%d_%d_TsdToLocal.bam", cluster->tid, cluster->idx);
     htsFile *inputBam = sam_open(inputFn, "rb");
     sam_hdr_t *header = sam_hdr_read(inputBam);
-    bam1_t *bamRecord = bam_init1();
+    bam1_t *bam = bam_init1();
 
     int leftEnd = -1, rightStart = -1;
     while (1)
     {
-        int returnValue = bam_read1(inputBam->fp.bgzf, bamRecord);
-        if (returnValue < 0)
+        int retValue = bam_read1(inputBam->fp.bgzf, bam);
+        if (retValue < 0)
             break;
-        if (bamIsInvalid(bamRecord) || bamIsSup(bamRecord) || bam_is_rev(bamRecord))
+        if (bamIsInvalid(bam) || bamIsSup(bam) || bam_is_rev(bam))
             continue;
 
-        if (isLeftFlank(bamRecord))
-            leftEnd = bam_endpos(bamRecord);
+        if (isLeftFlank(bam))
+            leftEnd = bam_endpos(bam);
         else
-            rightStart = bamRecord->core.pos;
+            rightStart = bam->core.pos;
     }
 
     setTsd(cluster, atoi(sam_hdr_tid2name(header, 0)), leftEnd, rightStart);
 
-    if (bamRecord != NULL) {bam_destroy1(bamRecord); bamRecord=NULL;}
+    if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
     if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
     if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
     if (inputFn != NULL) {free(inputFn); inputFn=NULL;}
 }
 
-/// @brief set TSD and refine breakpoint for cluster
+/// @brief Find TSD and refine breakpoint
 void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
 {
     if (leftEnd < 0 && rightStart < 0)

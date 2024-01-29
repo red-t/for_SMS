@@ -26,7 +26,7 @@ cdef annotateAssm(Cluster[::1] cltArray, int startIdx, int endIdx, object cmdArg
         mapFlankToAssm(cltArray[i].tid, cltArray[i].idx)
         extractIns(&cltArray[i])
         mapInsToTE(cltArray[i].tid, cltArray[i].idx, cmdArgs)
-        mapTsdToRefLocal(cltArray[i].tid, cltArray[i].idx)
+        mapTsdToLocal(cltArray[i].tid, cltArray[i].idx)
         
 
 cdef mapFlankToAssm(int tid, int idx):
@@ -58,11 +58,11 @@ cdef mapInsToTE(int tid, int idx, object cmdArgs):
         raise Exception("Error: minimap2 failed for {}".format(queryFn))
 
 
-cdef mapTsdToRefLocal(int tid, int idx):
+cdef mapTsdToLocal(int tid, int idx):
     cdef int exitCode
-    cdef str targetFn = "tmp_anno/{}_{}_refLocal.fa".format(tid, idx)
+    cdef str targetFn = "tmp_anno/{}_{}_local.fa".format(tid, idx)
     cdef str queryFn = "tmp_anno/{}_{}_tsd.fa".format(tid, idx)
-    cdef str outFn = "tmp_anno/{}_{}_TsdToRefLocal.bam".format(tid, idx)
+    cdef str outFn = "tmp_anno/{}_{}_TsdToLocal.bam".format(tid, idx)
     cdef str cmd = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t 1 -aY {} {} | " \
                    "samtools view -bhS -o {} -".format(targetFn, queryFn, outFn)
     if os.path.isfile(queryFn) == False:
@@ -78,7 +78,7 @@ cdef mapTsdToRefLocal(int tid, int idx):
 ### Annotate Insertion ###
 ##########################
 cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
-    cdef int i, returnValue, numAnno=0, maxNum=9900
+    cdef int i, retValue, numAnno=0, maxNum=9900
     cdef object annoArray = np.zeros(10000, dtype=AnnoDt)
     cdef Anno[::1] annoArrayView = annoArray
     cdef str bamFn
@@ -94,9 +94,9 @@ cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
             annoArrayView = annoArray
             maxNum -= 100
 
-        returnValue = fillAnnoArray(&cltArray[i], &annoArrayView[numAnno], i)
+        retValue = fillAnnoArray(&cltArray[i], &annoArrayView[numAnno], i)
         annoTsd(&cltArray[i])
-        numAnno += returnValue
+        numAnno += retValue
     
     annoArray.resize((numAnno,), refcheck=False)
     annoArray.sort(order=['idx', 'queryStart', 'queryEnd'])

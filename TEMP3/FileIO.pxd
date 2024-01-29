@@ -16,7 +16,7 @@ cdef class BamFile:
 
     cdef void      openFile(self, BamFile template=*)
     cdef htsFile   *openHtsFile(self) except? NULL
-    cdef void      write(self, bam1_t *bamRecord)
+    cdef void      write(self, bam1_t *bam)
 
 
 cdef class Iterator:
@@ -153,7 +153,7 @@ cdef extern from "src/seg_utils.h" nogil:
     ###############################
     ### Initialize TeAlignments ###
     ###############################
-    int bamIsInvalid(bam1_t *bamRecord)
+    int bamIsInvalid(bam1_t *bam)
     
     ####################
     ### Trim Segment ###
@@ -169,7 +169,7 @@ cdef extern from "src/io_utils.h" nogil:
     int isSomaClt(Cluster *cluster)
 
     int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
-    void setTrimRegion(Segment *segment, int *startPtr, int *endPtr, int flankSize)
+    void setTrimRegion(Segment *segment, int *start, int *end, int flankSize)
 
     #########################
     ### Flank Sequence IO ###
