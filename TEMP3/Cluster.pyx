@@ -143,7 +143,7 @@ cdef updateSegArrayByTe(Segment[::1] segArray, Args args):
 
 
 #########################
-### Construct TeArray ###z
+### Construct TeArray ###
 #########################
 cdef mapSegToTE(str teFn, Args args):
     cdef int exitCode
