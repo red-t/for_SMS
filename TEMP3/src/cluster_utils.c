@@ -240,10 +240,12 @@ void divideByBgInfo(Cluster *cluster, Args args)
 /// @brief Set cluster strand
 void setDirection(Cluster *cluster)
 {
-    if (directionIsConsistent(cluster))
+    if (directionIsConsistent(cluster)) 
+        cluster->directionFlag = 0;
+    else if (directionIsInconsistent(cluster)) {
         cluster->directionFlag = 1;
-    else if (directionIsInconsistent(cluster))
-        cluster->directionFlag = 2;
+        cluster->flag |= CLT_REVERSED;
+    }
 }
 
 /// @brief Set background info of a cluster
@@ -264,5 +266,8 @@ void intersectBlackList(Cluster *cluster, Args args)
 {
     int numOverlap = 0, minDistanceToOverlap = 0x7fffffff;
     ailistQueryInterval(args.blackAiList, cluster->refStart, cluster->refEnd, 2, &numOverlap, &minDistanceToOverlap);
-    cluster->isInBlacklist = (uint8_t)(numOverlap > 0);
+    if (numOverlap > 0) {
+        cluster->isInBlacklist = 1;
+        cluster->flag |= CLT_IN_BLACKLIST;
+    }
 }

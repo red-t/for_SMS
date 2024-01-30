@@ -37,8 +37,8 @@
  @field  endIdx             end index in segments array (0-based, not-include)
  @field  numSeg             number of segments in the cluster (normalized by bg depth)
  @field  directionFlag      bitwise flag representing cluster direction
-                                1: forward
-                                2: reverse
+                                0: forward
+                                1: reverse
  @field  cltType            cluster type
                                 0: germline (multiple support reads)
                                 1: somatic (1 support read & 1 alignment)
