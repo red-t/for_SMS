@@ -253,7 +253,6 @@ cdef updateCltArray(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genome
 ######################
 cdef filterByBlacklist(Cluster[::1] cltArray, Args args):
     cdef int i
-
     for i in range(cltArray.shape[0]):
         intersectBlackList(&cltArray[i], args)
     
@@ -399,7 +398,7 @@ cdef object getHighQualClts(dict allCltData):
     cdef Cluster[::1] arrayView = highQualArray
     cdef Cluster[::1] cltArray
 
-    for tid in allCltData.keys():
+    for tid in range(len(allCltData)):
         cltArray = allCltData[tid][0]
         if cltArray.shape[0] == 0:
             continue

@@ -19,7 +19,6 @@ cpdef assembleCluster(Cluster[::1] cltArray, int startIdx, int taskSize, int num
             continue
 
         prefix = "tmp_assm/{}_{}".format(cltArray[i].tid, cltArray[i].idx)
-
         cmd = "wtdbg2 -l 256 -e 1 -S 1 --rescue-low-cov-edges --node-len 256 --ctg-min-length 256 " \
               "--ctg-min-nodes 1 -q -t {} -i {}.fa -fo {}".format(numThread, prefix, prefix)
         subProcess = Popen(cmd, stderr=DEVNULL, shell=True, executable='/bin/bash')
