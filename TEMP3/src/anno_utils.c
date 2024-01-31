@@ -1,15 +1,15 @@
 #include "anno_utils.h"
 
-/// @brief Initiate TsdRegion
-TsdRegion initTsdRegion(int idx, int cltTid, int cltIdx)
+/// @brief Initiate PolyA
+PolyA initPolyA(int idx, int cltTid, int cltIdx)
 {
-    TsdRegion region;
-    region.leftMost = INT_MAX;
-    region.rightMost = 0;
-    region.idx = idx;
-    region.cltTid = cltTid;
-    region.cltIdx = cltIdx;
-    return region;
+    PolyA polyA;
+    polyA.leftMost = INT_MAX;
+    polyA.rightMost = 0;
+    polyA.idx = idx;
+    polyA.cltTid = cltTid;
+    polyA.cltIdx = cltIdx;
+    return polyA;
 }
 
 /// @brief Record single TE annotation
@@ -58,7 +58,7 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
     bam1_t *bam = bam_init1();
 
     int numAnno = 0;
-    TsdRegion region = initTsdRegion(idx, cluster->tid, cluster->idx);
+    PolyA polyA = initPolyA(idx, cluster->tid, cluster->idx);
     while (1)
     {
         int retValue = bam_read1(inputBam->fp.bgzf, bam);
@@ -68,13 +68,13 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
             continue;
 
         initAnno(bam, &annoArray[numAnno], idx, cluster->tid, cluster->idx);
-        if (annoArray[numAnno].queryStart < region.leftMost) {
-            region.leftMost = annoArray[numAnno].queryStart;
-            region.leftIdx = numAnno;
+        if (annoArray[numAnno].queryStart < polyA.leftMost) {
+            polyA.leftMost = annoArray[numAnno].queryStart;
+            polyA.leftIdx = numAnno;
         }
-        if (annoArray[numAnno].queryEnd > region.rightMost) {
-            region.rightMost = annoArray[numAnno].queryEnd;
-            region.rightIdx = numAnno;
+        if (annoArray[numAnno].queryEnd > polyA.rightMost) {
+            polyA.rightMost = annoArray[numAnno].queryEnd;
+            polyA.rightIdx = numAnno;
         }
         numAnno++;
     }
@@ -83,7 +83,7 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
         cluster->flag |= CLT_TE_MAP;
 
     int numTE = numAnno;
-    numAnno = annoPolyA(cluster, annoArray, numAnno, region);
+    numAnno = annoPolyA(cluster, annoArray, numAnno, polyA);
     if (numAnno - numTE > 0)
         cluster->flag |= CLT_POLYA;
 
@@ -95,7 +95,7 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
 }
 
 /// @brief Find and record all polyA/polyT
-int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, TsdRegion region)
+int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, PolyA polyA)
 {
     char *insFn = (char *)malloc(100 * sizeof(char));
     sprintf(insFn, "tmp_anno/%d_%d_insertion.fa", cluster->tid, cluster->idx);
@@ -104,19 +104,19 @@ int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, TsdRegion region)
     char *flankSeq = NULL;
     hts_pos_t seqLen;
 
-    if (region.leftMost > 10) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, 0, region.leftMost, &seqLen);
-        region.isA = 0;
-        region.seqLen = seqLen;
-        numAnno = getPolyA(flankSeq, annoArray, numAnno, region);
+    if (polyA.leftMost > 10) {
+        flankSeq = faidx_fetch_seq64(insFa, insID, 0, polyA.leftMost, &seqLen);
+        polyA.isA = 0;
+        polyA.seqLen = seqLen;
+        numAnno = getPolyA(flankSeq, annoArray, numAnno, polyA);
     }
 
     int insLen = faidx_seq_len64(insFa, insID);
-    if ((insLen - region.rightMost) > 10) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, region.rightMost, insLen, &seqLen);
-        region.isA = 1;
-        region.seqLen = seqLen;
-        numAnno = getPolyA(flankSeq, annoArray, numAnno, region);
+    if ((insLen - polyA.rightMost) > 10) {
+        flankSeq = faidx_fetch_seq64(insFa, insID, polyA.rightMost, insLen, &seqLen);
+        polyA.isA = 1;
+        polyA.seqLen = seqLen;
+        numAnno = getPolyA(flankSeq, annoArray, numAnno, polyA);
     }
 
     if (insFn != NULL) {free(insFn); insFn=NULL;}
@@ -126,15 +126,15 @@ int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, TsdRegion region)
 }
 
 /// @brief Find and record single polyA/polyT
-int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, TsdRegion region)
+int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, PolyA polyA)
 {
-    uint8_t targetChar = (region.isA) ? 65 : 84; // A OR T
+    uint8_t targetChar = (polyA.isA) ? 65 : 84; // A OR T
     int thisLen = 0, maxLen = 0;
     int thisSum = 0, maxSum = 0;
     int thisNum = 0, maxNum = 0;
     int end = 0;
 
-    for (int i = 0; i < region.seqLen; i++)
+    for (int i = 0; i < polyA.seqLen; i++)
     {
         thisLen++;
         // Is a/A OR t/T
@@ -160,11 +160,11 @@ int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, TsdRegion region)
     }
 
     // polyA at the end, but right-most TE is reverse
-    if (region.isA && annoArray[region.rightIdx].strand)
+    if (polyA.isA && annoArray[polyA.rightIdx].strand)
         return numAnno;
 
     // polyT at the start, but left-most TE is forward
-    if ((!region.isA) && (!annoArray[region.leftIdx].strand))
+    if ((!polyA.isA) && (!annoArray[polyA.leftIdx].strand))
         return numAnno;
 
     if(maxLen < 10)
@@ -174,14 +174,14 @@ int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, TsdRegion region)
     if (fracA < 0.8)
         return numAnno;
 
-    end = (region.isA) ? (end + region.rightMost) : end;
-    annoArray[numAnno].idx = region.idx;
-    annoArray[numAnno].cltTid = region.cltTid;
-    annoArray[numAnno].cltIdx = region.cltIdx;
+    end = (polyA.isA) ? (end + polyA.rightMost) : end;
+    annoArray[numAnno].idx = polyA.idx;
+    annoArray[numAnno].cltTid = polyA.cltTid;
+    annoArray[numAnno].cltIdx = polyA.cltIdx;
     annoArray[numAnno].queryStart = end - maxLen;
     annoArray[numAnno].queryEnd = end;
-    annoArray[numAnno].strand = (region.isA) ? 0 : 1;
-    annoArray[numAnno].tid = (region.isA) ? -1 : -2;
+    annoArray[numAnno].strand = (polyA.isA) ? 0 : 1;
+    annoArray[numAnno].tid = (polyA.isA) ? -1 : -2;
     numAnno++;
     return numAnno;
 }

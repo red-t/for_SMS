@@ -22,8 +22,8 @@ typedef struct Anno
     int     refEnd;
 } __attribute__((packed)) Anno;
 
-/// @brief Data container for tsd-containing-region
-typedef struct TsdRegion
+/// @brief Data container for polyA
+typedef struct PolyA
 {
     int idx;
     int cltTid;
@@ -34,7 +34,7 @@ typedef struct TsdRegion
     int rightIdx;
     int isA;
     int seqLen;
-} TsdRegion;
+} PolyA;
 
 
 /***********************************
@@ -45,10 +45,10 @@ typedef struct TsdRegion
 int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx);
 
 /// @brief Find and record all polyA/polyT
-int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, TsdRegion region);
+int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, PolyA polyA);
 
 /// @brief Find and record single polyA/polyT
-int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, TsdRegion region);
+int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, PolyA polyA);
 
 /// @brief Annotate TSD and refine breakpoint by parsing Tsd-To-Local alignments
 void annoTsd(Cluster *cluster);
