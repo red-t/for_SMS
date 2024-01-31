@@ -7,6 +7,8 @@ from subprocess import Popen, DEVNULL
 ##################
 AnnoDt = np.dtype([
     ('idx',         np.int32),
+    ('cltTid',      np.int32),
+    ('cltIdx',      np.int32),
     ('queryStart',  np.int32),
     ('queryEnd',    np.int32),
     ('strand',      np.uint8),

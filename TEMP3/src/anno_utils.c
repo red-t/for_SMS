@@ -1,12 +1,51 @@
 #include "anno_utils.h"
 
 /// @brief Initiate TsdRegion
-TsdRegion initTsdRegion()
+TsdRegion initTsdRegion(int idx, int cltTid, int cltIdx)
 {
     TsdRegion region;
     region.leftMost = INT_MAX;
     region.rightMost = 0;
+    region.idx = idx;
+    region.cltTid = cltTid;
+    region.cltIdx = cltIdx;
     return region;
+}
+
+/// @brief Record single TE annotation
+void initAnno(bam1_t *bam, Anno *anno, int idx, int cltTid, int cltIdx)
+{
+    int numCigar = bam->core.n_cigar;
+    uint32_t *cigarArray = bam_get_cigar(bam);
+
+    int queryStart = 0;
+    if (bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP)
+        queryStart = bam_cigar_oplen(cigarArray[0]);
+
+    int queryEnd = bam->core.l_qseq;
+    if (bam_cigar_op(cigarArray[numCigar - 1]) == BAM_CSOFT_CLIP)
+        queryEnd -= bam_cigar_oplen(cigarArray[numCigar - 1]);
+
+    int i, refLen;
+    for (i = refLen = 0; i < numCigar; i++)
+        if (bam_cigar_type(bam_cigar_op(cigarArray[i])) & 2)
+            refLen += bam_cigar_oplen(cigarArray[i]);
+
+    anno->idx = idx;
+    anno->cltTid = cltTid;
+    anno->cltIdx = cltIdx;
+    anno->queryStart = queryStart;
+    anno->queryEnd = queryEnd;
+    anno->strand = bam_is_rev(bam);
+    anno->tid = bam->core.tid;
+    anno->refStart = bam->core.pos;
+    anno->refEnd = bam->core.pos + refLen;
+
+    if (bam_is_rev(bam))
+    {
+        anno->queryStart = bam->core.l_qseq - queryEnd;
+        anno->queryEnd = bam->core.l_qseq - queryStart;
+    }
 }
 
 /// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
@@ -19,8 +58,7 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
     bam1_t *bam = bam_init1();
 
     int numAnno = 0;
-    TsdRegion region = initTsdRegion();
-    region.idx = idx;
+    TsdRegion region = initTsdRegion(idx, cluster->tid, cluster->idx);
     while (1)
     {
         int retValue = bam_read1(inputBam->fp.bgzf, bam);
@@ -29,7 +67,7 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
         if (bamIsInvalid(bam))
             continue;
 
-        initAnno(bam, &annoArray[numAnno], idx);
+        initAnno(bam, &annoArray[numAnno], idx, cluster->tid, cluster->idx);
         if (annoArray[numAnno].queryStart < region.leftMost) {
             region.leftMost = annoArray[numAnno].queryStart;
             region.leftIdx = numAnno;
@@ -54,40 +92,6 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
     if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
     if (inputFn != NULL) {free(inputFn); inputFn=NULL;}
     return numAnno;
-}
-
-/// @brief Record single TE annotation
-void initAnno(bam1_t *bam, Anno *anno, int idx)
-{
-    int numCigar = bam->core.n_cigar;
-    uint32_t *cigarArray = bam_get_cigar(bam);
-
-    int queryStart = 0;
-    if (bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP)
-        queryStart = bam_cigar_oplen(cigarArray[0]);
-
-    int queryEnd = bam->core.l_qseq;
-    if (bam_cigar_op(cigarArray[numCigar - 1]) == BAM_CSOFT_CLIP)
-        queryEnd -= bam_cigar_oplen(cigarArray[numCigar - 1]);
-
-    int i, refLen;
-    for (i = refLen = 0; i < numCigar; i++)
-        if (bam_cigar_type(bam_cigar_op(cigarArray[i])) & 2)
-            refLen += bam_cigar_oplen(cigarArray[i]);
-
-    anno->idx = idx;
-    anno->queryStart = queryStart;
-    anno->queryEnd = queryEnd;
-    anno->strand = bam_is_rev(bam);
-    anno->tid = bam->core.tid;
-    anno->refStart = bam->core.pos;
-    anno->refEnd = bam->core.pos + refLen;
-
-    if (bam_is_rev(bam))
-    {
-        anno->queryStart = bam->core.l_qseq - queryEnd;
-        anno->queryEnd = bam->core.l_qseq - queryStart;
-    }
 }
 
 /// @brief Find and record all polyA/polyT
@@ -172,6 +176,8 @@ int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, TsdRegion region)
 
     end = (region.isA) ? (end + region.rightMost) : end;
     annoArray[numAnno].idx = region.idx;
+    annoArray[numAnno].cltTid = region.cltTid;
+    annoArray[numAnno].cltIdx = region.cltIdx;
     annoArray[numAnno].queryStart = end - maxLen;
     annoArray[numAnno].queryEnd = end;
     annoArray[numAnno].strand = (region.isA) ? 0 : 1;
@@ -265,7 +271,7 @@ void outPutAnno(Anno *annoArray, int numAnno, const char *outFn)
         if (annoArray[i].idx != prevIdx) {
             queryStr[strlen(queryStr)-1] = '\0';
             refStr[strlen(refStr)-1] = '\0';
-            fprintf(fp, "%d-%d\t%s\t%s\n", annoArray[i - 1].tid, annoArray[i - 1].idx, queryStr, refStr);
+            fprintf(fp, "%d-%d\t%s\t%s\n", annoArray[i-1].cltTid, annoArray[i-1].cltIdx, queryStr, refStr);
             prevIdx = annoArray[i].idx;
             memset(queryStr, '\0', strlen(queryStr));
             memset(refStr, '\0', strlen(refStr));
@@ -280,7 +286,7 @@ void outPutAnno(Anno *annoArray, int numAnno, const char *outFn)
     // Output final anno record
     queryStr[strlen(queryStr)-1] = '\0';
     refStr[strlen(refStr)-1] = '\0';
-    fprintf(fp, "%d-%d\t%s\t%s\n", annoArray[numAnno-1].tid, annoArray[numAnno-1].idx, queryStr, refStr);
+    fprintf(fp, "%d-%d\t%s\t%s\n", annoArray[numAnno-1].cltTid, annoArray[numAnno-1].cltIdx, queryStr, refStr);
     fclose(fp);
 
     if (queryStr != NULL) {free(queryStr); queryStr=NULL;}

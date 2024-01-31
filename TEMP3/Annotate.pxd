@@ -6,6 +6,8 @@ cdef extern from "src/anno_utils.h" nogil:
     ##################
     ctypedef packed struct Anno:
         int     idx
+        int     cltTid
+        int     cltIdx
         int     queryStart
         int     queryEnd
         uint8_t strand

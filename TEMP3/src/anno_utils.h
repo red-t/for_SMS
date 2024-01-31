@@ -12,6 +12,8 @@
 typedef struct Anno
 {
     int     idx;
+    int     cltTid;
+    int     cltIdx;
     int     queryStart;
     int     queryEnd;
     uint8_t strand;
@@ -20,15 +22,12 @@ typedef struct Anno
     int     refEnd;
 } __attribute__((packed)) Anno;
 
-
-/***********************************
- *** Annotate Insertion sequence ***
- ***********************************/
-
 /// @brief Data container for tsd-containing-region
 typedef struct TsdRegion
 {
     int idx;
+    int cltTid;
+    int cltIdx;
     int leftMost;
     int leftIdx;
     int rightMost;
@@ -37,11 +36,13 @@ typedef struct TsdRegion
     int seqLen;
 } TsdRegion;
 
+
+/***********************************
+ *** Annotate Insertion sequence ***
+ ***********************************/
+
 /// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
 int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx);
-
-/// @brief Record single TE annotation
-void initAnno(bam1_t *bam, Anno *anno, int idx);
 
 /// @brief Find and record all polyA/polyT
 int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, TsdRegion region);
