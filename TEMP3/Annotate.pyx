@@ -81,9 +81,13 @@ cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
     cdef int i, retValue, numAnno=0, maxNum=9900
     cdef object annoArray = np.zeros(10000, dtype=AnnoDt)
     cdef Anno[::1] annoArrayView = annoArray
-    cdef str bamFn
+    cdef str bamFn, assmFn
 
     for i in range(startIdx, endIdx):
+        assmFn = "tmp_assm/{}_{}.ctg.lay.gz".format(cltArray[i].tid, cltArray[i].idx)
+        if os.path.isfile(assmFn) != 0:
+                cltArray[i].flag |= CLT_ASSEMBLED
+        
         bamFn = "tmp_anno/{}_{}_InsToTE.bam".format(cltArray[i].tid, cltArray[i].idx)
         if os.path.isfile(bamFn) == False:
             continue
@@ -100,6 +104,10 @@ cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
     
     annoArray.resize((numAnno,), refcheck=False)
     annoArray.sort(order=['idx', 'queryStart', 'queryEnd'])
+    annoArrayView = annoArray
+
+    cdef bytes annoFn = 'tmp_anno/{}_anno.txt'.format(startIdx).encode()
+    outPutAnno(&annoArrayView[0], numAnno, annoFn)
 
     ##
     return annoArray
@@ -118,12 +126,31 @@ cpdef annotateCluster(Cluster[::1] cltArray, int startIdx, int taskSize, object 
 
     ##
     annoArray = annotateIns(cltArray, startIdx, endIdx)
-    np.savetxt('tmp_anno_{}.txt'.format(startIdx), annoArray, fmt='%d\t%d\t%d\t%d\t%d\t%d\t%d')
+    # np.savetxt('tmp_anno_{}.txt'.format(startIdx), annoArray, fmt='%d\t%d\t%d\t%d\t%d\t%d\t%d')
+    np.savetxt('tmp_clt_{}.txt'.format(startIdx), cltArray[startIdx:endIdx-1])
 
-    cdef int numTsd = 0
-    for i in range(cltArray.shape[0]):
+    rev = 0; black = 0; assm = 0; left = 0; right = 0; diff = 0; same = 0; te = 0; polya = 0; tsd = 0
+    for i in range(startIdx, endIdx):
+        if (cltArray[i].flag & 1) != 0:
+            rev += 1
+        if (cltArray[i].flag & 2) != 0:
+            black += 1
+        if (cltArray[i].flag & 4) != 0:
+            assm += 1
+        if (cltArray[i].flag & 8) != 0:
+            left += 1
+        if (cltArray[i].flag & 16) != 0:
+            right += 1
+        if (cltArray[i].flag & 32) != 0:
+            diff += 1
+        if (cltArray[i].flag & 64) != 0:
+            same += 1
+        if (cltArray[i].flag & 128) != 0:
+            te += 1
+        if (cltArray[i].flag & 256) != 0:
+            polya += 1
         if (cltArray[i].flag & 512) != 0:
-            numTsd += 1
+            tsd += 1
     
-    print("numTsd:\t{}".format(numTsd))
+    print("rev:{}\tblack:{}\tassm:{}\tleft:{}\tright:{}\tdiff:{}\tsame:{}\tte:{}\tpolya:{}\ttsd:{}".format(rev, black, assm, left, right, diff, same, te, polya, tsd))
     ##

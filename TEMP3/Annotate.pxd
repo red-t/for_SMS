@@ -18,5 +18,6 @@ cdef extern from "src/anno_utils.h" nogil:
     ###################################
     int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
     void annoTsd(Cluster *cluster)
+    void outPutAnno(Anno *annoArray, int numAnno, const char *outFn)
 
 cpdef annotateCluster(Cluster[::1] cltArray, int startIdx, int taskSize, object cmdArgs)

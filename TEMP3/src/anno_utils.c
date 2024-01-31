@@ -6,8 +6,6 @@ TsdRegion initTsdRegion()
     TsdRegion region;
     region.leftMost = INT_MAX;
     region.rightMost = 0;
-    region.leftIdx = 0;
-    region.rightIdx = 0;
     return region;
 }
 
@@ -162,7 +160,7 @@ int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, TsdRegion region)
         return numAnno;
 
     // polyT at the start, but left-most TE is forward
-    if ((!region.isA) && (!annoArray[region.rightIdx].strand))
+    if ((!region.isA) && (!annoArray[region.leftIdx].strand))
         return numAnno;
 
     if(maxLen < 10)
@@ -248,4 +246,45 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
         cluster->refStart = localStart + leftEnd;
         cluster->refEnd = localStart + rightStart;
     }
+}
+
+/// @brief Output annotation records
+void outPutAnno(Anno *annoArray, int numAnno, const char *outFn)
+{
+    char *queryTmp = malloc(100 * sizeof(char));
+    char *refTmp = malloc(100 * sizeof(char));
+    char *queryStr = malloc(500 * sizeof(char));
+    char *refStr = malloc(500 * sizeof(char));
+    memset(queryStr, '\0', 500);
+    memset(refStr, '\0', 500);
+    
+    int prevIdx = annoArray[0].idx;
+    FILE *fp = fopen(outFn, "w");
+    for (int i = 0; i < numAnno; i++)
+    {
+        if (annoArray[i].idx != prevIdx) {
+            queryStr[strlen(queryStr)-1] = '\0';
+            refStr[strlen(refStr)-1] = '\0';
+            fprintf(fp, "%d-%d\t%s\t%s\n", annoArray[i - 1].tid, annoArray[i - 1].idx, queryStr, refStr);
+            prevIdx = annoArray[i].idx;
+            memset(queryStr, '\0', strlen(queryStr));
+            memset(refStr, '\0', strlen(refStr));
+        }
+
+        char strand = (annoArray[i].strand == 0) ? '+' : '-';
+        sprintf(queryTmp, "%c:%d-%d,", strand, annoArray[i].queryStart, annoArray[i].queryEnd);
+        sprintf(refTmp, "%d:%d-%d,", annoArray[i].tid, annoArray[i].refStart, annoArray[i].refEnd);
+        strcat(queryStr, queryTmp);
+        strcat(refStr, refTmp);
+    }
+    // Output final anno record
+    queryStr[strlen(queryStr)-1] = '\0';
+    refStr[strlen(refStr)-1] = '\0';
+    fprintf(fp, "%d-%d\t%s\t%s\n", annoArray[numAnno-1].tid, annoArray[numAnno-1].idx, queryStr, refStr);
+    fclose(fp);
+
+    if (queryStr != NULL) {free(queryStr); queryStr=NULL;}
+    if (refStr != NULL) {free(refStr); refStr=NULL;}
+    if (queryTmp != NULL) {free(queryTmp); queryTmp=NULL;}
+    if (refTmp != NULL) {free(refTmp); refTmp=NULL;}
 }
