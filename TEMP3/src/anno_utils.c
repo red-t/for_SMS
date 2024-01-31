@@ -255,7 +255,7 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
 }
 
 /// @brief Output annotation records
-void outPutAnno(Anno *annoArray, int numAnno, const char *outFn)
+void outPutAnno(Anno *annoArray, int numAnno, const char *teFn, const char *outFn)
 {
     char *queryTmp = malloc(100 * sizeof(char));
     char *refTmp = malloc(100 * sizeof(char));
@@ -263,7 +263,8 @@ void outPutAnno(Anno *annoArray, int numAnno, const char *outFn)
     char *refStr = malloc(500 * sizeof(char));
     memset(queryStr, '\0', 500);
     memset(refStr, '\0', 500);
-    
+
+    faidx_t *teFa = fai_load(teFn);
     int prevIdx = annoArray[0].idx;
     FILE *fp = fopen(outFn, "w");
     for (int i = 0; i < numAnno; i++)
@@ -279,7 +280,14 @@ void outPutAnno(Anno *annoArray, int numAnno, const char *outFn)
 
         char strand = (annoArray[i].strand == 0) ? '+' : '-';
         sprintf(queryTmp, "%c:%d-%d,", strand, annoArray[i].queryStart, annoArray[i].queryEnd);
-        sprintf(refTmp, "%d:%d-%d,", annoArray[i].tid, annoArray[i].refStart, annoArray[i].refEnd);
+
+        if (annoArray[i].tid == -1)
+            sprintf(refTmp, "PolyA:%d-%d,", annoArray[i].refStart, annoArray[i].refEnd);
+        else if (annoArray[i].tid == -2)
+            sprintf(refTmp, "PolyT:%d-%d,", annoArray[i].refStart, annoArray[i].refEnd);
+        else
+            sprintf(refTmp, "%s:%d-%d,", faidx_iseq(teFa, annoArray[i].tid), annoArray[i].refStart, annoArray[i].refEnd);
+
         strcat(queryStr, queryTmp);
         strcat(refStr, refTmp);
     }
@@ -293,4 +301,5 @@ void outPutAnno(Anno *annoArray, int numAnno, const char *outFn)
     if (refStr != NULL) {free(refStr); refStr=NULL;}
     if (queryTmp != NULL) {free(queryTmp); queryTmp=NULL;}
     if (refTmp != NULL) {free(refTmp); refTmp=NULL;}
+    if (teFa != NULL) {fai_destroy(teFa); teFa = NULL;}
 }

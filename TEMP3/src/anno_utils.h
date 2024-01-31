@@ -57,6 +57,6 @@ void annoTsd(Cluster *cluster);
 void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart);
 
 /// @brief Output annotation records
-void outPutAnno(Anno *annoArray, int numAnno, const char *outFn);
+void outPutAnno(Anno *annoArray, int numAnno, const char *teFn, const char *outFn);
 
 #endif // ANNO_UTILS_H

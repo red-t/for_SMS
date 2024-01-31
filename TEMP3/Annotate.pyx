@@ -79,7 +79,7 @@ cdef mapTsdToLocal(int tid, int idx):
 ##########################
 ### Annotate Insertion ###
 ##########################
-cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
+cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx, object cmdArgs):
     cdef int i, retValue, numAnno=0, maxNum=9900
     cdef object annoArray = np.zeros(10000, dtype=AnnoDt)
     cdef Anno[::1] annoArrayView = annoArray
@@ -109,7 +109,8 @@ cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx):
     annoArrayView = annoArray
 
     cdef bytes annoFn = 'tmp_anno/{}_anno.txt'.format(startIdx).encode()
-    outPutAnno(&annoArrayView[0], numAnno, annoFn)
+    cdef bytes teFn = cmdArgs.teFn.encode()
+    outPutAnno(&annoArrayView[0], numAnno, teFn, annoFn)
 
     ##
     return annoArray
@@ -127,7 +128,7 @@ cpdef annotateCluster(Cluster[::1] cltArray, int startIdx, int taskSize, object 
     annotateAssm(cltArray, startIdx, endIdx, cmdArgs)
 
     ##
-    annoArray = annotateIns(cltArray, startIdx, endIdx)
+    annoArray = annotateIns(cltArray, startIdx, endIdx, cmdArgs)
     # np.savetxt('tmp_anno_{}.txt'.format(startIdx), annoArray, fmt='%d\t%d\t%d\t%d\t%d\t%d\t%d')
     np.savetxt('tmp_clt_{}.txt'.format(startIdx), cltArray[startIdx:endIdx-1])
 
