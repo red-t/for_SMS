@@ -62,9 +62,9 @@ cdef extern from "src/cluster_utils.h" nogil:
     ##################
     ctypedef packed struct Cluster:
         int         tid
+        int         idx
         int         refStart
         int         refEnd
-        int         idx
         int         startIdx
         int         endIdx
         float       numSeg

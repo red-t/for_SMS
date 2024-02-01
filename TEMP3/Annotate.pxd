@@ -1,5 +1,11 @@
 from .FileIO cimport *
 
+cdef extern from "src/cluster_utils.h":
+    ######################
+    ### Cluster I/O ###
+    ######################
+    void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn)
+
 cdef extern from "src/anno_utils.h" nogil:
     ##################
     ### Structures ###
@@ -20,6 +26,10 @@ cdef extern from "src/anno_utils.h" nogil:
     ###################################
     int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
     void annoTsd(Cluster *cluster)
-    void outPutAnno(Anno *annoArray, int numAnno, const char *teFn, const char *outFn)
 
-cpdef annotateCluster(Cluster[::1] cltArray, int startIdx, int taskSize, object cmdArgs)
+    ######################
+    ### Annotation I/O ###
+    ######################
+    void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
+
+cpdef annotateCluster(Cluster[::1] cltView, int startIdx, int taskSize, object cmdArgs)

@@ -6,6 +6,7 @@
 #include "htslib/bgzf.h"
 #include "htslib/hts.h"
 #include "htslib/sam.h"
+#include "htslib/faidx.h"
 #include "seg_utils.h"
 #include "AIList.h"
 
@@ -30,9 +31,9 @@
 
 /*! @brief Data container for cluster merged from segments.
  @field  tid                target id of corresponding chromosome
+ @field  idx                cluster index in clusters array (0-based)
  @field  refStart           cluster start on reference genome (0-based, included)
  @field  refEnd             cluster end on reference genome (0-based, not-included)
- @field  idx                cluster index in clusters array (0-based)
  @field  startIdx           start index in segments array (0-based, include)
  @field  endIdx             end index in segments array (0-based, not-include)
  @field  numSeg             number of segments in the cluster (normalized by bg depth)
@@ -75,9 +76,9 @@
 typedef struct Cluster
 {
     int         tid;
+    int         idx;
     int         refStart;
     int         refEnd;
-    int         idx;
     int         startIdx;
     int         endIdx;
     float       numSeg;
@@ -213,5 +214,13 @@ void setBackbgInfo(Cluster *cluster, Args args);
 
 /// @brief Check if the cluster inersect with blacklist
 void intersectBlackList(Cluster *cluster, Args args);
+
+
+/*******************
+ *** Cluster I/O ***
+ *******************/
+
+/// @brief Output formated cluster records
+void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn);
 
 #endif // CLUSTER_UTILS_H

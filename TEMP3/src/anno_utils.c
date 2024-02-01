@@ -1,5 +1,9 @@
 #include "anno_utils.h"
 
+/***********************************
+ *** Annotate Insertion sequence ***
+ ***********************************/
+
 /// @brief Initiate PolyA
 PolyA initPolyA(int idx, int cltTid, int cltIdx)
 {
@@ -254,18 +258,25 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
     }
 }
 
-/// @brief Output annotation records
-void outPutAnno(Anno *annoArray, int numAnno, const char *teFn, const char *outFn)
+
+/**********************
+ *** Annotation I/O ***
+ **********************/
+
+/// @brief Output formated annotation records
+void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
 {
     char *queryTmp = malloc(100 * sizeof(char));
     char *refTmp = malloc(100 * sizeof(char));
     char *queryStr = malloc(500 * sizeof(char));
     char *refStr = malloc(500 * sizeof(char));
-    memset(queryStr, '\0', 500);
-    memset(refStr, '\0', 500);
-
+    char *outFn = malloc(100 * sizeof(char));
     faidx_t *teFa = fai_load(teFn);
     int prevIdx = annoArray[0].idx;
+
+    sprintf(outFn, "tmp_anno/%d_annoFormated.txt", startIdx);
+    memset(queryStr, '\0', 500);
+    memset(refStr, '\0', 500);
     FILE *fp = fopen(outFn, "w");
     for (int i = 0; i < numAnno; i++)
     {
@@ -301,5 +312,6 @@ void outPutAnno(Anno *annoArray, int numAnno, const char *teFn, const char *outF
     if (refStr != NULL) {free(refStr); refStr=NULL;}
     if (queryTmp != NULL) {free(queryTmp); queryTmp=NULL;}
     if (refTmp != NULL) {free(refTmp); refTmp=NULL;}
+    if (outFn != NULL) {free(outFn); outFn=NULL;}
     if (teFa != NULL) {fai_destroy(teFa); teFa = NULL;}
 }

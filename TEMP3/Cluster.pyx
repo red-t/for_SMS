@@ -47,9 +47,9 @@ TeAlignmentDt = np.dtype([
 
 ClusterDt = np.dtype([
     ('tid',                 np.int32),
+    ('idx',                 np.int32),
     ('refStart',            np.int32),
     ('refEnd',              np.int32),
-    ('idx',                 np.int32),
     ('startIdx',            np.int32),
     ('endIdx',              np.int32),
     ('numSeg',              np.float32),
@@ -283,70 +283,6 @@ cdef filterSomaByModel(object cltDf, str modelPath):
     probability.columns = ['0', 'probability']
     cltDf.update(probability)
 
-
-##############
-### Output ###
-##############
-cdef outPut(object cltArray, Segment[::1] segArray, BamFile genomeBam, Args args):
-
-    cdef bytes qnameBytes
-    cdef bytes chromBytes = sam_hdr_tid2name(genomeBam.header, args.tid)
-    cdef str cltId, chrom = chromBytes.decode()
-    cdef Iterator iterator = Iterator(genomeBam, args.tid)
-    cdef list cltList
-    cdef int i, j
-
-    cltOutput = open('tmp_clt_{}.txt'.format(args.tid), 'w')
-    segOutput = open('tmp_seg_{}.txt'.format(args.tid), 'w')
-
-    for i in range(cltArray.shape[0]):
-        ### output clt ###
-        cltList = list(cltArray[i])
-
-        # direction
-        if cltList[5] == 1:
-            cltList.insert(2, '+')
-        elif cltList[5] == 2:
-            cltList.insert(2, '-')
-        else:
-            cltList.insert(2, '*')
-        
-        # normalized numSeg
-        cltList.insert(2, cltList[5])
-
-        # cluster id
-        cltId = str(args.tid) + '-' + str(i)
-        cltList.insert(2, cltId)
-        
-        # chromosome
-        cltList.insert(0, chrom)
-
-        # write out clt
-        cltList = [str(x) for x in cltList]
-        cltOutput.write('\t'.join(cltList) + '\n')
-
-        ### output seg ###
-        for j in range(cltArray[i]['startIdx'], cltArray[i]['endIdx']):
-            if segArray[j].overhang < args.minOverhang:
-                continue
-
-            # chromosome & cluster id
-            cltList = [chrom, cltId]
-
-            # refst
-            cltList.append(str(segArray[j].alnRefStart))
-
-            # qname
-            iterator.cnext3(segArray[j].fileOffset)
-
-            qnameBytes = bam_get_qname(iterator.bamRcord)
-            cltList.append(qnameBytes.decode())
-
-            # write out seg
-            segOutput.write('\t'.join(cltList) + '\n')
-    
-    cltOutput.close(); segOutput.close(); del iterator
-    
 
 #####################
 ### Build Cluster ###

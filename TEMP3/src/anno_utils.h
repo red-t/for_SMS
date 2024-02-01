@@ -56,7 +56,12 @@ void annoTsd(Cluster *cluster);
 /// @brief Find TSD and refine breakpoint
 void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart);
 
-/// @brief Output annotation records
-void outPutAnno(Anno *annoArray, int numAnno, const char *teFn, const char *outFn);
+
+/**********************
+ *** Annotation I/O ***
+ **********************/
+
+/// @brief Output formated annotation records
+void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn);
 
 #endif // ANNO_UTILS_H
