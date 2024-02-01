@@ -89,7 +89,7 @@ ClusterDt = np.dtype([
 cdef object getSegArray(BamFile genomeBam, Args args):
     cdef int retValue, numSeg=0, maxNum=9900
     cdef object segArray = np.zeros(10000, dtype=SegmentDt)
-    cdef Segment[::1] segArrayView = segArray
+    cdef Segment[::1] segView = segArray
     cdef Iterator iterator = Iterator(genomeBam, args.tid)
     
     while True:
@@ -103,26 +103,26 @@ cdef object getSegArray(BamFile genomeBam, Args args):
             continue
 
         if numSeg >= maxNum:
-            maxNum = segArrayView.shape[0] + 10000
+            maxNum = segView.shape[0] + 10000
             segArray.resize((maxNum,), refcheck=False)
-            segArrayView = segArray
+            segView = segArray
             maxNum -= 100
 
-        retValue = fillSegmentArray(iterator.bamRcord, &segArrayView[numSeg], iterator.offset, args.minSegLen)
+        retValue = fillSegArray(iterator.bamRcord, &segView[numSeg], iterator.offset, args.minSegLen)
         numSeg += retValue
 
 
-cdef updateSegArray(Segment[::1] segArray, Args args):
+cdef updateSegArray(Segment[::1] segView, Args args):
     cdef int i
-    for i in range(segArray.shape[0]):
-        updateSegment(&segArray[i], args.repeatAiList, args.gapAiList)
+    for i in range(segView.shape[0]):
+        updateSegment(&segView[i], args.repeatAiList, args.gapAiList)
 
 
-cdef updateSegArrayByTe(Segment[::1] segArray, Args args):
+cdef updateSegArrayByTe(Segment[::1] segView, Args args):
     cdef BamFile teBam = BamFile("tmp_build/all_seg_{}.bam".format(args.tid), "rb", args.numThread)
     cdef Iterator iterator = Iterator(teBam)
     cdef object teArray = getTeArray(iterator)
-    cdef TeAlignment[::1] teArrayView = teArray
+    cdef TeAlignment[::1] teView = teArray
     cdef int numTeTid = teBam.header.n_targets
 
     teArray.sort(order=['segIdx', 'queryStart'])
@@ -131,13 +131,13 @@ cdef updateSegArrayByTe(Segment[::1] segArray, Args args):
     cdef int[::1] teTidCountTableView = teTidCountTable
     cdef int i
 
-    for i in range(teArrayView.shape[0]):
-        updateSegByTeArray(&segArray[0], &teArrayView[0], i)
+    for i in range(teView.shape[0]):
+        updateSegByTeArray(&segView[0], &teView[0], i)
 
-    for i in range(segArray.shape[0]):
-        if segArray[i].numTeAlignment:
-            countTeTids(&segArray[i], &teArrayView[0], &teTidCountTableView[0], numTeTid)
-            segArray[i].teTid = np.argmax(teTidCountTable)
+    for i in range(segView.shape[0]):
+        if segView[i].numTeAlignment:
+            countTeTids(&segView[i], &teView[0], &teTidCountTableView[0], numTeTid)
+            segView[i].teTid = np.argmax(teTidCountTable)
 
     del iterator; teBam.close(); del teBam; del teTidCountTable
 
@@ -159,7 +159,7 @@ cdef mapSegToTE(str teFn, Args args):
 cdef object getTeArray(Iterator iterator):
     cdef int retValue, numTeAln=0, maxNum=9900
     cdef object teArray = np.zeros(10000, dtype=TeAlignmentDt)
-    cdef TeAlignment[::1] teArrayView = teArray
+    cdef TeAlignment[::1] teView = teArray
     
     while True:
         retValue = iterator.cnext2()
@@ -173,57 +173,57 @@ cdef object getTeArray(Iterator iterator):
         if numTeAln >= maxNum:
             maxNum = teArray.shape[0] + 10000
             teArray.resize((maxNum,), refcheck=False)
-            teArrayView = teArray
+            teView = teArray
             maxNum -= 100
 
-        fillTeArray(iterator.bamRcord, &teArrayView[numTeAln])
+        fillTeArray(iterator.bamRcord, &teView[numTeAln])
         numTeAln += 1
 
 
 ##########################
 ### Construct CltArray ###
 ##########################
-cdef object getCltArray(Segment[::1] segArray, Args args):
+cdef object getCltArray(Segment[::1] segView, Args args):
     cdef int startIdx=0, endIdx, numClt=0, maxNum=9900
     cdef object cltArray = np.zeros(10000, dtype=ClusterDt)
-    cdef Cluster[::1] cltArrayView = cltArray
+    cdef Cluster[::1] cltView = cltArray
     
-    while startIdx < segArray.shape[0]:
-        if overhangIsShort(&segArray[startIdx], args.minOverhang):
+    while startIdx < segView.shape[0]:
+        if overhangIsShort(&segView[startIdx], args.minOverhang):
             startIdx += 1; continue
 
         if numClt > maxNum:
             maxNum = cltArray.shape[0] + 10000
             cltArray.resize((maxNum,), refcheck=False)
-            cltArrayView = cltArray
+            cltView = cltArray
             maxNum -= 100
         
         # Initialize numClt-th cluster
-        cltArrayView[numClt].tid = args.tid
-        cltArrayView[numClt].refStart = segArray[startIdx].refPosition - 1
-        cltArrayView[numClt].refEnd = segArray[startIdx].refPosition + args.maxDistance
-        cltArrayView[numClt].idx = numClt
-        cltArrayView[numClt].startIdx = startIdx
+        cltView[numClt].tid = args.tid
+        cltView[numClt].refStart = segView[startIdx].refPosition - 1
+        cltView[numClt].refEnd = segView[startIdx].refPosition + args.maxDistance
+        cltView[numClt].idx = numClt
+        cltView[numClt].startIdx = startIdx
 
         endIdx = startIdx + 1
-        while endIdx < segArray.shape[0]:
-            if overhangIsShort(&segArray[endIdx], args.minOverhang):
+        while endIdx < segView.shape[0]:
+            if overhangIsShort(&segView[endIdx], args.minOverhang):
                 endIdx += 1; continue
-            if segArray[endIdx].refPosition > cltArrayView[numClt].refEnd:
+            if segView[endIdx].refPosition > cltView[numClt].refEnd:
                 break
 
-            cltArrayView[numClt].refEnd = segArray[endIdx].refPosition + args.maxDistance
+            cltView[numClt].refEnd = segView[endIdx].refPosition + args.maxDistance
             endIdx += 1
         
-        cltArrayView[numClt].endIdx = endIdx
-        cltArrayView[numClt].refEnd = cltArrayView[numClt].refEnd - args.maxDistance
+        cltView[numClt].endIdx = endIdx
+        cltView[numClt].refEnd = cltView[numClt].refEnd - args.maxDistance
         startIdx = endIdx; numClt += 1
     
     cltArray.resize((numClt,), refcheck=False)
     return cltArray
 
 
-cdef updateCltArray(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBam, Args args):
+cdef updateCltArray(Cluster[::1] cltView, Segment[::1] segView, BamFile genomeBam, Args args):
     
     cdef BamFile teBam = BamFile("tmp_build/all_seg_{}.bam".format(args.tid), "rb", 1)
     cdef object teTidCountTable = np.zeros(teBam.header.n_targets, dtype=np.int32)
@@ -237,12 +237,12 @@ cdef updateCltArray(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genome
     args.secondBamRecord = bam_init1()
 
     teBam.close(); del teBam
-    for i in range(cltArray.shape[0]):
-        updateCluster(&cltArray[i], &segArray[0], args)
+    for i in range(cltView.shape[0]):
+        updateCluster(&cltView[i], &segView[0], args)
 
-        if not isValidCandidate(&cltArray[i]):
+        if not isValidCandidate(&cltView[i]):
             continue
-        cltArray[i].teTid = np.argmax(teTidCountTable)
+        cltView[i].teTid = np.argmax(teTidCountTable)
     
     bam_destroy1(args.firstBamRecord); bam_destroy1(args.secondBamRecord)
     destroyAiList(args.repeatAiList); destroyAiList(args.gapAiList); del teTidCountTable
@@ -251,10 +251,10 @@ cdef updateCltArray(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genome
 ######################
 ### Filter Cluster ###
 ######################
-cdef filterByBlacklist(Cluster[::1] cltArray, Args args):
+cdef filterByBlacklist(Cluster[::1] cltView, Args args):
     cdef int i
-    for i in range(cltArray.shape[0]):
-        intersectBlackList(&cltArray[i], args)
+    for i in range(cltView.shape[0]):
+        intersectBlackList(&cltView[i], args)
     
     destroyAiList(args.blackAiList)
 
@@ -331,25 +331,25 @@ cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdA
 cdef object getHighQualClts(dict allCltData):
     cdef int i, tid, numClt = 0, maxNum = 1900
     cdef object highQualArray = np.zeros(2000, dtype=ClusterDt)
-    cdef Cluster[::1] arrayView = highQualArray
-    cdef Cluster[::1] cltArray
+    cdef Cluster[::1] highQualView = highQualArray
+    cdef Cluster[::1] cltView
 
     for tid in range(len(allCltData)):
-        cltArray = allCltData[tid][0]
-        if cltArray.shape[0] == 0:
+        cltView = allCltData[tid][0]
+        if cltView.shape[0] == 0:
             continue
         
-        for i in range(cltArray.shape[0]):
-            if isLowQualClt(&cltArray[i]):
+        for i in range(cltView.shape[0]):
+            if isLowQualClt(&cltView[i]):
                 continue
             
             if numClt >= maxNum:
                 maxNum = highQualArray.shape[0] + 2000
                 highQualArray.resize((maxNum,), refcheck=False)
-                arrayView = highQualArray
+                highQualView = highQualArray
                 maxNum -= 100
             
-            arrayView[numClt] = cltArray[i]
+            highQualView[numClt] = cltView[i]
             numClt += 1
 
     highQualArray.resize((numClt,), refcheck=False)

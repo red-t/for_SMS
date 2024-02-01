@@ -22,8 +22,8 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
     cdef int numAln = 0, maxNumAln = 499900
     cdef object readLenArray = np.zeros(500000, dtype=np.int32)
     cdef object divArray = np.zeros(500000, dtype=np.float32)
-    cdef float[::1] divArrayView = divArray
-    cdef int[::1] readLenArrayView = readLenArray
+    cdef float[::1] divView = divArray
+    cdef int[::1] readLenView = readLenArray
     cdef int retValue, alnLen
     cdef int64_t sumAlnLen = 0
     cdef float divergence
@@ -36,7 +36,6 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
             bgInfo["bgDiv"] = np.mean(divArray[:numAln])
             bgInfo["bgDepth"] = float(sumAlnLen) / maxChromLen
             bgInfo["bgReadLen"] = np.median(readLenArray[:numAln])
-
             genomeBam.close(); del iterator; del genomeBam; return bgInfo
 
         if bamIsInvalid(iterator.bamRcord):
@@ -46,14 +45,14 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
             maxNumAln = divArray.shape[0] + 500000
             divArray.resize((maxNumAln,), refcheck=False)
             readLenArray.resize((maxNumAln,), refcheck=False)
-            divArrayView = divArray
-            readLenArrayView = readLenArray
+            divView = divArray
+            readLenView = readLenArray
             maxNumAln -= 100
             
         getMapLenAndDiv(&alnLen, &divergence, iterator.bamRcord)
         sumAlnLen += alnLen
-        divArrayView[numAln] = divergence
-        readLenArrayView[numAln] = iterator.bamRcord.core.l_qseq
+        divView[numAln] = divergence
+        readLenView[numAln] = iterator.bamRcord.core.l_qseq
         numAln += 1
 
 

@@ -20,7 +20,7 @@ cdef extern from "src/seg_utils.h" nogil:
         int16_t flag
         int     teTid
     
-    int fillSegmentArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegmentLength)
+    int fillSegArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegmentLength)
     void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList)
     void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx)
     void countTeTids(Segment *segment, TeAlignment *teArray, int *teTidCountTable, int numTeTid)

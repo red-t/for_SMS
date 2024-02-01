@@ -21,14 +21,13 @@ AnnoDt = np.dtype([
 #########################
 ### Annotate Assembly ###
 #########################
-cdef annotateAssm(Cluster[::1] cltArray, int startIdx, int endIdx, object cmdArgs):
+cdef annotateAssm(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs):
     cdef int i
-
     for i in range(startIdx, endIdx):
-        mapFlankToAssm(cltArray[i].tid, cltArray[i].idx)
-        extractIns(&cltArray[i])
-        mapInsToTE(cltArray[i].tid, cltArray[i].idx, cmdArgs)
-        mapTsdToLocal(cltArray[i].tid, cltArray[i].idx)
+        mapFlankToAssm(cltView[i].tid, cltView[i].idx)
+        extractIns(&cltView[i])
+        mapInsToTE(cltView[i].tid, cltView[i].idx, cmdArgs)
+        mapTsdToLocal(cltView[i].tid, cltView[i].idx)
         
 
 cdef mapFlankToAssm(int tid, int idx):
@@ -79,18 +78,18 @@ cdef mapTsdToLocal(int tid, int idx):
 ##########################
 ### Annotate Insertion ###
 ##########################
-cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx, object cmdArgs):
+cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs):
     cdef int i, retValue, numAnno=0, maxNum=9900
     cdef object annoArray = np.zeros(10000, dtype=AnnoDt)
     cdef Anno[::1] annoView = annoArray
     cdef str bamFn, assmFn
 
     for i in range(startIdx, endIdx):
-        assmFn = "tmp_assm/{}_{}.ctg.lay.gz".format(cltArray[i].tid, cltArray[i].idx)
+        assmFn = "tmp_assm/{}_{}.ctg.lay.gz".format(cltView[i].tid, cltView[i].idx)
         if os.path.isfile(assmFn) != 0:
-                cltArray[i].flag |= CLT_ASSEMBLED
+                cltView[i].flag |= CLT_ASSEMBLED
         
-        bamFn = "tmp_anno/{}_{}_InsToTE.bam".format(cltArray[i].tid, cltArray[i].idx)
+        bamFn = "tmp_anno/{}_{}_InsToTE.bam".format(cltView[i].tid, cltView[i].idx)
         if os.path.isfile(bamFn) == False:
             continue
 
@@ -100,8 +99,8 @@ cdef object annotateIns(Cluster[::1] cltArray, int startIdx, int endIdx, object 
             annoView = annoArray
             maxNum -= 100
 
-        retValue = fillAnnoArray(&cltArray[i], &annoView[numAnno], i)
-        annoTsd(&cltArray[i])
+        retValue = fillAnnoArray(&cltView[i], &annoView[numAnno], i)
+        annoTsd(&cltView[i])
         numAnno += retValue
     
     annoArray.resize((numAnno,), refcheck=False)
@@ -118,7 +117,7 @@ cpdef annotateCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
         endIdx = cltView.shape[0]
     
     annotateAssm(cltView, startIdx, endIdx, cmdArgs)
-    annoArray = annotateIns(cltView, startIdx, endIdx, cmdArgs)
+    cdef object annoArray = annotateIns(cltView, startIdx, endIdx, cmdArgs)
     
     # Output formated cluster and annotation records
     cdef Anno[::1] annoView = annoArray

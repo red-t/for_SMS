@@ -5,7 +5,7 @@
  ***************************/
 
 /// @brief Extract all segments from CIGAR, record in segArray
-int fillSegmentArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen)
+int fillSegArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen)
 {
     SegValues sameSegValues = initSegmentsFromCigar(bam, segArray, fileOffset, minSegLen);
     if (sameSegValues.numSeg > 0)

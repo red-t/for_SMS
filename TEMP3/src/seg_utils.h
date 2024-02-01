@@ -121,7 +121,7 @@ typedef struct TeAlignment
 #define DUAL_CLIP   5
 
 /// @brief Extract all segments from CIGAR, record in segArray
-int fillSegmentArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen);
+int fillSegArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen);
 
 /// @brief Init all segments from CIGAR
 SegValues initSegmentsFromCigar(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen);

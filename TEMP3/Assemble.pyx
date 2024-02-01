@@ -5,20 +5,20 @@ from subprocess import Popen, DEVNULL
 ######################
 ### Local Assembly ###
 ######################
-cpdef assembleCluster(Cluster[::1] cltArray, int startIdx, int taskSize, int numThread):
+cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, int numThread):
     cdef int i, exitCode, endIdx
     cdef str cmd, prefix
     cdef object subProcess
 
     endIdx = startIdx + taskSize
-    if endIdx > cltArray.shape[0]:
-        endIdx = cltArray.shape[0]
+    if endIdx > cltView.shape[0]:
+        endIdx = cltView.shape[0]
 
     for i in range(startIdx, endIdx):
-        if isSomaClt(&cltArray[i]):
+        if isSomaClt(&cltView[i]):
             continue
 
-        prefix = "tmp_assm/{}_{}".format(cltArray[i].tid, cltArray[i].idx)
+        prefix = "tmp_assm/{}_{}".format(cltView[i].tid, cltView[i].idx)
         cmd = "wtdbg2 -l 256 -e 1 -S 1 --rescue-low-cov-edges --node-len 256 --ctg-min-length 256 " \
               "--ctg-min-nodes 1 -q -t {} -i {}.fa -fo {}".format(numThread, prefix, prefix)
         subProcess = Popen(cmd, stderr=DEVNULL, shell=True, executable='/bin/bash')

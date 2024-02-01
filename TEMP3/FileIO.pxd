@@ -54,8 +54,13 @@ cdef extern from "src/cluster_utils.h" nogil:
     int CLT_REVERSED
     int CLT_IN_BLACKLIST
     int CLT_ASSEMBLED
-    int CLT_SINGLE_FLANK_MAP
-    int CLT_BOTH_FLANK_MAP
+    int CLT_LEFT_FLANK_MAP
+    int CLT_RIGHT_FLANK_MAP
+    int CLT_DIFF_FLANK_MAP
+    int CLT_SAME_FLANK_MAP
+    int CLT_TE_MAP
+    int CLT_POLYA
+    int CLT_TSD
 
     ##################
     ### Structures ###
@@ -184,7 +189,7 @@ cdef extern from "src/io_utils.h" nogil:
 
 cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs)
 cdef AiList* newAiList(str bedFn, const char *chrom)
-cdef ouputAllSegSeqs(Segment[::1] segArray, BamFile genomeBam, Args args)
-cdef outputGermCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBam, Args args)
-cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmdArgs, int tid)
-cpdef outputRefFlank(Cluster[::1] cltArray, int startIdx, int taskSize, object cmdArgs)
+cdef ouputAllSegSeqs(Segment[::1] segView, BamFile genomeBam, Args args)
+cdef outputGermCltSeqs(Cluster[::1] cltView, Segment[::1] segView, BamFile genomeBam, Args args)
+cpdef outputSomaCltSeqs(Cluster[::1] cltView, Segment[::1] segView, object cmdArgs, int tid)
+cpdef outputRefFlank(Cluster[::1] cltView, int startIdx, int taskSize, object cmdArgs)

@@ -182,45 +182,45 @@ cdef AiList* newAiList(str bedFn, const char *chrom):
 ###########################
 ### Segment Sequence IO ###
 ###########################
-cdef ouputAllSegSeqs(Segment[::1] segArray, BamFile genomeBam, Args args):
+cdef ouputAllSegSeqs(Segment[::1] segView, BamFile genomeBam, Args args):
     cdef str outputFn = "tmp_build/all_seg_{}.fa".format(args.tid)
     cdef BamFile outputFa = BamFile(outputFn, "wF", args.numThread, genomeBam)
     cdef Iterator iterator = Iterator(genomeBam, args.tid)
     cdef bam1_t *destRecord = bam_init1()
     cdef int i, retValue
 
-    for i in range(segArray.shape[0]):
-        retValue = iterator.cnext3(segArray[i].fileOffset)
-        trimSegment(iterator.bamRcord, destRecord, i, segArray[i].queryStart, segArray[i].queryEnd)
+    for i in range(segView.shape[0]):
+        retValue = iterator.cnext3(segView[i].fileOffset)
+        trimSegment(iterator.bamRcord, destRecord, i, segView[i].queryStart, segView[i].queryEnd)
         outputFa.write(destRecord)
     
     bam_destroy1(destRecord); outputFa.close(); del outputFa; del iterator
 
 
-cdef outputGermCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, BamFile genomeBam, Args args):
+cdef outputGermCltSeqs(Cluster[::1] cltView, Segment[::1] segView, BamFile genomeBam, Args args):
     cdef str outputFn
     cdef BamFile outputFa
     cdef Iterator iterator = Iterator(genomeBam, args.tid)
     cdef bam1_t *destRecord = bam_init1()
     cdef int i, j
 
-    for i in range(cltArray.shape[0]):
-        if isLowQualClt(&cltArray[i]) or isSomaClt(&cltArray[i]):
+    for i in range(cltView.shape[0]):
+        if isLowQualClt(&cltView[i]) or isSomaClt(&cltView[i]):
             continue
 
         outputFn = "tmp_assm/{}_{}.fa".format(args.tid, i)
         outputFa = BamFile(outputFn, "wF", args.numThread, genomeBam)
-        for j in range(cltArray[i].startIdx, cltArray[i].endIdx):
-            if overhangIsShort(&segArray[j], args.minOverhang):
+        for j in range(cltView[i].startIdx, cltView[i].endIdx):
+            if overhangIsShort(&segView[j], args.minOverhang):
                 continue
-            outputSingleSeq(segArray, outputFa, iterator, destRecord, j)
+            outputSingleSeq(segView, outputFa, iterator, destRecord, j)
         
         outputFa.close()
 
     bam_destroy1(destRecord); del iterator
 
 
-cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmdArgs, int tid):
+cpdef outputSomaCltSeqs(Cluster[::1] cltView, Segment[::1] segView, object cmdArgs, int tid):
     cdef int i, j
     cdef Args args
     cdef str outputFn
@@ -230,8 +230,8 @@ cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmd
     cdef bam1_t *destRecord = bam_init1()
 
     args.minOverhang = cmdArgs.minOverhang
-    for i in range(cltArray.shape[0]):
-        if isLowQualClt(&cltArray[i]):
+    for i in range(cltView.shape[0]):
+        if isLowQualClt(&cltView[i]):
             continue
         
         # Skip successfully assembled clusters
@@ -241,19 +241,19 @@ cpdef outputSomaCltSeqs(Cluster[::1] cltArray, Segment[::1] segArray, object cmd
                 continue
         
         outputFa = BamFile(outputFn, "wF", cmdArgs.numThread, genomeBam)
-        j = getOuputSegIdx(&cltArray[i], &segArray[0], args)
-        outputSingleSeq(segArray, outputFa, iterator, destRecord, j)
+        j = getOuputSegIdx(&cltView[i], &segView[0], args)
+        outputSingleSeq(segView, outputFa, iterator, destRecord, j)
         outputFa.close()
 
     bam_destroy1(destRecord); del iterator
     genomeBam.close(); del genomeBam
 
 
-cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFa, Iterator iterator, bam1_t *destRecord, int j, int flankSize=3000):
+cdef outputSingleSeq(Segment[::1] segView, BamFile outputFa, Iterator iterator, bam1_t *destRecord, int j, int flankSize=3000):
     cdef int start, end, retValue
 
-    retValue = iterator.cnext3(segArray[j].fileOffset)
-    setTrimRegion(&segArray[j], &start, &end, flankSize)
+    retValue = iterator.cnext3(segView[j].fileOffset)
+    setTrimRegion(&segView[j], &start, &end, flankSize)
     trimSegment(iterator.bamRcord, destRecord, j, start, end)
     outputFa.write(destRecord)
 
@@ -261,10 +261,10 @@ cdef outputSingleSeq(Segment[::1]segArray, BamFile outputFa, Iterator iterator, 
 #########################
 ### Flank Sequence IO ###
 #########################
-cpdef outputRefFlank(Cluster[::1] cltArray, int startIdx, int taskSize, object cmdArgs):
+cpdef outputRefFlank(Cluster[::1] cltView, int startIdx, int taskSize, object cmdArgs):
     cdef int endIdx = startIdx + taskSize
-    if endIdx > cltArray.shape[0]:
-        endIdx = cltArray.shape[0]
+    if endIdx > cltView.shape[0]:
+        endIdx = cltView.shape[0]
     
     cdef bytes refFn = cmdArgs.refFn.encode('utf-8')
-    extractRefFlanks(refFn, &cltArray[0], startIdx, endIdx)
+    extractRefFlanks(refFn, &cltView[0], startIdx, endIdx)
