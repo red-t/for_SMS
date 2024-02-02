@@ -109,7 +109,7 @@ int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, PolyA polyA)
     hts_pos_t seqLen;
 
     if (polyA.leftMost > 10) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, 0, polyA.leftMost, &seqLen);
+        flankSeq = faidx_fetch_seq64(insFa, insID, 0, polyA.leftMost-1, &seqLen);
         polyA.isA = 0;
         polyA.seqLen = seqLen;
         numAnno = getPolyA(flankSeq, annoArray, numAnno, polyA);
@@ -117,7 +117,7 @@ int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, PolyA polyA)
 
     int insLen = faidx_seq_len64(insFa, insID);
     if ((insLen - polyA.rightMost) > 10) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, polyA.rightMost, insLen, &seqLen);
+        flankSeq = faidx_fetch_seq64(insFa, insID, polyA.rightMost, insLen-1, &seqLen);
         polyA.isA = 1;
         polyA.seqLen = seqLen;
         numAnno = getPolyA(flankSeq, annoArray, numAnno, polyA);
