@@ -284,24 +284,24 @@ char *getInsSeq(faidx_t *assmFa, InsRegion region)
 {
     hts_pos_t seqLen;
     if ((region.flag & CLT_LEFT_FLANK_MAP) != 0)
-        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, region.len1, &seqLen);
+        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, (region.len1-1), &seqLen);
 
     if ((region.flag & CLT_RIGHT_FLANK_MAP) != 0)
-        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), 0, region.start2, &seqLen);
+        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), 0, (region.start2-1), &seqLen);
 
     if ((region.flag & CLT_SAME_FLANK_MAP) != 0)
-        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, region.start2, &seqLen);
+        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, (region.start2-1), &seqLen);
 
     if ((region.flag & CLT_DIFF_FLANK_MAP) != 0) {
-        char *seq1 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, region.len1, &seqLen);
-        char *seq2 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), 0, region.start2, &seqLen);
+        char *seq1 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, (region.len1-1), &seqLen);
+        char *seq2 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), 0, (region.start2-1), &seqLen);
 
         int len1 = strlen(seq1), len2 = strlen(seq2);
-        seqLen = len1 + len2 + 200;
+        seqLen = len1 + len2 + 500;
         char *insSeq = (char *)malloc((seqLen + 1) * sizeof(char));
         char *temp = insSeq;
         memcpy(temp, seq1, len1); temp += len1;
-        memset(temp, 'N', 200); temp += 200;
+        memset(temp, 'N', 500); temp += 500;
         memcpy(temp, seq2, len2);
         insSeq[seqLen] = '\0';
 
@@ -320,8 +320,8 @@ void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
         return;
 
     hts_pos_t seqLen;
-    char *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), (region.end1-100), region.end1, &seqLen);
-    char *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), region.start2, (region.start2+100), &seqLen);
+    char *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), (region.end1-100), (region.end1-1), &seqLen);
+    char *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), region.start2, (region.start2+99), &seqLen);
 
     char *outFn = (char *)malloc(100 * sizeof(char));
     sprintf(outFn, "tmp_anno/%d_%d_tsd.fa", cluster->tid, cluster->idx);
@@ -334,3 +334,5 @@ void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
     if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
     if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
+
+ATCAATTACTCAACCGTAATAGACATAAGCTGATTTGATACACTCACCATTGGTCTGGTCGGGAACCACATAACATAGTTCCGAAAACTGCAAATTTACC

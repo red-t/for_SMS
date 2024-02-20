@@ -232,14 +232,14 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
         return;
     
     if (leftEnd < 0) {
-        cluster->refEnd = localStart + rightStart;
-        cluster->refStart = cluster->refEnd - 1;
+        cluster->refStart = localStart + rightStart;
+        cluster->refEnd = cluster->refStart + 1;
         return;
     }
 
     if (rightStart < 0) {
-        cluster->refStart = localStart + leftEnd;
-        cluster->refEnd = cluster->refStart + 1;
+        cluster->refEnd = localStart + leftEnd;
+        cluster->refStart = cluster->refEnd - 1;
         return;
     }
 
@@ -252,8 +252,8 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
         return;
     }
 
-    if (rightStart > leftEnd) {
-        cluster->refStart = localStart + leftEnd;
+    if (rightStart >= leftEnd) {
+        cluster->refStart = localStart + leftEnd - 1;
         cluster->refEnd = localStart + rightStart;
     }
 }
