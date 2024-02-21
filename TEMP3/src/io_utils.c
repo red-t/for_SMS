@@ -334,5 +334,3 @@ void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
     if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
     if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
-
-ATCAATTACTCAACCGTAATAGACATAAGCTGATTTGATACACTCACCATTGGTCTGGTCGGGAACCACATAACATAGTTCCGAAAACTGCAAATTTACC
