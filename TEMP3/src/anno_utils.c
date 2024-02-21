@@ -83,13 +83,13 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
         numAnno++;
     }
 
-    if (numAnno > 0)
+    if (numAnno > 0) {
         cluster->flag |= CLT_TE_MAP;
-
-    int numTE = numAnno;
-    numAnno = annoPolyA(cluster, annoArray, numAnno, polyA);
-    if (numAnno - numTE > 0)
-        cluster->flag |= CLT_POLYA;
+        int numTE = numAnno;
+        numAnno = annoPolyA(cluster, annoArray, numAnno, polyA);
+        if (numAnno - numTE > 0)
+            cluster->flag |= CLT_POLYA;
+    }
 
     if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
     if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}

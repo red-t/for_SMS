@@ -219,6 +219,7 @@ void intersectBlackList(Cluster *cluster, Args args);
 /*******************
  *** Cluster I/O ***
  *******************/
+#define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
 
 /// @brief Output formated cluster records
 void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn);

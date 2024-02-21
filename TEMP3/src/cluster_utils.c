@@ -282,7 +282,6 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
 {
     faidx_t *refFa = fai_load(refFn);
     faidx_t *teFa = fai_load(teFn);
-    char *outStr = malloc(500 * sizeof(char));
     char *outFn = malloc(100 * sizeof(char));
     sprintf(outFn, "tmp_anno/%d_cltFormated.txt", startIdx);
     
@@ -290,9 +289,11 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
     for (int i = startIdx; i < endIdx; i++)
     {
         Cluster *clt = &cltArray[i];
+        if (!isTEMapped(clt->flag))
+            continue;
+
         char strand = '*';
         strand = ((clt->flag & CLT_REVERSED) != 0) ? '-' : '+';
-
         fprintf(fp, "%s\t%d\t%d\t%s\t%d\t%c\t%d-%d\t%f\t%d\t%d\n",
                 faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd,
                 faidx_iseq(teFa, clt->teTid), clt->flag, strand, clt->tid,
@@ -302,6 +303,5 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
 
     if (refFa != NULL) {fai_destroy(refFa); refFa=NULL;}
     if (teFa != NULL) {fai_destroy(teFa); teFa=NULL;}
-    if (outStr != NULL) {free(outStr); outStr=NULL;}
     if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
