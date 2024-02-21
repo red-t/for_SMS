@@ -232,8 +232,8 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
         return;
     
     if (leftEnd < 0) {
-        cluster->refStart = localStart + rightStart;
-        cluster->refEnd = cluster->refStart + 1;
+        cluster->refEnd = localStart + rightStart;
+        cluster->refStart = cluster->refEnd - 1;
         return;
     }
 
@@ -245,8 +245,8 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
 
     if (rightStart < leftEnd && (leftEnd - rightStart) < 50) {
         cluster->flag |= CLT_TSD;
-        cluster->refStart = localStart + rightStart;
-        cluster->refEnd = cluster->refStart + 1;
+        cluster->refEnd = localStart + rightStart;
+        cluster->refStart = cluster->refEnd - 1;
         cluster->tsdStart = localStart + rightStart;
         cluster->tsdEnd = localStart + leftEnd;
         return;
