@@ -263,23 +263,57 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
 {
     faidx_t *refFa = fai_load(refFn);
     faidx_t *teFa = fai_load(teFn);
-    char *outFn = malloc(100 * sizeof(char));
+    char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_cltFormated.txt", startIdx);
-    
+
+    char *tsdSeq = NULL, *insSeq = NULL;
     FILE *fp = fopen(outFn, "w");
     for (int i = startIdx; i < endIdx; i++)
     {
         Cluster *clt = &cltArray[i];
         if (!isTEMapped(clt->flag))
             continue;
+        
+        tsdSeq = fetchTsdSeq(refFa, clt);
+        insSeq = fetchInsSeq(clt);
 
-        fprintf(fp, "%s\t%d\t%d\t%d-%d\t%f\t%d\t%d\n",
+        fprintf(fp, "%s\t%d\t%d\t%d-%d\t%f\t%d\t%d\t%s\t%s\n",
                 faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd, clt->tid,
-                clt->idx, clt->probability, clt->tsdStart, clt->tsdEnd);
+                clt->idx, clt->probability, clt->tsdStart, clt->tsdEnd, tsdSeq, insSeq);
+
+        free(tsdSeq);
+        free(insSeq);
     }
     fclose(fp);
 
     if (refFa != NULL) {fai_destroy(refFa); refFa=NULL;}
     if (teFa != NULL) {fai_destroy(teFa); teFa=NULL;}
-    if (outFn != NULL) {free(outFn); outFn=NULL;}
+}
+
+/// @brief Fetch TSD sequence from reference genome
+char *fetchTsdSeq(faidx_t *refFa, Cluster *clt)
+{
+    hts_pos_t seqLen;
+    char *tsdSeq = NULL;
+    if ((clt->flag & CLT_TSD) != 0)
+        tsdSeq = faidx_fetch_seq64(refFa, faidx_iseq(refFa, clt->tid), clt->tsdStart, clt->tsdEnd-1, &seqLen);
+    else {
+        tsdSeq = faidx_fetch_seq64(refFa, faidx_iseq(refFa, clt->tid), 0, 0, &seqLen);
+        tsdSeq[0] = '*';
+    }
+    return tsdSeq;
+}
+
+/// @brief Fetch insertion sequence from temporary file
+char *fetchInsSeq(Cluster *clt)
+{
+    char insFn[100] = {'\0'};
+    sprintf(insFn, "tmp_anno/%d_%d_insertion.fa", clt->tid, clt->idx);
+    faidx_t *insFa = fai_load(insFn);
+    
+    hts_pos_t seqLen;
+    char *insSeq = faidx_fetch_seq64(insFa, faidx_iseq(insFa, 0), 0, INT_MAX, &seqLen);
+
+    if (insFa != NULL) {fai_destroy(insFa); insFa=NULL;}
+    return insSeq;
 }

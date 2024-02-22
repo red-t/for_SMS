@@ -211,4 +211,10 @@ void intersectBlackList(Cluster *cluster, Args args);
 /// @brief Output formated cluster records
 void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn);
 
+/// @brief Fetch TSD sequence from reference genome
+char *fetchTsdSeq(faidx_t *refFa, Cluster *clt);
+
+/// @brief Fetch insertion sequence from temporary file
+char *fetchInsSeq(Cluster *clt);
+
 #endif // CLUSTER_UTILS_H
