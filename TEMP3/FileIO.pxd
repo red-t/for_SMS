@@ -187,5 +187,3 @@ cdef outputGermCltSeqs(Cluster[::1] cltView, Segment[::1] segView, BamFile genom
 cpdef outputSomaCltSeqs(Cluster[::1] cltView, Segment[::1] segView, object cmdArgs, int tid)
 cpdef outputRefFlank(Cluster[::1] cltView, int startIdx, int taskSize, object cmdArgs)
 cpdef mergeOutput()
-
-TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
