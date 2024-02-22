@@ -113,7 +113,7 @@ void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region)
     char *leftSeq = faidx_fetch_seq64(refFa, chrom, region.start1, region.end1, &seqLen);
     char *rightSeq = faidx_fetch_seq64(refFa, chrom, region.start2, region.end2, &seqLen);
 
-    char *outFn = (char *)malloc(100 * sizeof(char));
+    char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_%d_flank.fa", cluster->tid, cluster->idx);
     FILE *fp = fopen(outFn, "w");
     fprintf(fp, ">0\n%s\n", leftSeq);
@@ -122,7 +122,6 @@ void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region)
 
     if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
     if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
-    if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
 
 /// @brief output +-500bp local-seq around cluster position for tsd annotation
@@ -133,14 +132,13 @@ void outputLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region)
     const char *chrom = faidx_iseq(refFa, cluster->tid);
     char *localSeq = faidx_fetch_seq64(refFa, chrom, start, region.end2, &seqLen);
 
-    char *outFn = (char *)malloc(100 * sizeof(char));
+    char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_%d_local.fa", cluster->tid, cluster->idx);
     FILE *fp = fopen(outFn, "w");
     fprintf(fp, ">%d\n%s\n", start, localSeq);
     fclose(fp);
 
     if (localSeq != NULL) {free(localSeq); localSeq=NULL;}
-    if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
 
 
@@ -172,14 +170,13 @@ void extractIns(Cluster *cluster)
     if (!isFlankMapped(region.flag))
         return;
 
-    char *assmFn = (char *)malloc(100 * sizeof(char));
+    char assmFn[100] = {'\0'};
     sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", cluster->tid, cluster->idx);
     faidx_t *assmFa = fai_load((const char *)assmFn);
 
     outputInsSeq(cluster, assmFa, region);
     outputTsdSeq(cluster, assmFa, region);
 
-    if (assmFn != NULL) {free(assmFn); assmFn=NULL;}
     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
     return;
 }
@@ -187,7 +184,7 @@ void extractIns(Cluster *cluster)
 /// @brief define insertion-seq region by Flank-To-Assm alignments
 void setInsRegion(int cltTid, int cltIdx, InsRegion *region)
 {
-    char *inputFn = (char *)malloc(100 * sizeof(char));
+    char inputFn[100] = {'\0'};
     sprintf(inputFn, "tmp_anno/%d_%d_FlankToAssm.bam", cltTid, cltIdx);
     htsFile *inputBam = sam_open(inputFn, "rb");
     sam_hdr_t *header = sam_hdr_read(inputBam);
@@ -219,7 +216,6 @@ void setInsRegion(int cltTid, int cltIdx, InsRegion *region)
     if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
     if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
     if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
-    if (inputFn != NULL) {free(inputFn); inputFn=NULL;}
 
     adjustInsRegion(region);
 }
@@ -268,7 +264,7 @@ void adjustInsRegion(InsRegion *region)
 void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
 {
     char *insSeq = getInsSeq(assmFa, region);
-    char *outFn = (char *)malloc(100 * sizeof(char));
+    char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_%d_insertion.fa", cluster->tid, cluster->idx);
 
     FILE *fp = fopen(outFn, "w");
@@ -276,7 +272,6 @@ void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
     fclose(fp);
 
     if (insSeq != NULL) {free(insSeq); insSeq=NULL;}
-    if (outFn != NULL) {free(outFn); outFn=NULL;}
 }
 
 /// @brief get insertion-seq
@@ -323,7 +318,7 @@ void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
     char *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), (region.end1-100), (region.end1-1), &seqLen);
     char *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), region.start2, (region.start2+99), &seqLen);
 
-    char *outFn = (char *)malloc(100 * sizeof(char));
+    char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_%d_tsd.fa", cluster->tid, cluster->idx);
     FILE *fp = fopen(outFn, "w");
     fprintf(fp, ">0\n%s\n", leftSeq);
@@ -332,5 +327,4 @@ void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
 
     if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
     if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
-    if (outFn != NULL) {free(outFn); outFn=NULL;}
 }

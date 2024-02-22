@@ -265,53 +265,93 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
 
 /// @brief Output formated annotation records
 void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
-{
-    char *queryTmp = malloc(100 * sizeof(char));
-    char *refTmp = malloc(100 * sizeof(char));
-    char *queryStr = malloc(500 * sizeof(char));
-    char *refStr = malloc(500 * sizeof(char));
-    char *outFn = malloc(100 * sizeof(char));
+{   
     faidx_t *teFa = fai_load(teFn);
-    int prevIdx = annoArray[0].idx;
+    int numTe = faidx_nseq(teFa), strandFlag = 0, prevIdx = annoArray[0].idx;
+    int *teTable = malloc(numTe * sizeof(int));
+    memset(teTable, 0, numTe * sizeof(int));
 
+    char queryTmp[100] = {'\0'}, refTmp[100] = {'\0'};
+    char queryStr[500] = {'\0'}, refStr[500] = {'\0'};
+    char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_annoFormated.txt", startIdx);
-    memset(queryStr, '\0', 500);
-    memset(refStr, '\0', 500);
     FILE *fp = fopen(outFn, "w");
+
     for (int i = 0; i < numAnno; i++)
     {
         if (annoArray[i].idx != prevIdx) {
-            queryStr[strlen(queryStr)-1] = '\0';
-            refStr[strlen(refStr)-1] = '\0';
-            fprintf(fp, "%d-%d\t%s\t%s\n", annoArray[i-1].cltTid, annoArray[i-1].cltIdx, queryStr, refStr);
+            writeSingleCltAnno(strandFlag, numTe, teTable, teFa, queryStr, refStr, fp, annoArray[i-1]);
             prevIdx = annoArray[i].idx;
-            memset(queryStr, '\0', strlen(queryStr));
-            memset(refStr, '\0', strlen(refStr));
+            strandFlag = 0;
+            memset(teTable, 0, numTe * sizeof(int));
+            memset(queryStr, '\0', 500);
+            memset(refStr, '\0', 500);
         }
-
-        char strand = (annoArray[i].strand == 0) ? '+' : '-';
-        sprintf(queryTmp, "%c:%d-%d,", strand, annoArray[i].queryStart, annoArray[i].queryEnd);
-
-        if (annoArray[i].tid == -1)
-            sprintf(refTmp, "PolyA:%d-%d,", annoArray[i].refStart, annoArray[i].refEnd);
-        else if (annoArray[i].tid == -2)
-            sprintf(refTmp, "PolyT:%d-%d,", annoArray[i].refStart, annoArray[i].refEnd);
-        else
-            sprintf(refTmp, "%s:%d-%d,", faidx_iseq(teFa, annoArray[i].tid), annoArray[i].refStart, annoArray[i].refEnd);
-
+        formatSingleAnno(annoArray[i], queryTmp, refTmp, teFa, teTable, strandFlag);
         strcat(queryStr, queryTmp);
         strcat(refStr, refTmp);
     }
     // Output final anno record
-    queryStr[strlen(queryStr)-1] = '\0';
-    refStr[strlen(refStr)-1] = '\0';
-    fprintf(fp, "%d-%d\t%s\t%s\n", annoArray[numAnno-1].cltTid, annoArray[numAnno-1].cltIdx, queryStr, refStr);
+    writeSingleCltAnno(strandFlag, numTe, teTable, teFa, queryStr, refStr, fp, annoArray[numAnno-1]);
     fclose(fp);
 
-    if (queryStr != NULL) {free(queryStr); queryStr=NULL;}
-    if (refStr != NULL) {free(refStr); refStr=NULL;}
-    if (queryTmp != NULL) {free(queryTmp); queryTmp=NULL;}
-    if (refTmp != NULL) {free(refTmp); refTmp=NULL;}
-    if (outFn != NULL) {free(outFn); outFn=NULL;}
     if (teFa != NULL) {fai_destroy(teFa); teFa = NULL;}
+    if (teTable != NULL) {free(teTable); teTable = NULL;}
+}
+
+/// @brief Change single annotation record into specified format
+void formatSingleAnno(Anno anno, char *queryTmp, char *refTmp, faidx_t *teFa, int *teTable, int strandFlag)
+{
+    char strand = (anno.strand == 0) ? '+' : '-';
+    sprintf(queryTmp, "%c:%d-%d,", strand, anno.queryStart, anno.queryEnd);
+
+    if (anno.tid == -1)
+        sprintf(refTmp, "PolyA:%d-%d,", anno.refStart, anno.refEnd);
+    else if (anno.tid == -2)
+        sprintf(refTmp, "PolyT:%d-%d,", anno.refStart, anno.refEnd);
+    else
+    {
+        sprintf(refTmp, "%s:%d-%d,", faidx_iseq(teFa, anno.tid), anno.refStart, anno.refEnd);
+        teTable[anno.tid] = 1;
+        strandFlag += (anno.strand == 0) ? 1 : -1;
+    }
+}
+
+/// @brief Write annotation for a single cluster
+void writeSingleCltAnno(int strandFlag, int numTe, int *teTable, faidx_t *teFa, char *queryStr, char *refStr, FILE *fp, Anno anno)
+{
+    char strand = getCltStrand(strandFlag);
+    char *cltClass = getCltClass(numTe, teTable, teFa);
+    queryStr[strlen(queryStr) - 1] = '\0';
+    refStr[strlen(refStr) - 1] = '\0';
+    fprintf(fp, "%d-%d\t%c\t%s\t%s\t%s\n", anno.cltTid, anno.cltIdx, strand, cltClass, queryStr, refStr);
+}
+
+/// @brief Get cluster strand
+char getCltStrand(int strandFlag)
+{
+    char strand = '*';
+    if (strandFlag > 0)
+        strand = '+';
+    if (strandFlag < 0)
+        strand = '-';
+
+    return strand;
+}
+
+/// @brief Generate a string which represents cluster TE-class
+char *getCltClass(int numTe, int *teTable, faidx_t *teFa)
+{
+    static char cltClass[500] = {'\0'};
+    memset(cltClass, '\0', 500);
+    for (int tid = 0; tid < numTe; tid++)
+    {
+        if (teTable[tid] == 0)
+            continue;
+        strcat(cltClass, faidx_iseq(teFa, tid));
+        cltClass[strlen(cltClass)] = ',';
+    }
+
+    cltClass[strlen(cltClass) - 1] = '\0';
+    return cltClass;
 }

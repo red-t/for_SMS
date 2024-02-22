@@ -64,4 +64,16 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart);
 /// @brief Output formated annotation records
 void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn);
 
+/// @brief Change single annotation record into specified format
+void formatSingleAnno(Anno anno, char *queryTmp, char *refTmp, faidx_t *teFa, int *teTable, int strandFlag);
+
+/// @brief Write annotation for a single cluster
+void writeSingleCltAnno(int strandFlag, int numTe, int *teTable, faidx_t *teFa, char *queryStr, char *refStr, FILE *fp, Anno anno);
+
+/// @brief Get cluster strand
+char getCltStrand(int strandFlag);
+
+/// @brief Generate a string which represents cluster TE-class
+char *getCltClass(int numTe, int *teTable, faidx_t *teFa);
+
 #endif // ANNO_UTILS_H
