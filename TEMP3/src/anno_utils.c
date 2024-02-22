@@ -287,7 +287,7 @@ void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
             memset(queryStr, '\0', 500);
             memset(refStr, '\0', 500);
         }
-        formatSingleAnno(annoArray[i], queryTmp, refTmp, teFa, teTable, strandFlag);
+        formatSingleAnno(annoArray[i], queryTmp, refTmp, teFa, teTable, &strandFlag);
         strcat(queryStr, queryTmp);
         strcat(refStr, refTmp);
     }
@@ -300,7 +300,7 @@ void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
 }
 
 /// @brief Change single annotation record into specified format
-void formatSingleAnno(Anno anno, char *queryTmp, char *refTmp, faidx_t *teFa, int *teTable, int strandFlag)
+void formatSingleAnno(Anno anno, char *queryTmp, char *refTmp, faidx_t *teFa, int *teTable, int *strandFlag)
 {
     char strand = (anno.strand == 0) ? '+' : '-';
     sprintf(queryTmp, "%c:%d-%d,", strand, anno.queryStart, anno.queryEnd);
@@ -313,7 +313,7 @@ void formatSingleAnno(Anno anno, char *queryTmp, char *refTmp, faidx_t *teFa, in
     {
         sprintf(refTmp, "%s:%d-%d,", faidx_iseq(teFa, anno.tid), anno.refStart, anno.refEnd);
         teTable[anno.tid] = 1;
-        strandFlag += (anno.strand == 0) ? 1 : -1;
+        *strandFlag += (anno.strand == 0) ? 1 : -1;
     }
 }
 
