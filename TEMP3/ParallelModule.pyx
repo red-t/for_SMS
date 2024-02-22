@@ -1,5 +1,5 @@
 import numpy as np
-from .FileIO import outputSomaCltSeqs, outputRefFlank
+from .FileIO import outputSomaCltSeqs, outputRefFlank, mergeOutput
 from .Cluster import buildCluster
 from .Assemble import assembleCluster
 from .Annotate import annotateCluster
@@ -131,5 +131,8 @@ cpdef object runInParallel(object cmdArgs):
                                           cmdArgs) for startIdx in startList])
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
+        
+        # 7. Merge Output
+        mergeOutput()
     
     return allCltData

@@ -277,9 +277,9 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
         tsdSeq = fetchTsdSeq(refFa, clt);
         insSeq = fetchInsSeq(clt);
 
-        fprintf(fp, "%s\t%d\t%d\t%d-%d\t%f\t%d\t%d\t%s\t%s\n",
-                faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd, clt->tid,
-                clt->idx, clt->probability, clt->tsdStart, clt->tsdEnd, tsdSeq, insSeq);
+        fprintf(fp, "%d-%d\t%s\t%d\t%d\t%f\t%d\t%d\t%s\t%s\n",
+                clt->tid, clt->idx, faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd,
+                clt->probability, clt->tsdStart, clt->tsdEnd, tsdSeq, insSeq);
 
         free(tsdSeq);
         free(insSeq);
