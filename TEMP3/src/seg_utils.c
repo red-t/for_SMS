@@ -72,7 +72,6 @@ SegValues initSegmentsFromCigar(bam1_t *bam, Segment *segArray, int64_t fileOffs
 
     segValues.fileOffset = fileOffset;
     segValues.mapQual = bam->core.qual;
-    segValues.flag = bam->core.flag;
     segValues.alnRefStart = bam->core.pos;
     segValues.readLen = bam->core.l_qseq;
     return segValues;
@@ -96,7 +95,6 @@ void setSameSegValues(Segment *segArray, SegValues segValues)
     {
         Segment *segment = &segArray[i];
         segment->mapQual = segValues.mapQual;
-        segment->flag = segValues.flag;
         segment->alnType = segValues.alnType;
         segment->numSeg = segValues.numSeg;
         segment->alnRefStart = segValues.alnRefStart;
@@ -228,31 +226,6 @@ void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teId
     segment->sumQueryMapLen += queryMapLen;
     segment->sumDivergence += teAlignment->divergence;
     segment->sumAlnScore += (float)teAlignment->AlnScore / teAlignment->mapLen;
-
-    if (isReverse(segment))
-    {
-        if (isSameDirection(segment, teAlignment)) {
-            segment->directionFlag += (1 << 8);
-            return;
-        }
-        segment->directionFlag += 1;
-        return;
-    }
-
-    if (isSameDirection(segment, teAlignment)) {
-        segment->directionFlag += 1;
-        return;
-    }
-
-    segment->directionFlag += (1 << 8);
-}
-
-/// @brief Count occurrences of all TEs, to which the segment map
-void countTeTids(Segment *segment, TeAlignment *teArray, int *teTidCountTable, int numTeTid)
-{
-    memset(teTidCountTable, 0, numTeTid * sizeof(int));
-    for (int i = segment->startIdx; i < segment->endIdx; i++)
-        teTidCountTable[teArray[i].teTid] += 1;
 }
 
 
@@ -331,8 +304,6 @@ void initTeAlignment(TeAlignment *teAlignment, bam1_t *bam, int queryStart, int 
     teAlignment->queryEnd = queryEnd;
     teAlignment->mapLen = mapLen;
     teAlignment->divergence = divergence;
-    teAlignment->flag = bam->core.flag;
-    teAlignment->teTid = bam->core.tid;
 }
 
 

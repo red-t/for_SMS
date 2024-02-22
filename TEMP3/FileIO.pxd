@@ -73,7 +73,6 @@ cdef extern from "src/cluster_utils.h" nogil:
         int         startIdx
         int         endIdx
         float       numSeg
-        uint16_t    directionFlag
         uint8_t     cltType
         uint8_t     locationType
         uint8_t     numSegType
@@ -94,7 +93,6 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       bgDepth
         float       bgReadLen
         float       teAlignedFrac
-        int         teTid
         uint8_t     isInBlacklist
         float       probability
         uint16_t    flag
@@ -106,8 +104,6 @@ cdef extern from "src/cluster_utils.h" nogil:
         int         tid
         int         minSegLen
         int         maxDistance
-        int         numTeTid
-        int         *teTidCountTable
         int         minOverhang
         float       bgDiv
         float       bgDepth
@@ -130,7 +126,6 @@ cdef extern from "src/seg_utils.h" nogil:
     ### Structures ###
     ##################
     ctypedef packed struct Segment:
-        uint16_t    flag
         uint8_t     mapQual
         int         queryStart
         int         queryEnd
@@ -150,10 +145,8 @@ cdef extern from "src/seg_utils.h" nogil:
         int         sumQueryMapLen
         float       sumAlnScore
         float       sumDivergence
-        uint16_t    directionFlag
         int         startIdx
         int         endIdx
-        int         teTid
     
     ###############################
     ### Initialize TeAlignments ###

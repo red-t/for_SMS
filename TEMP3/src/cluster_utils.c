@@ -19,7 +19,6 @@ void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
     setCltLocationType(cluster, args);
     divideByNumSeg(cluster);
     divideByBgInfo(cluster, args);
-    setDirection(cluster);
     setBackbgInfo(cluster, args);
 }
 
@@ -79,7 +78,6 @@ void setCltType(Cluster *cluster, Segment *segArray, Args args)
 void updateBySegArray(Cluster *cluster, Segment *segArray, Args args)
 {
     int numLeft = 0, numMiddle = 0, numRight = 0;
-    memset(args.teTidCountTable, 0, args.numTeTid * sizeof(int));
 
     for (int i = cluster->startIdx; i < cluster->endIdx; i++)
     {
@@ -111,15 +109,9 @@ void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numL
         return;
     }
 
-    args.teTidCountTable[segment->teTid] += 1;
     cluster->meanAlnScore += segment->sumAlnScore / segment->numTeAlignment;
     cluster->meanQueryMapFrac += (float)segment->sumQueryMapLen / (segment->queryEnd - segment->queryStart);
     cluster->meanDivergence += segment->sumDivergence / segment->numTeAlignment;
-
-    if (directionIsConsistent(segment))
-        cluster->directionFlag += 1;
-    else if (directionIsInconsistent(segment))
-        cluster->directionFlag += 256;
 }
 
 /// @brief Count the number of segments with different type
@@ -237,17 +229,6 @@ void divideByBgInfo(Cluster *cluster, Args args)
     cluster->numSeg = cluster->numSeg / args.bgDepth;
 }
 
-/// @brief Set cluster strand
-void setDirection(Cluster *cluster)
-{
-    if (directionIsConsistent(cluster)) 
-        cluster->directionFlag = 0;
-    else if (directionIsInconsistent(cluster)) {
-        cluster->directionFlag = 1;
-        cluster->flag |= CLT_REVERSED;
-    }
-}
-
 /// @brief Set background info of a cluster
 void setBackbgInfo(Cluster *cluster, Args args)
 {
@@ -292,11 +273,8 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
         if (!isTEMapped(clt->flag))
             continue;
 
-        char strand = '*';
-        strand = ((clt->flag & CLT_REVERSED) != 0) ? '-' : '+';
-        fprintf(fp, "%s\t%d\t%d\t%s\t%d\t%c\t%d-%d\t%f\t%d\t%d\n",
-                faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd,
-                faidx_iseq(teFa, clt->teTid), clt->flag, strand, clt->tid,
+        fprintf(fp, "%s\t%d\t%d\t%d-%d\t%f\t%d\t%d\n",
+                faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd, clt->tid,
                 clt->idx, clt->probability, clt->tsdStart, clt->tsdEnd);
     }
     fclose(fp);

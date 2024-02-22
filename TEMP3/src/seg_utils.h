@@ -12,7 +12,6 @@
  ******************/
 
 /*! @brief Data container for segment extracted from CIGAR.
- @field  flag               alignment flag
  @field  mapQual            alignment mapping quality
  @field  queryStart         segment start on query sequence (0-based, include)
  @field  queryEnd           segment end on query sequence (0-based, not-include)
@@ -40,14 +39,11 @@
  @field  sumQueryMapLen     summary query mapped-length of the TE alignments (M/I/=/X, no overlap)
  @field  sumAlnScore        summary per base alignment score of the TE alignments
  @field  sumDivergence      summary per base divergence of the TE alignments
- @field  directionFlag      flag representing segment direction
  @field  startIdx           start index in TE alignments array (0-based, include)
  @field  endIdx             end index in TE alignments array (0-based, not-include)
- @field  teTid              majority TE-tid of the segment
  */
 typedef struct Segment
 {
-    uint16_t    flag;
     uint8_t     mapQual;
     int         queryStart;
     int         queryEnd;
@@ -67,10 +63,8 @@ typedef struct Segment
     int         sumQueryMapLen;
     float       sumAlnScore;
     float       sumDivergence;
-    uint16_t    directionFlag;
     int         startIdx;
     int         endIdx;
-    int         teTid;
 } __attribute__((packed)) Segment;
 
 /// @brief Data container used in constrcuting Segment
@@ -80,7 +74,6 @@ typedef struct SegValues
     uint8_t     numSeg;
     uint8_t     segType;
     uint8_t     alnType;
-    uint16_t    flag;
     int         queryPosition;
     int         refPosition;
     int         alnRefStart;
@@ -96,8 +89,6 @@ typedef struct SegValues
  @field  queryEnd       query end (original direction of segment)
  @field  mapLen         mapped length (M/I/D/=/X)
  @field  divergence     per-base divergence
- @field  flag           bitwise flag of the alignment
- @field  teTid          tid of the TE alignment
  */
 typedef struct TeAlignment
 {
@@ -107,8 +98,6 @@ typedef struct TeAlignment
     int     queryEnd;
     int     mapLen;
     float   divergence;
-    int16_t flag;
-    int     teTid;
 } __attribute__((packed)) TeAlignment;
 
 
@@ -141,7 +130,6 @@ void setSameSegValues(Segment *segArray, SegValues segValues);
 #define isRightClip(segment) (((segment)->segType & RIGHT_CLIP) != 0)
 #define isFirstSegment(segment) ((segment)->order == 0)
 #define isSingleSegment(segment) ((segment)->numSeg == 1)
-#define isReverse(segment) (((segment)->flag & BAM_FREVERSE) != 0)
 
 /// @brief Update segment's overhang and location type
 void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList);
@@ -165,7 +153,6 @@ uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType);
 #define isFirstTeAlign(segment) ((segment)->numTeAlignment == 0)
 #define isOverlap(teAlignment, prevTeAlignment) ((teAlignment)->queryStart < (prevTeAlignment)->queryEnd)
 #define isCover(teAlignment, prevTeAlignment) ((teAlignment)->queryEnd <= (prevTeAlignment)->queryEnd)
-#define isSameDirection(segment, teAlignment) (((segment)->flag & BAM_FREVERSE) == ((teAlignment)->flag & BAM_FREVERSE))
 
 /// @brief Update segment values using Seg-To-TE alignments
 void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx);
@@ -178,9 +165,6 @@ int getOverlapQueryMapLen(TeAlignment *teAlignment, TeAlignment *prevTeAlignment
 
 /// @brief Update segment values using single Seg-To-TE alignment
 void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teIdx, int queryMapLen);
-
-/// @brief Count occurrences of all TEs, to which the segment map
-void countTeTids(Segment *segment, TeAlignment *teArray, int *teTidCountTable, int numTeTid);
 
 
 /*******************************

@@ -8,7 +8,6 @@ from autogluon.tabular import TabularPredictor
 ### Data Types ###
 ##################
 SegmentDt = np.dtype([
-    ('flag',            np.uint16),
     ('mapQual',         np.uint8),
     ('queryStart',      np.int32),
     ('queryEnd',        np.int32),
@@ -28,10 +27,8 @@ SegmentDt = np.dtype([
     ('sumQueryMapLen',  np.int32),
     ('sumAlnScore',     np.float32),
     ('sumDivergence',   np.float32),
-    ('directionFlag',   np.uint16),
     ('startIdx',        np.int32),
     ('endIdx',          np.int32),
-    ('teTid',           np.int32),
 ])
 
 TeAlignmentDt = np.dtype([
@@ -41,8 +38,6 @@ TeAlignmentDt = np.dtype([
     ('queryEnd',    np.int32),
     ('mapLen',      np.int32),
     ('divergence',  np.float32),
-    ('flag',        np.int16),
-    ('teTid',       np.int32),
 ])
 
 ClusterDt = np.dtype([
@@ -53,7 +48,6 @@ ClusterDt = np.dtype([
     ('startIdx',            np.int32),
     ('endIdx',              np.int32),
     ('numSeg',              np.float32),
-    ('directionFlag',       np.uint16),
     ('cltType',             np.uint8),
     ('locationType',        np.uint8),
     ('numSegType',          np.uint8),
@@ -74,7 +68,6 @@ ClusterDt = np.dtype([
     ('bgDepth',             np.float32),
     ('bgReadLen',           np.float32),
     ('teAlignedFrac',       np.float32),
-    ('teTid',               np.int32),
     ('isInBlacklist',       np.uint8),
     ('probability',         np.float32),
     ('flag',                np.uint16),
@@ -123,23 +116,13 @@ cdef updateSegArrayByTe(Segment[::1] segView, Args args):
     cdef Iterator iterator = Iterator(teBam)
     cdef object teArray = getTeArray(iterator)
     cdef TeAlignment[::1] teView = teArray
-    cdef int numTeTid = teBam.header.n_targets
-
-    teArray.sort(order=['segIdx', 'queryStart'])
-    
-    cdef object teTidCountTable = np.zeros(numTeTid, dtype=np.int32)
-    cdef int[::1] teTidCountTableView = teTidCountTable
     cdef int i
 
+    teArray.sort(order=['segIdx', 'queryStart'])
     for i in range(teView.shape[0]):
         updateSegByTeArray(&segView[0], &teView[0], i)
 
-    for i in range(segView.shape[0]):
-        if segView[i].numTeAlignment:
-            countTeTids(&segView[i], &teView[0], &teTidCountTableView[0], numTeTid)
-            segView[i].teTid = np.argmax(teTidCountTable)
-
-    del iterator; teBam.close(); del teBam; del teTidCountTable
+    del iterator; teBam.close(); del teBam
 
 
 #########################
@@ -224,28 +207,17 @@ cdef object getCltArray(Segment[::1] segView, Args args):
 
 
 cdef updateCltArray(Cluster[::1] cltView, Segment[::1] segView, BamFile genomeBam, Args args):
-    
-    cdef BamFile teBam = BamFile("tmp_build/all_seg_{}.bam".format(args.tid), "rb", 1)
-    cdef object teTidCountTable = np.zeros(teBam.header.n_targets, dtype=np.int32)
-    cdef int[::1] teTidCountTableView = teTidCountTable
     cdef int i
     
-    args.numTeTid = teBam.header.n_targets
-    args.teTidCountTable = &teTidCountTableView[0]
     args.genomeBam = genomeBam.htsFile
     args.firstBamRecord = bam_init1()
     args.secondBamRecord = bam_init1()
 
-    teBam.close(); del teBam
     for i in range(cltView.shape[0]):
         updateCluster(&cltView[i], &segView[0], args)
-
-        if not isValidCandidate(&cltView[i]):
-            continue
-        cltView[i].teTid = np.argmax(teTidCountTable)
     
     bam_destroy1(args.firstBamRecord); bam_destroy1(args.secondBamRecord)
-    destroyAiList(args.repeatAiList); destroyAiList(args.gapAiList); del teTidCountTable
+    destroyAiList(args.repeatAiList); destroyAiList(args.gapAiList)
 
 
 ######################

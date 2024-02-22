@@ -37,9 +37,6 @@
  @field  startIdx           start index in segments array (0-based, include)
  @field  endIdx             end index in segments array (0-based, not-include)
  @field  numSeg             number of segments in the cluster (normalized by bg depth)
- @field  directionFlag      bitwise flag representing cluster direction
-                                0: forward
-                                1: reverse
  @field  cltType            cluster type
                                 0: germline (multiple support reads)
                                 1: somatic (1 support read & 1 alignment)
@@ -66,7 +63,6 @@
  @field  bgDepth            background depth (for normalization)
  @field  bgReadLen          background read length
  @field  teAlignedFrac      fraction of TE-aligned segments
- @field  teTid              majority TE-tid of cluster
  @field  isInBlacklist      whether cluster intersects with blacklist
  @field  probability        the probability of the cluster to be a positive insertion
  @field  flag               bitwise flag representing cluster features
@@ -82,7 +78,6 @@ typedef struct Cluster
     int         startIdx;
     int         endIdx;
     float       numSeg;
-    uint16_t    directionFlag;
     uint8_t     cltType;
     uint8_t     locationType;
     uint8_t     numSegType;
@@ -103,7 +98,6 @@ typedef struct Cluster
     float       bgDepth;
     float       bgReadLen;
     float       teAlignedFrac;
-    int         teTid;
     uint8_t     isInBlacklist;
     float       probability;
     uint16_t    flag;
@@ -118,8 +112,6 @@ typedef struct Args
     int         tid;
     int         minSegLen;
     int         maxDistance;
-    int         numTeTid;
-    int         *teTidCountTable;
     int         minOverhang;
     float       bgDiv;
     float       bgDepth;
@@ -160,8 +152,6 @@ void setCltType(Cluster *cluster, Segment *segArray, Args args);
  **********************************/
 #define isDualClip(segment) (((segment)->alnType & DUAL_CLIP) == 5)
 #define noTeAlignment(segment) ((segment)->numTeAlignment == 0)
-#define directionIsConsistent(record) (((record)->directionFlag & 255) > ((record)->directionFlag >> 8))
-#define directionIsInconsistent(record) (((record)->directionFlag & 255) < ((record)->directionFlag >> 8))
 
 /// @brief Update cluster values by all segments
 void updateBySegArray(Cluster *cluster, Segment *segArray, Args args);
@@ -200,9 +190,6 @@ void divideByNumSeg(Cluster *cluster);
 
 /// @brief Divide cluster values by background info
 void divideByBgInfo(Cluster *cluster, Args args);
-
-/// @brief Set cluster strand
-void setDirection(Cluster *cluster);
 
 /// @brief Set background info of a cluster
 void setBackbgInfo(Cluster *cluster, Args args);
