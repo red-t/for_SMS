@@ -245,10 +245,8 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
 
     if (rightStart < leftEnd && (leftEnd - rightStart) < 50) {
         cluster->flag |= CLT_TSD;
-        cluster->refEnd = localStart + rightStart;
-        cluster->refStart = cluster->refEnd - 1;
-        cluster->tsdStart = localStart + rightStart;
-        cluster->tsdEnd = localStart + leftEnd;
+        cluster->refStart = localStart + rightStart;
+        cluster->refEnd = localStart + leftEnd;
         return;
     }
 
@@ -330,7 +328,7 @@ void writeSingleCltAnno(int strandFlag, int numTe, int *teTable, faidx_t *teFa, 
 /// @brief Get cluster strand
 char getCltStrand(int strandFlag)
 {
-    char strand = '*';
+    char strand = '.';
     if (strandFlag > 0)
         strand = '+';
     if (strandFlag < 0)

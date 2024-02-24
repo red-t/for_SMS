@@ -101,8 +101,10 @@ typedef struct Cluster
     uint8_t     isInBlacklist;
     float       probability;
     uint16_t    flag;
-    int         tsdStart;
-    int         tsdEnd;
+    int         numSegRaw;
+    int         numLeft;
+    int         numMiddle;
+    int         numRight;
 } __attribute__((packed)) Cluster;
 
 /// @brief Data container for arguments

@@ -165,7 +165,13 @@ float getEntropy(int numLeft, int numMiddle, int numRight, int numSeg)
 
 /// @brief Set entropy of the cluster
 void setEntropy(Cluster *cluster, int numLeft, int numMiddle, int numRight)
-{ cluster->entropy = getEntropy(numLeft, numMiddle, numRight, cluster->numSeg); }
+{
+    cluster->entropy = getEntropy(numLeft, numMiddle, numRight, cluster->numSeg);
+    cluster->numSegRaw = cluster->numSeg;
+    cluster->numLeft = numLeft;
+    cluster->numMiddle = numMiddle;
+    cluster->numRight = numRight;
+}
 
 /// @brief Compute BalanceRatio of the cluster
 void setBalanceRatio(Cluster *cluster, int numLeft, int numRight)
@@ -277,9 +283,10 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
         tsdSeq = fetchTsdSeq(refFa, clt);
         insSeq = fetchInsSeq(clt);
 
-        fprintf(fp, "%d-%d\t%s\t%d\t%d\t%f\t%d\t%d\t%s\t%s\n",
+        fprintf(fp, "%d-%d\t%s\t%d\t%d\t%f\t%d\t%d\t%d\t%d\t%s\t%s\n",
                 clt->tid, clt->idx, faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd,
-                clt->probability, clt->tsdStart, clt->tsdEnd, tsdSeq, insSeq);
+                clt->probability, clt->numSegRaw, clt->numLeft, clt->numMiddle, clt->numRight,
+                tsdSeq, insSeq);
 
         free(tsdSeq);
         free(insSeq);
@@ -296,10 +303,10 @@ char *fetchTsdSeq(faidx_t *refFa, Cluster *clt)
     hts_pos_t seqLen;
     char *tsdSeq = NULL;
     if ((clt->flag & CLT_TSD) != 0)
-        tsdSeq = faidx_fetch_seq64(refFa, faidx_iseq(refFa, clt->tid), clt->tsdStart, clt->tsdEnd-1, &seqLen);
+        tsdSeq = faidx_fetch_seq64(refFa, faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd-1, &seqLen);
     else {
         tsdSeq = faidx_fetch_seq64(refFa, faidx_iseq(refFa, clt->tid), 0, 0, &seqLen);
-        tsdSeq[0] = '*';
+        tsdSeq[0] = '.';
     }
     return tsdSeq;
 }

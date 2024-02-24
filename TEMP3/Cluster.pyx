@@ -71,8 +71,10 @@ ClusterDt = np.dtype([
     ('isInBlacklist',       np.uint8),
     ('probability',         np.float32),
     ('flag',                np.uint16),
-    ('tsdStart',            np.int32),
-    ('tsdEnd',              np.int32)
+    ('numSegRaw',           np.int32),
+    ('numLeft',             np.int32),
+    ('numMiddle',           np.int32),
+    ('numRight',            np.int32),
 ])
 
 
