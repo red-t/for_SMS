@@ -217,6 +217,9 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
 char *fetchTsdSeq(faidx_t *refFa, Cluster *clt);
 
 /// @brief Fetch insertion sequence from temporary file
-char *fetchInsSeq(Cluster *clt);
+char *fetchInsSeq(Cluster *clt, int *tid1, int *end1, int *tid2, int *start2);
+
+/// @brief Fetch flank sequence from temporary file
+void fetchFlankSeq(Cluster *clt, char **leftSeq, char **rightSeq, int tid1, int end1, int tid2, int start2);
 
 #endif // CLUSTER_UTILS_H

@@ -272,7 +272,8 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
     char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_cltFormated.txt", startIdx);
 
-    char *tsdSeq = NULL, *insSeq = NULL;
+    int tid1, end1, tid2, start2, isAssembled;
+    char *tsdSeq = NULL, *insSeq = NULL, *leftSeq = NULL, *rightSeq = NULL;
     FILE *fp = fopen(outFn, "w");
     for (int i = startIdx; i < endIdx; i++)
     {
@@ -280,17 +281,17 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
         if (!isTEMapped(clt->flag))
             continue;
 
-        int isAssembled = ((clt->flag & CLT_ASSEMBLED) != 0);
+        isAssembled = ((clt->flag & CLT_ASSEMBLED) != 0);
         tsdSeq = fetchTsdSeq(refFa, clt);
-        insSeq = fetchInsSeq(clt);
+        insSeq = fetchInsSeq(clt, &tid1, &end1, &tid2, &start2);
+        fetchFlankSeq(clt, &leftSeq, &rightSeq, tid1, end1, tid2, start2);
 
-        fprintf(fp, "%d-%d\t%s\t%d\t%d\t%f\t%d\t%d\t%d\t%d\t%d\t%s\t%s\n",
+        fprintf(fp, "%d-%d\t%s\t%d\t%d\t%f\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s\t%s\n",
                 clt->tid, clt->idx, faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd,
                 clt->probability, clt->numSegRaw, clt->numLeft, clt->numMiddle, clt->numRight,
-                isAssembled, tsdSeq, insSeq);
+                isAssembled, tsdSeq, insSeq, leftSeq, rightSeq);
 
-        free(tsdSeq);
-        free(insSeq);
+        free(tsdSeq); free(insSeq); free(leftSeq); free(rightSeq);
     }
     fclose(fp);
 
@@ -313,7 +314,7 @@ char *fetchTsdSeq(faidx_t *refFa, Cluster *clt)
 }
 
 /// @brief Fetch insertion sequence from temporary file
-char *fetchInsSeq(Cluster *clt)
+char *fetchInsSeq(Cluster *clt, int *tid1, int *end1, int *tid2, int *start2)
 {
     char insFn[100] = {'\0'};
     sprintf(insFn, "tmp_anno/%d_%d_insertion.fa", clt->tid, clt->idx);
@@ -321,7 +322,38 @@ char *fetchInsSeq(Cluster *clt)
     
     hts_pos_t seqLen;
     char *insSeq = faidx_fetch_seq64(insFa, faidx_iseq(insFa, 0), 0, INT_MAX, &seqLen);
+    sscanf(faidx_iseq(insFa, 0), "%d_%d_%d_%d", tid1, end1, tid2, start2);
 
     if (insFa != NULL) {fai_destroy(insFa); insFa=NULL;}
     return insSeq;
+}
+
+/// @brief Fetch flank sequence from temporary file
+void fetchFlankSeq(Cluster *clt, char **leftSeq, char **rightSeq, int tid1, int end1, int tid2, int start2)
+{
+    hts_pos_t seqLen;
+    char assmFn[100] = {'\0'};
+    sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
+    faidx_t *assmFa = fai_load((const char *)assmFn);
+
+    if ((clt->flag & CLT_LEFT_FLANK_MAP) != 0) {
+        *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, tid1), (end1-500), (end1-1), &seqLen);
+        *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, 0), 0, 0, &seqLen);
+        **rightSeq = '.';
+        goto END;
+    }
+
+    if ((clt->flag & CLT_RIGHT_FLANK_MAP) != 0) {
+        *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, 0), 0, 0, &seqLen);
+        *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, tid2), start2, (start2 + 499), &seqLen);
+        **leftSeq = '.';
+        goto END;
+    }
+    
+    *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, tid1), (end1 - 500), (end1 - 1), &seqLen);
+    *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, tid2), start2, (start2 + 499), &seqLen);
+    goto END;
+
+    END:
+    if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
 }

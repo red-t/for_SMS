@@ -268,7 +268,7 @@ void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
     sprintf(outFn, "tmp_anno/%d_%d_insertion.fa", cluster->tid, cluster->idx);
 
     FILE *fp = fopen(outFn, "w");
-    fprintf(fp, ">0\n%s\n", insSeq);
+    fprintf(fp, ">%d_%d_%d_%d\n%s\n", region.tid1, region.end1, region.tid2, region.start2, insSeq);
     fclose(fp);
 
     if (insSeq != NULL) {free(insSeq); insSeq=NULL;}
