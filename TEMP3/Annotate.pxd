@@ -25,8 +25,8 @@ cdef extern from "src/anno_utils.h" nogil:
     ###################################
     ### Annotate Insertion sequence ###
     ###################################
-    int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
-    void annoTsd(Cluster *cluster, Anno *annoArray, int numAnno)
+    int fillAnnoArray(Cluster *clt, Anno *annoArray, int idx)
+    void annoTsd(Cluster *clt, Anno *annoArray, int numAnno)
     void checkGap(Cluster *clt, Anno *annoArray, int numAnno)
 
     ######################

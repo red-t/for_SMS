@@ -2,7 +2,7 @@ from .FileIO cimport *
 
 cdef extern from "src/cluster_utils.h" nogil:
     void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
-    void intersectBlackList(Cluster *cluster, Args args)
+    void intersectBlackList(Cluster *clt, Args args)
 
 
 cdef extern from "src/seg_utils.h" nogil:

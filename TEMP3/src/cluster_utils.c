@@ -7,19 +7,19 @@
 /// @brief Update cluster values by segments features and background info
 void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
 {
-    Cluster *cluster = &cltArray[0];
-    setTeAlignedFrac(cluster, segArray, args);
-    if (cluster->numSeg <= 2)
-        setCltType(cluster, segArray, args);
+    Cluster *clt = &cltArray[0];
+    setTeAlignedFrac(clt, segArray, args);
+    if (clt->numSeg <= 2)
+        setCltType(clt, segArray, args);
         
-    if (!isValidCandidate(cluster))
+    if (!isValidCandidate(clt))
         return;
 
-    updateBySegArray(cluster, segArray, args);
-    setCltLocationType(cluster, args);
-    divideByNumSeg(cluster);
-    divideByBgInfo(cluster, args);
-    setBackbgInfo(cluster, args);
+    updateBySegArray(clt, segArray, args);
+    setCltLocationType(clt, args);
+    divideByNumSeg(clt);
+    divideByBgInfo(clt, args);
+    setBackbgInfo(clt, args);
 }
 
 
@@ -28,30 +28,30 @@ void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
  ************************/
 
 /// @brief Compute TE-aligned-fraction of a cluster
-void setTeAlignedFrac(Cluster *cluster, Segment *segArray, Args args)
+void setTeAlignedFrac(Cluster *clt, Segment *segArray, Args args)
 {
     float numTeAlignedSeg = 0;
-    for (int i = cluster->startIdx; i < cluster->endIdx; i++) {
+    for (int i = clt->startIdx; i < clt->endIdx; i++) {
         if (segArray[i].overhang < args.minOverhang)
             continue;
         if (segArray[i].numTeAlignment > 0)
             numTeAlignedSeg += 1;
-        cluster->numSeg += 1;
+        clt->numSeg += 1;
     }
 
-    cluster->teAlignedFrac = numTeAlignedSeg / cluster->numSeg;
+    clt->teAlignedFrac = numTeAlignedSeg / clt->numSeg;
 }
 
 /// @brief Set cluster's cltType, which represent the cluster is germ/soma
-void setCltType(Cluster *cluster, Segment *segArray, Args args)
+void setCltType(Cluster *clt, Segment *segArray, Args args)
 {
-    if (cluster->numSeg == 1) {
-        cluster->cltType = 1;
+    if (clt->numSeg == 1) {
+        clt->cltType = 1;
         return;
     }
 
     int isFirst = 1;
-    for (int i = cluster->startIdx; i < cluster->endIdx; i++) {
+    for (int i = clt->startIdx; i < clt->endIdx; i++) {
         Segment *segment = &segArray[i];
         if (overhangIsShort(segment, args.minOverhang))
             continue;
@@ -66,7 +66,7 @@ void setCltType(Cluster *cluster, Segment *segArray, Args args)
     }
     
     if (nameIsSame(args.firstBamRecord, args.secondBamRecord))
-        cluster->cltType = 2;
+        clt->cltType = 2;
 }
 
 
@@ -75,43 +75,43 @@ void setCltType(Cluster *cluster, Segment *segArray, Args args)
  **********************************/
 
 /// @brief Update cluster values by all segments
-void updateBySegArray(Cluster *cluster, Segment *segArray, Args args)
+void updateBySegArray(Cluster *clt, Segment *segArray, Args args)
 {
     int numLeft = 0, numMiddle = 0, numRight = 0;
 
-    for (int i = cluster->startIdx; i < cluster->endIdx; i++)
+    for (int i = clt->startIdx; i < clt->endIdx; i++)
     {
         Segment *segment = &segArray[i];
         if (overhangIsShort(segment, args.minOverhang))
             continue;
-        countValuesFromSeg(cluster, args, segment, &numLeft, &numMiddle, &numRight);
+        countValuesFromSeg(clt, args, segment, &numLeft, &numMiddle, &numRight);
     }
 
-    setEntropy(cluster, numLeft, numMiddle, numRight);
-    setBalanceRatio(cluster, numLeft, numRight);
-    setNumSegType(cluster);
+    setEntropy(clt, numLeft, numMiddle, numRight);
+    setBalanceRatio(clt, numLeft, numRight);
+    setNumSegType(clt);
 }
 
 /// @brief Update cluster values by single segment
-void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numLeft, int *numMiddle, int *numRight)
+void countValuesFromSeg(Cluster *clt, Args args, Segment *segment, int *numLeft, int *numMiddle, int *numRight)
 {
     countDifferentSeg(numLeft, numMiddle, numRight, segment);
-    cluster->numSegType |= segment->segType;
-    cluster->meanMapQual += segment->mapQual;
-    countAlnFracs(cluster, segment);
+    clt->numSegType |= segment->segType;
+    clt->meanMapQual += segment->mapQual;
+    countAlnFracs(clt, segment);
 
     if (segment->mapQual < 5)
-        cluster->lowMapQualFrac += 1;
+        clt->lowMapQualFrac += 1;
     if (isDualClip(segment))
-        cluster->dualClipFrac += 1;
+        clt->dualClipFrac += 1;
     if (noTeAlignment(segment)) {
-        cluster->meanDivergence += args.bgDiv;
+        clt->meanDivergence += args.bgDiv;
         return;
     }
 
-    cluster->meanAlnScore += segment->sumAlnScore / segment->numTeAlignment;
-    cluster->meanQueryMapFrac += (float)segment->sumQueryMapLen / (segment->queryEnd - segment->queryStart);
-    cluster->meanDivergence += segment->sumDivergence / segment->numTeAlignment;
+    clt->meanAlnScore += segment->sumAlnScore / segment->numTeAlignment;
+    clt->meanQueryMapFrac += (float)segment->sumQueryMapLen / (segment->queryEnd - segment->queryStart);
+    clt->meanDivergence += segment->sumDivergence / segment->numTeAlignment;
 }
 
 /// @brief Count the number of segments with different type
@@ -131,20 +131,20 @@ void countDifferentSeg(int *numLeft, int *numMiddle, int *numRight, Segment *seg
 }
 
 /// @brief Count the number of segments with different alnLocationType
-void countAlnFracs(Cluster *cluster, Segment *segment)
+void countAlnFracs(Cluster *clt, Segment *segment)
 {
     switch (segment->alnLocationType)
     {
     case 1:
-        cluster->alnFrac1 += 1; break;
+        clt->alnFrac1 += 1; break;
     case 2:
-        cluster->alnFrac2 += 1; break;
+        clt->alnFrac2 += 1; break;
     case 4:
-        cluster->alnFrac4 += 1; break;
+        clt->alnFrac4 += 1; break;
     case 8:
-        cluster->alnFrac8 += 1; break;
+        clt->alnFrac8 += 1; break;
     case 16:
-        cluster->alnFrac16 += 1; break;
+        clt->alnFrac16 += 1; break;
     default:
         break;
     }
@@ -164,22 +164,22 @@ float getEntropy(int numLeft, int numMiddle, int numRight, int numSeg)
 }
 
 /// @brief Set entropy of the cluster
-void setEntropy(Cluster *cluster, int numLeft, int numMiddle, int numRight)
+void setEntropy(Cluster *clt, int numLeft, int numMiddle, int numRight)
 {
-    cluster->entropy = getEntropy(numLeft, numMiddle, numRight, cluster->numSeg);
-    cluster->numSegRaw = cluster->numSeg;
-    cluster->numLeft = numLeft;
-    cluster->numMiddle = numMiddle;
-    cluster->numRight = numRight;
+    clt->entropy = getEntropy(numLeft, numMiddle, numRight, clt->numSeg);
+    clt->numSegRaw = clt->numSeg;
+    clt->numLeft = numLeft;
+    clt->numMiddle = numMiddle;
+    clt->numRight = numRight;
 }
 
 /// @brief Compute BalanceRatio of the cluster
-void setBalanceRatio(Cluster *cluster, int numLeft, int numRight)
-{ cluster->balanceRatio = (MIN(numLeft, numRight) + 0.01) / (MAX(numLeft, numRight) + 0.01); }
+void setBalanceRatio(Cluster *clt, int numLeft, int numRight)
+{ clt->balanceRatio = (MIN(numLeft, numRight) + 0.01) / (MAX(numLeft, numRight) + 0.01); }
 
 /// @brief Compute the numer of segment type of the cluster
-void setNumSegType(Cluster *cluster)
-{ cluster->numSegType = (cluster->numSegType & 1) + ((cluster->numSegType & 2) >> 1) + ((cluster->numSegType & 4) >> 2); }
+void setNumSegType(Cluster *clt)
+{ clt->numSegType = (clt->numSegType & 1) + ((clt->numSegType & 2) >> 1) + ((clt->numSegType & 4) >> 2); }
 
 
 /*********************************
@@ -187,60 +187,60 @@ void setNumSegType(Cluster *cluster)
  *********************************/
 
 /// @brief Set location type of a cluster
-void setCltLocationType(Cluster *cluster, Args args)
+void setCltLocationType(Cluster *clt, Args args)
 {
     int numOverlap = 0, minDistanceToOverlap = 0x7fffffff;
-    ailistQueryInterval(args.repeatAiList, cluster->refStart, cluster->refEnd, 50, &numOverlap, &minDistanceToOverlap);
-    ailistQueryInterval(args.gapAiList, cluster->refStart, cluster->refEnd, 50, &numOverlap, &minDistanceToOverlap);
+    ailistQueryInterval(args.repeatAiList, clt->refStart, clt->refEnd, 50, &numOverlap, &minDistanceToOverlap);
+    ailistQueryInterval(args.gapAiList, clt->refStart, clt->refEnd, 50, &numOverlap, &minDistanceToOverlap);
 
     if (numOverlap == 0) {
-        cluster->locationType = 1;
+        clt->locationType = 1;
         return;
     }
 
     if (minDistanceToOverlap < 50) {
-        cluster->locationType = 2;
+        clt->locationType = 2;
         return;
     }
 
-    cluster->locationType = 4;
+    clt->locationType = 4;
 }
 
 /// @brief Divide cluster values by numSeg
-void divideByNumSeg(Cluster *cluster)
+void divideByNumSeg(Cluster *clt)
 {
-    if (cluster->alnFrac1 > 0)
-        cluster->alnFrac1 = cluster->alnFrac1 / cluster->numSeg;
-    if (cluster->alnFrac2 > 0)
-        cluster->alnFrac2 = cluster->alnFrac2 / cluster->numSeg;
-    if (cluster->alnFrac4 > 0)
-        cluster->alnFrac4 = cluster->alnFrac4 / cluster->numSeg;
-    if (cluster->alnFrac8 > 0)
-        cluster->alnFrac8 = cluster->alnFrac8 / cluster->numSeg;
-    if (cluster->alnFrac16 > 0)
-        cluster->alnFrac16 = cluster->alnFrac16 / cluster->numSeg;
+    if (clt->alnFrac1 > 0)
+        clt->alnFrac1 = clt->alnFrac1 / clt->numSeg;
+    if (clt->alnFrac2 > 0)
+        clt->alnFrac2 = clt->alnFrac2 / clt->numSeg;
+    if (clt->alnFrac4 > 0)
+        clt->alnFrac4 = clt->alnFrac4 / clt->numSeg;
+    if (clt->alnFrac8 > 0)
+        clt->alnFrac8 = clt->alnFrac8 / clt->numSeg;
+    if (clt->alnFrac16 > 0)
+        clt->alnFrac16 = clt->alnFrac16 / clt->numSeg;
 
-    cluster->dualClipFrac = cluster->dualClipFrac / cluster->numSeg;
-    cluster->lowMapQualFrac = cluster->lowMapQualFrac / cluster->numSeg;
-    cluster->meanQueryMapFrac = cluster->meanQueryMapFrac / cluster->numSeg;
-    cluster->meanDivergence = cluster->meanDivergence / cluster->numSeg;
-    cluster->meanMapQual = cluster->meanMapQual / cluster->numSeg;
-    cluster->meanAlnScore = cluster->meanAlnScore / cluster->numSeg;
+    clt->dualClipFrac = clt->dualClipFrac / clt->numSeg;
+    clt->lowMapQualFrac = clt->lowMapQualFrac / clt->numSeg;
+    clt->meanQueryMapFrac = clt->meanQueryMapFrac / clt->numSeg;
+    clt->meanDivergence = clt->meanDivergence / clt->numSeg;
+    clt->meanMapQual = clt->meanMapQual / clt->numSeg;
+    clt->meanAlnScore = clt->meanAlnScore / clt->numSeg;
 }
 
 /// @brief Divide cluster values by background info
-void divideByBgInfo(Cluster *cluster, Args args)
+void divideByBgInfo(Cluster *clt, Args args)
 {
-    cluster->meanDivergence = cluster->meanDivergence / args.bgDiv;
-    cluster->numSeg = cluster->numSeg / args.bgDepth;
+    clt->meanDivergence = clt->meanDivergence / args.bgDiv;
+    clt->numSeg = clt->numSeg / args.bgDepth;
 }
 
 /// @brief Set background info of a cluster
-void setBackbgInfo(Cluster *cluster, Args args)
+void setBackbgInfo(Cluster *clt, Args args)
 {
-    cluster->bgDiv = args.bgDiv;
-    cluster->bgDepth = args.bgDepth;
-    cluster->bgReadLen = args.bgReadLen;
+    clt->bgDiv = args.bgDiv;
+    clt->bgDepth = args.bgDepth;
+    clt->bgReadLen = args.bgReadLen;
 }
 
 
@@ -249,12 +249,12 @@ void setBackbgInfo(Cluster *cluster, Args args)
  *****************/
 
 /// @brief Check if the cluster inersect with blacklist
-void intersectBlackList(Cluster *cluster, Args args)
+void intersectBlackList(Cluster *clt, Args args)
 {
     int numOverlap = 0, minDistanceToOverlap = 0x7fffffff;
-    ailistQueryInterval(args.blackAiList, cluster->refStart, cluster->refEnd, 2, &numOverlap, &minDistanceToOverlap);
+    ailistQueryInterval(args.blackAiList, clt->refStart, clt->refEnd, 2, &numOverlap, &minDistanceToOverlap);
     if (numOverlap > 0) {
-        cluster->isInBlacklist = 1;
-        cluster->flag |= CLT_IN_BLACKLIST;
+        clt->isInBlacklist = 1;
+        clt->flag |= CLT_IN_BLACKLIST;
     }
 }

@@ -170,10 +170,10 @@ cdef extern from "src/io_utils.h" nogil:
     ###########################
     ### Segment Sequence IO ###
     ###########################
-    int isLowQualClt(Cluster *cluster)
-    int isSomaClt(Cluster *cluster)
+    int isLowQualClt(Cluster *clt)
+    int isSomaClt(Cluster *clt)
 
-    int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args)
+    int getOuputSegIdx(Cluster *clt, Segment *segArray, Args args)
     void setTrimRegion(Segment *segment, int *start, int *end, int flankSize)
 
     #########################
@@ -184,7 +184,7 @@ cdef extern from "src/io_utils.h" nogil:
     #############################
     ### Insertion Sequence IO ###
     #############################
-    void extractIns(Cluster *cluster)
+    void extractIns(Cluster *clt)
 
 
 cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs)

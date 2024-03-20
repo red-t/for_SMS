@@ -9,11 +9,11 @@
 /****************************
  *** Segment Sequence IO  ***
  ****************************/
-#define isLowQualClt(cluster) (((cluster)->isInBlacklist) || ((cluster)->probability <= 0.5))
-#define isSomaClt(cluster) ((cluster)->cltType != 0)
+#define isLowQualClt(clt) (((clt)->isInBlacklist) || ((clt)->probability <= 0.5))
+#define isSomaClt(clt) ((clt)->cltType != 0)
 
 /// @brief select a segment to output from cluster
-int getOuputSegIdx(Cluster *cluster, Segment *segArray, Args args);
+int getOuputSegIdx(Cluster *clt, Segment *segArray, Args args);
 
 /// @brief get extended region of the segment
 void setTrimRegion(Segment *segment, int *start, int *end, int flankSize);
@@ -36,13 +36,13 @@ typedef struct FlankRegion
 void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx);
 
 /// @brief define flank region on ref-genome
-void setFlankRegion(Cluster *cluster, FlankRegion *region);
+void setFlankRegion(Cluster *clt, FlankRegion *region);
 
 /// @brief output flank-seq for single cluster
-void outputFlank(Cluster *cluster, faidx_t *refFa, FlankRegion region);
+void outputFlank(Cluster *clt, faidx_t *refFa, FlankRegion region);
 
 /// @brief output +-500bp local-seq around cluster position for tsd annotation
-void outputLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region);
+void outputLocal(Cluster *clt, faidx_t *refFa, FlankRegion region);
 
 
 /*****************************
@@ -66,7 +66,7 @@ typedef struct InsRegion
 } InsRegion;
 
 /// @brief output insertion-seq and tsd-containing-seq from contig
-void extractIns(Cluster *cluster);
+void extractIns(Cluster *clt);
 
 /// @brief define insertion-seq region by Flank-To-Assm alignments
 void setInsRegion(int cltTid, int cltIdx, InsRegion *region);
@@ -75,7 +75,7 @@ void setInsRegion(int cltTid, int cltIdx, InsRegion *region);
 void adjustInsRegion(InsRegion *region);
 
 /// @brief output insertion-seq in FASTA format
-void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region);
+void outputInsSeq(Cluster *clt, faidx_t *assmFa, InsRegion region);
 
 /// @brief get insertion-seq
 char *getInsSeq(faidx_t *assmFa, Cluster *clt);

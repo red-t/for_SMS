@@ -60,10 +60,10 @@ void initAnno(bam1_t *bam, sam_hdr_t *header, Cluster *clt, Anno *anno, int idx)
 }
 
 /// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
-int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
+int fillAnnoArray(Cluster *clt, Anno *annoArray, int idx)
 {
     char inputFn[100] = {'\0'};
-    sprintf(inputFn, "tmp_anno/%d_%d_InsToTE.bam", cluster->tid, cluster->idx);
+    sprintf(inputFn, "tmp_anno/%d_%d_InsToTE.bam", clt->tid, clt->idx);
     htsFile *inputBam = sam_open(inputFn, "rb");
     sam_hdr_t *header = sam_hdr_read(inputBam);
     bam1_t *bam = bam_init1();
@@ -78,7 +78,7 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
         if (bamIsInvalid(bam))
             continue;
 
-        initAnno(bam, header, cluster, &annoArray[numAnno], idx);
+        initAnno(bam, header, clt, &annoArray[numAnno], idx);
         if (annoArray[numAnno].queryStart < polyA.leftMost) {
             polyA.leftMost = annoArray[numAnno].queryStart;
             polyA.leftIdx = numAnno;
@@ -94,10 +94,10 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
         goto END;
 
     if (numAnno > 1)
-        cluster->flag |= CLT_MULTI_TE;
-    cluster->flag |= CLT_TE_MAP;
-    numAnno = annoPolyA(cluster, annoArray, numAnno, &polyA);
-    outputTsdSeq(cluster, &polyA, annoArray, numAnno);
+        clt->flag |= CLT_MULTI_TE;
+    clt->flag |= CLT_TE_MAP;
+    numAnno = annoPolyA(clt, annoArray, numAnno, &polyA);
+    outputTsdSeq(clt, &polyA, annoArray, numAnno);
     goto END;
 
     END:
@@ -253,10 +253,10 @@ void adjustAnno(Anno *annoArray, int numAnno, int leftDelta)
 }
 
 /// @brief Annotate TSD and refine breakpoint by parsing Tsd-To-Local alignments
-void annoTsd(Cluster *cluster, Anno *annoArray, int numAnno)
+void annoTsd(Cluster *clt, Anno *annoArray, int numAnno)
 {
     char inputFn[100] = {'\0'};
-    sprintf(inputFn, "tmp_anno/%d_%d_TsdToLocal.bam", cluster->tid, cluster->idx);
+    sprintf(inputFn, "tmp_anno/%d_%d_TsdToLocal.bam", clt->tid, clt->idx);
     htsFile *inputBam = sam_open(inputFn, "rb");
     sam_hdr_t *header = sam_hdr_read(inputBam);
     bam1_t *bam = bam_init1();
@@ -285,11 +285,11 @@ void annoTsd(Cluster *cluster, Anno *annoArray, int numAnno)
         }
     }
 
-    setTsd(cluster, atoi(sam_hdr_tid2name(header, 0)), leftEnd, rightStart);
+    setTsd(clt, atoi(sam_hdr_tid2name(header, 0)), leftEnd, rightStart);
     adjustAnno(annoArray, numAnno, leftDelta);
-    cluster->leftMost -= leftDelta;
-    cluster->rightMost += rightDelta;
-    cluster->insLen += leftDelta + rightDelta;
+    clt->leftMost -= leftDelta;
+    clt->rightMost += rightDelta;
+    clt->insLen += leftDelta + rightDelta;
 
     if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
     if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
@@ -297,32 +297,32 @@ void annoTsd(Cluster *cluster, Anno *annoArray, int numAnno)
 }
 
 /// @brief Find TSD and refine breakpoint
-void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
+void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart)
 {
     if (leftEnd < 0 && rightStart < 0)
         return;
     
     if (leftEnd < 0) {
-        cluster->refEnd = localStart + rightStart;
-        cluster->refStart = cluster->refEnd - 1;
+        clt->refEnd = localStart + rightStart;
+        clt->refStart = clt->refEnd - 1;
         return;
     }
 
     if (rightStart < 0) {
-        cluster->refEnd = localStart + leftEnd;
-        cluster->refStart = cluster->refEnd - 1;
+        clt->refEnd = localStart + leftEnd;
+        clt->refStart = clt->refEnd - 1;
         return;
     }
 
     if (rightStart < leftEnd) {
-        cluster->refStart = localStart + rightStart;
-        cluster->refEnd = localStart + leftEnd;
-        cluster->flag |= ((leftEnd - rightStart) < 50) ? CLT_TSD : 0;
+        clt->refStart = localStart + rightStart;
+        clt->refEnd = localStart + leftEnd;
+        clt->flag |= ((leftEnd - rightStart) < 50) ? CLT_TSD : 0;
         return;
     }
     
-    cluster->refStart = localStart + leftEnd - 1;
-    cluster->refEnd = localStart + rightStart;
+    clt->refStart = localStart + leftEnd - 1;
+    clt->refEnd = localStart + rightStart;
 }
 
 /// @brief Check whether large gap exists in ins-seq

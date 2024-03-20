@@ -43,7 +43,7 @@ typedef struct PolyA
  ***********************************/
 
 /// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
-int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx);
+int fillAnnoArray(Cluster *clt, Anno *annoArray, int idx);
 
 /// @brief Find and record all polyA/polyT
 int annoPolyA(Cluster *clt, Anno *annoArray, int numAnno, PolyA *polyA);
@@ -58,10 +58,10 @@ void outputTsdSeq(Cluster *clt, PolyA *polyA, Anno *annoArray, int numAnno);
 void adjustAnno(Anno *annoArray, int numAnno, int leftDelta);
 
 /// @brief Annotate TSD and refine breakpoint by parsing Tsd-To-Local alignments
-void annoTsd(Cluster *cluster, Anno *annoArray, int numAnno);
+void annoTsd(Cluster *clt, Anno *annoArray, int numAnno);
 
 /// @brief Find TSD and refine breakpoint
-void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart);
+void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart);
 
 /// @brief Check whether large gap exists in ins-seq
 void checkGap(Cluster *clt, Anno *annoArray, int numAnno);

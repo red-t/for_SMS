@@ -157,13 +157,13 @@ void updateCluster(Cluster *cltArray, Segment *segArray, Args args);
  ************************/
 #define overhangIsShort(segment, minOverhang) ((segment)->overhang < (minOverhang))
 #define nameIsSame(record1, record2) (strcmp(bam_get_qname((record1)), bam_get_qname((record2))) == 0)
-#define isValidCandidate(cluster) ((cluster)->teAlignedFrac >= 0.8)
+#define isValidCandidate(clt) ((clt)->teAlignedFrac >= 0.8)
 
 /// @brief Compute TE-aligned-fraction of a cluster
-void setTeAlignedFrac(Cluster *cluster, Segment *segArray, Args args);
+void setTeAlignedFrac(Cluster *clt, Segment *segArray, Args args);
 
 /// @brief Set cluster's cltType, which represent the cluster is germ/soma
-void setCltType(Cluster *cluster, Segment *segArray, Args args);
+void setCltType(Cluster *clt, Segment *segArray, Args args);
 
 
 /**********************************
@@ -173,28 +173,28 @@ void setCltType(Cluster *cluster, Segment *segArray, Args args);
 #define noTeAlignment(segment) ((segment)->numTeAlignment == 0)
 
 /// @brief Update cluster values by all segments
-void updateBySegArray(Cluster *cluster, Segment *segArray, Args args);
+void updateBySegArray(Cluster *clt, Segment *segArray, Args args);
 
 /// @brief Update cluster values by single segment
-void countValuesFromSeg(Cluster *cluster, Args args, Segment *segment, int *numLeft, int *numMiddle, int *numRight);
+void countValuesFromSeg(Cluster *clt, Args args, Segment *segment, int *numLeft, int *numMiddle, int *numRight);
 
 /// @brief Count number of different type segments
 void countDifferentSeg(int *numLeft, int *numMiddle, int *numRight, Segment *segment);
 
 /// @brief Count the number of segments with different alnLocationType
-void countAlnFracs(Cluster *cluster, Segment *segment);
+void countAlnFracs(Cluster *clt, Segment *segment);
 
 /// @brief Compute entropy based on the number of different type segments
 float getEntropy(int numLeft, int numMiddle, int numRight, int numSeg);
 
 /// @brief Set entropy of the cluster
-void setEntropy(Cluster *cluster, int numLeft, int numMiddle, int numRight);
+void setEntropy(Cluster *clt, int numLeft, int numMiddle, int numRight);
 
 /// @brief Compute BalanceRatio of the cluster
-void setBalanceRatio(Cluster *cluster, int numLeft, int numRight);
+void setBalanceRatio(Cluster *clt, int numLeft, int numRight);
 
 /// @brief Compute the numer of segment type of the cluster
-void setNumSegType(Cluster *cluster);
+void setNumSegType(Cluster *clt);
 
 
 /*********************************
@@ -202,16 +202,16 @@ void setNumSegType(Cluster *cluster);
  *********************************/
 
 /// @brief Set location type of a cluster
-void setCltLocationType(Cluster *cluster, Args args);
+void setCltLocationType(Cluster *clt, Args args);
 
 /// @brief Divide cluster values by numSeg
-void divideByNumSeg(Cluster *cluster);
+void divideByNumSeg(Cluster *clt);
 
 /// @brief Divide cluster values by background info
-void divideByBgInfo(Cluster *cluster, Args args);
+void divideByBgInfo(Cluster *clt, Args args);
 
 /// @brief Set background info of a cluster
-void setBackbgInfo(Cluster *cluster, Args args);
+void setBackbgInfo(Cluster *clt, Args args);
 
 
 /*****************
@@ -219,6 +219,6 @@ void setBackbgInfo(Cluster *cluster, Args args);
  *****************/
 
 /// @brief Check if the cluster inersect with blacklist
-void intersectBlackList(Cluster *cluster, Args args);
+void intersectBlackList(Cluster *clt, Args args);
 
 #endif // CLUSTER_UTILS_H
