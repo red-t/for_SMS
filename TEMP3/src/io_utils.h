@@ -51,20 +51,18 @@ void outputLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region);
 #define bamIsSup(bam) (((bam)->core.flag & BAM_FSUPPLEMENTARY) != 0)
 #define isLeftFlank(bam) (strcmp(bam_get_qname((bam)), "0") == 0)
 #define isClipInFlank(cigar) (bam_cigar_op((cigar)) == BAM_CSOFT_CLIP && bam_cigar_oplen((cigar)) > 400)
-#define isFlankMapped(flag) (((flag) & 120) != 0)
-#define isBothFlankMapped(flag) (((flag) & 96) != 0)
 
 /// @brief Data container for insertion region on assembled contig
 typedef struct InsRegion
 {
-    int start2;
-    int end1;
+    int rightMost;
+    int leftMost;
     int tid1;
     int tid2;
     int len1;
     uint32_t cigar1;
     uint32_t cigar2;
-    uint16_t flag;
+    uint32_t flag;
 } InsRegion;
 
 /// @brief output insertion-seq and tsd-containing-seq from contig
@@ -80,9 +78,20 @@ void adjustInsRegion(InsRegion *region);
 void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region);
 
 /// @brief get insertion-seq
-char *getInsSeq(faidx_t *assmFa, InsRegion region);
+char *getInsSeq(faidx_t *assmFa, Cluster *clt);
 
-/// @brief output tsd-containing-seq for tsd annotation
-void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region);
+
+/*******************
+ *** Cluster I/O ***
+ *******************/
+
+/// @brief Output formated cluster records
+void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn);
+
+/// @brief Fetch TSD sequence from reference genome
+char *fetchTsdSeq(faidx_t *refFa, Cluster *clt);
+
+/// @brief Fetch flank sequence from temporary file
+void fetchSeqs(Cluster *clt, char **insSeq, char **leftSeq, char **rightSeq);
 
 #endif // IO_UTILS_H

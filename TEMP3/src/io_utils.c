@@ -88,20 +88,10 @@ void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
 /// @brief define flank region on ref-genome
 void setFlankRegion(Cluster *cluster, FlankRegion *region)
 {
-    // cluster position is a point
-    if (cluster->refEnd - cluster->refStart == 1) {
-        region->start1 = cluster->refEnd - 450;
-        region->end1 = cluster->refEnd + 50;
-        region->start2 = cluster->refStart - 50;
-        region->end2 = cluster->refStart + 450;
-        return;
-    }
-
-    // cluster position is a region
-    region->start1 = cluster->refEnd - 500;
-    region->end1 = cluster->refEnd;
-    region->start2 = cluster->refStart;
-    region->end2 = cluster->refStart + 500;
+    region->start1 = cluster->refStart - 499;
+    region->end1 = cluster->refStart;
+    region->start2 = cluster->refEnd;
+    region->end2 = cluster->refEnd + 499;
     return;
 }
 
@@ -150,11 +140,10 @@ void outputLocal(Cluster *cluster, faidx_t *refFa, FlankRegion region)
 InsRegion initInsRegion()
 {
     InsRegion region;
-    region.start2 = 0;
-    region.end1 = 0;
+    region.rightMost = 0;
+    region.leftMost = 0;
     region.tid1 = -1;
     region.tid2 = -1;
-    region.len1 = 0;
     region.cigar1 = 0;
     region.cigar2 = 0;
     region.flag = 0;
@@ -173,9 +162,7 @@ void extractIns(Cluster *cluster)
     char assmFn[100] = {'\0'};
     sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", cluster->tid, cluster->idx);
     faidx_t *assmFa = fai_load((const char *)assmFn);
-
     outputInsSeq(cluster, assmFa, region);
-    outputTsdSeq(cluster, assmFa, region);
 
     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
     return;
@@ -202,12 +189,11 @@ void setInsRegion(int cltTid, int cltIdx, InsRegion *region)
         uint32_t *cigarArray = bam_get_cigar(bam);
 
         if (isLeftFlank(bam)) {
-            region->end1 = bam_endpos(bam);
+            region->leftMost = bam_endpos(bam);
             region->tid1 = bam->core.tid;
-            region->len1 = sam_hdr_tid2len(header, region->tid1);
             region->cigar1 = cigarArray[0];
         } else {
-            region->start2 = bam->core.pos;
+            region->rightMost = bam->core.pos;
             region->tid2 = bam->core.tid;
             region->cigar2 = cigarArray[numCigar - 1];
         }
@@ -251,7 +237,7 @@ void adjustInsRegion(InsRegion *region)
     }
 
     // Two flanks map to same contig
-    if (region->tid1 == region->tid2 && region->end1 <= (region->start2-100)) {
+    if (region->tid1 == region->tid2 && region->leftMost <= (region->rightMost-100)) {
         region->flag |= CLT_SAME_FLANK_MAP;
         return;
     }
@@ -260,36 +246,38 @@ void adjustInsRegion(InsRegion *region)
         region->flag |= CLT_DIFF_FLANK_MAP;
 }
 
-/// @brief output insertion-seq in FASTA format
+/// @brief output insertion-seq for annotation
 void outputInsSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
 {
-    char *insSeq = getInsSeq(assmFa, region);
+    cluster->tid1 = region.tid1; cluster->leftMost = region.leftMost;
+    cluster->tid2 = region.tid2; cluster->rightMost = region.rightMost;
+    char *insSeq = getInsSeq(assmFa, cluster);
     char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_%d_insertion.fa", cluster->tid, cluster->idx);
 
     FILE *fp = fopen(outFn, "w");
-    fprintf(fp, ">%d_%d_%d_%d\n%s\n", region.tid1, region.end1, region.tid2, region.start2, insSeq);
+    fprintf(fp, ">%d_%d_%d_%d\n%s\n", region.tid1, region.leftMost, region.tid2, region.rightMost, insSeq);
     fclose(fp);
 
     if (insSeq != NULL) {free(insSeq); insSeq=NULL;}
 }
 
 /// @brief get insertion-seq
-char *getInsSeq(faidx_t *assmFa, InsRegion region)
+char *getInsSeq(faidx_t *assmFa, Cluster *clt)
 {
     hts_pos_t seqLen;
-    if ((region.flag & CLT_LEFT_FLANK_MAP) != 0)
-        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, (region.len1-1), &seqLen);
+    if ((clt->flag & CLT_LEFT_FLANK_MAP) != 0)
+        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), clt->leftMost, INT_MAX, &seqLen);
 
-    if ((region.flag & CLT_RIGHT_FLANK_MAP) != 0)
-        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), 0, (region.start2-1), &seqLen);
+    if ((clt->flag & CLT_RIGHT_FLANK_MAP) != 0)
+        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), 0, (clt->rightMost-1), &seqLen);
 
-    if ((region.flag & CLT_SAME_FLANK_MAP) != 0)
-        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, (region.start2-1), &seqLen);
+    if ((clt->flag & CLT_SAME_FLANK_MAP) != 0)
+        return faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), clt->leftMost, (clt->rightMost-1), &seqLen);
 
-    if ((region.flag & CLT_DIFF_FLANK_MAP) != 0) {
-        char *seq1 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), region.end1, (region.len1-1), &seqLen);
-        char *seq2 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), 0, (region.start2-1), &seqLen);
+    if ((clt->flag & CLT_DIFF_FLANK_MAP) != 0) {
+        char *seq1 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), clt->leftMost, INT_MAX, &seqLen);
+        char *seq2 = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), 0, (clt->rightMost-1), &seqLen);
 
         int len1 = strlen(seq1), len2 = strlen(seq2);
         seqLen = len1 + len2 + 500;
@@ -308,23 +296,86 @@ char *getInsSeq(faidx_t *assmFa, InsRegion region)
     return NULL;
 }
 
-/// @brief output tsd-containing-seq for tsd annotation
-void outputTsdSeq(Cluster *cluster, faidx_t *assmFa, InsRegion region)
+
+/*******************
+ *** Cluster I/O ***
+ *******************/
+
+/// @brief Output formated cluster records
+void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn)
 {
-    if (!isBothFlankMapped(region.flag))
-        return;
-
-    hts_pos_t seqLen;
-    char *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid1), (region.end1-100), (region.end1-1), &seqLen);
-    char *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, region.tid2), region.start2, (region.start2+99), &seqLen);
-
+    faidx_t *refFa = fai_load(refFn);
+    faidx_t *teFa = fai_load(teFn);
     char outFn[100] = {'\0'};
-    sprintf(outFn, "tmp_anno/%d_%d_tsd.fa", cluster->tid, cluster->idx);
+    sprintf(outFn, "tmp_anno/%d_cltFormated.txt", startIdx);
+
+    int isAssembled;
+    char *tsdSeq = NULL, *insSeq = NULL, *leftSeq = NULL, *rightSeq = NULL;
     FILE *fp = fopen(outFn, "w");
-    fprintf(fp, ">0\n%s\n", leftSeq);
-    fprintf(fp, ">1\n%s\n", rightSeq);
+    for (int i = startIdx; i < endIdx; i++)
+    {
+        Cluster *clt = &cltArray[i];
+        if (!isTEMapped(clt->flag))
+            continue;
+
+        isAssembled = ((clt->flag & CLT_ASSEMBLED) != 0);
+        tsdSeq = fetchTsdSeq(refFa, clt);
+        fetchSeqs(clt, &insSeq, &leftSeq, &rightSeq);
+
+        fprintf(fp, "%d-%d\t%s\t%d\t%d\t%f\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s\t%s\t%d\n",
+                clt->tid, clt->idx, faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd,
+                clt->probability, clt->numSegRaw, clt->numLeft, clt->numMiddle, clt->numRight,
+                isAssembled, tsdSeq, insSeq, leftSeq, rightSeq, clt->flag);
+
+        free(tsdSeq); free(insSeq); free(leftSeq); free(rightSeq);
+    }
     fclose(fp);
 
-    if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
-    if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
+    if (refFa != NULL) {fai_destroy(refFa); refFa=NULL;}
+    if (teFa != NULL) {fai_destroy(teFa); teFa=NULL;}
+}
+
+/// @brief Fetch TSD sequence from reference genome
+char *fetchTsdSeq(faidx_t *refFa, Cluster *clt)
+{
+    hts_pos_t seqLen;
+    char *tsdSeq = NULL;
+    if ((clt->flag & CLT_TSD) != 0)
+        tsdSeq = faidx_fetch_seq64(refFa, faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd-1, &seqLen);
+    else {
+        tsdSeq = faidx_fetch_seq64(refFa, faidx_iseq(refFa, clt->tid), 0, 0, &seqLen);
+        tsdSeq[0] = '.';
+    }
+    return tsdSeq;
+}
+
+/// @brief Fetch flank sequence from temporary file
+void fetchSeqs(Cluster *clt, char **insSeq, char **leftSeq, char **rightSeq)
+{
+    hts_pos_t seqLen;
+    char assmFn[100] = {'\0'};
+    sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
+    faidx_t *assmFa = fai_load((const char *)assmFn);
+
+    if ((clt->flag & CLT_LEFT_FLANK_MAP) != 0) {
+        *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), (clt->leftMost - 500), (clt->leftMost - 1), &seqLen);
+        *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, 0), 0, 0, &seqLen);
+        **rightSeq = '.';
+        goto END;
+    }
+
+    if ((clt->flag & CLT_RIGHT_FLANK_MAP) != 0) {
+        *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, 0), 0, 0, &seqLen);
+        *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), clt->rightMost, (clt->rightMost + 499), &seqLen);
+        **leftSeq = '.';
+        goto END;
+    }
+    
+    *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), (clt->leftMost - 500), (clt->leftMost - 1), &seqLen);
+    *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), clt->rightMost, (clt->rightMost + 499), &seqLen);
+    goto END;
+
+    END:
+    *insSeq = getInsSeq(assmFa, clt);
+    if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
 }

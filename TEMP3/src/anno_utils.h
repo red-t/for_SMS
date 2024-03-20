@@ -11,15 +11,16 @@
 /// @brief Data container for annotation record
 typedef struct Anno
 {
-    int     idx;
-    int     cltTid;
-    int     cltIdx;
-    int     queryStart;
-    int     queryEnd;
-    uint8_t strand;
-    int     tid;
-    int     refStart;
-    int     refEnd;
+    int         idx;
+    int         cltTid;
+    int         cltIdx;
+    int         queryStart;
+    int         queryEnd;
+    uint8_t     strand;
+    int         tid;
+    int         refStart;
+    int         refEnd;
+    uint32_t    flag;
 } __attribute__((packed)) Anno;
 
 /// @brief Data container for polyA
@@ -45,16 +46,28 @@ typedef struct PolyA
 int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx);
 
 /// @brief Find and record all polyA/polyT
-int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, PolyA polyA);
+int annoPolyA(Cluster *clt, Anno *annoArray, int numAnno, PolyA *polyA);
 
 /// @brief Find and record single polyA/polyT
-int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, PolyA polyA);
+int setPolyA(char *flankSeq, Anno *annoArray, Cluster *clt, int numAnno, PolyA *polyA);
+
+/// @brief output tsd-containing-seq for tsd annotation
+void outputTsdSeq(Cluster *clt, PolyA *polyA, Anno *annoArray, int numAnno);
+
+/// @brief Adjust annotation position
+void adjustAnno(Anno *annoArray, int numAnno, int leftDelta);
 
 /// @brief Annotate TSD and refine breakpoint by parsing Tsd-To-Local alignments
-void annoTsd(Cluster *cluster);
+void annoTsd(Cluster *cluster, Anno *annoArray, int numAnno);
 
 /// @brief Find TSD and refine breakpoint
 void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart);
+
+/// @brief Check whether large gap exists in ins-seq
+void checkGap(Cluster *clt, Anno *annoArray, int numAnno);
+
+/// @brief Compare function for sorting annotations
+int compare(const void *a, const void *b);
 
 
 /**********************

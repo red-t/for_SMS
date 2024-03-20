@@ -70,11 +70,16 @@ ClusterDt = np.dtype([
     ('teAlignedFrac',       np.float32),
     ('isInBlacklist',       np.uint8),
     ('probability',         np.float32),
-    ('flag',                np.uint16),
+    ('flag',                np.uint32),
     ('numSegRaw',           np.int32),
     ('numLeft',             np.int32),
     ('numMiddle',           np.int32),
     ('numRight',            np.int32),
+    ('tid1',                np.int32),
+    ('leftMost',            np.int32),
+    ('tid2',                np.int32),
+    ('rightMost',           np.int32),
+    ('insLen',              np.int32),
 ])
 
 

@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "anno_utils.h"
 
 /***********************************
@@ -5,19 +6,17 @@
  ***********************************/
 
 /// @brief Initiate PolyA
-PolyA initPolyA(int idx, int cltTid, int cltIdx)
+PolyA initPolyA(int idx)
 {
     PolyA polyA;
     polyA.leftMost = INT_MAX;
     polyA.rightMost = 0;
     polyA.idx = idx;
-    polyA.cltTid = cltTid;
-    polyA.cltIdx = cltIdx;
     return polyA;
 }
 
 /// @brief Record single TE annotation
-void initAnno(bam1_t *bam, Anno *anno, int idx, int cltTid, int cltIdx)
+void initAnno(bam1_t *bam, sam_hdr_t *header, Cluster *clt, Anno *anno, int idx)
 {
     int numCigar = bam->core.n_cigar;
     uint32_t *cigarArray = bam_get_cigar(bam);
@@ -36,8 +35,8 @@ void initAnno(bam1_t *bam, Anno *anno, int idx, int cltTid, int cltIdx)
             refLen += bam_cigar_oplen(cigarArray[i]);
 
     anno->idx = idx;
-    anno->cltTid = cltTid;
-    anno->cltIdx = cltIdx;
+    anno->cltTid = clt->tid;
+    anno->cltIdx = clt->idx;
     anno->queryStart = queryStart;
     anno->queryEnd = queryEnd;
     anno->strand = bam_is_rev(bam);
@@ -50,19 +49,27 @@ void initAnno(bam1_t *bam, Anno *anno, int idx, int cltTid, int cltIdx)
         anno->queryStart = bam->core.l_qseq - queryEnd;
         anno->queryEnd = bam->core.l_qseq - queryStart;
     }
+
+    if (anno->refStart >= 20)
+        anno->flag |= CLT_5_TRUNC;
+    if ((sam_hdr_tid2len(header, anno->tid) - anno->refEnd) >= 20)
+        anno->flag |= CLT_3_TRUNC;
+    if ((anno->refStart < 20) && ((sam_hdr_tid2len(header, anno->tid) - anno->refEnd) < 20))
+        anno->flag |= CLT_FULL_LEN;
+    clt->flag |= anno->flag;
 }
 
 /// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
 int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
 {
-    char *inputFn = (char *)malloc(100 * sizeof(char));
+    char inputFn[100] = {'\0'};
     sprintf(inputFn, "tmp_anno/%d_%d_InsToTE.bam", cluster->tid, cluster->idx);
     htsFile *inputBam = sam_open(inputFn, "rb");
     sam_hdr_t *header = sam_hdr_read(inputBam);
     bam1_t *bam = bam_init1();
 
     int numAnno = 0;
-    PolyA polyA = initPolyA(idx, cluster->tid, cluster->idx);
+    PolyA polyA = initPolyA(idx);
     while (1)
     {
         int retValue = bam_read1(inputBam->fp.bgzf, bam);
@@ -71,7 +78,7 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
         if (bamIsInvalid(bam))
             continue;
 
-        initAnno(bam, &annoArray[numAnno], idx, cluster->tid, cluster->idx);
+        initAnno(bam, header, cluster, &annoArray[numAnno], idx);
         if (annoArray[numAnno].queryStart < polyA.leftMost) {
             polyA.leftMost = annoArray[numAnno].queryStart;
             polyA.leftIdx = numAnno;
@@ -83,126 +90,179 @@ int fillAnnoArray(Cluster *cluster, Anno *annoArray, int idx)
         numAnno++;
     }
 
-    if (numAnno > 0) {
-        cluster->flag |= CLT_TE_MAP;
-        int numTE = numAnno;
-        numAnno = annoPolyA(cluster, annoArray, numAnno, polyA);
-        if (numAnno - numTE > 0)
-            cluster->flag |= CLT_POLYA;
-    }
+    if (numAnno == 0)
+        goto END;
 
+    if (numAnno > 1)
+        cluster->flag |= CLT_MULTI_TE;
+    cluster->flag |= CLT_TE_MAP;
+    numAnno = annoPolyA(cluster, annoArray, numAnno, &polyA);
+    outputTsdSeq(cluster, &polyA, annoArray, numAnno);
+    goto END;
+
+    END:
     if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
     if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
     if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
-    if (inputFn != NULL) {free(inputFn); inputFn=NULL;}
     return numAnno;
 }
 
 /// @brief Find and record all polyA/polyT
-int annoPolyA(Cluster *cluster, Anno *annoArray, int numAnno, PolyA polyA)
+int annoPolyA(Cluster *clt, Anno *annoArray, int numAnno, PolyA *polyA)
 {
-    char *insFn = (char *)malloc(100 * sizeof(char));
-    sprintf(insFn, "tmp_anno/%d_%d_insertion.fa", cluster->tid, cluster->idx);
+    char insFn[100] = {'\0'};
+    sprintf(insFn, "tmp_anno/%d_%d_insertion.fa", clt->tid, clt->idx);
     faidx_t *insFa = fai_load((const char *)insFn);
     const char *insID = faidx_iseq(insFa, 0);
     char *flankSeq = NULL;
     hts_pos_t seqLen;
 
-    if (polyA.leftMost >= 5) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, 0, polyA.leftMost-1, &seqLen);
-        polyA.isA = 0;
-        polyA.seqLen = seqLen;
-        numAnno = getPolyA(flankSeq, annoArray, numAnno, polyA);
+    if (polyA->leftMost >= 5) {
+        flankSeq = faidx_fetch_seq64(insFa, insID, 0, polyA->leftMost-1, &seqLen);
+        polyA->isA = 0;
+        polyA->seqLen = seqLen;
+        numAnno = setPolyA(flankSeq, annoArray, clt, numAnno, polyA);
     }
 
-    int insLen = faidx_seq_len64(insFa, insID);
-    if ((insLen - polyA.rightMost) >= 5) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, polyA.rightMost, insLen-1, &seqLen);
-        polyA.isA = 1;
-        polyA.seqLen = seqLen;
-        numAnno = getPolyA(flankSeq, annoArray, numAnno, polyA);
+    clt->insLen = faidx_seq_len64(insFa, insID);
+    if ((clt->insLen - polyA->rightMost) >= 5) {
+        flankSeq = faidx_fetch_seq64(insFa, insID, polyA->rightMost, clt->insLen-1, &seqLen);
+        polyA->isA = 1;
+        polyA->seqLen = seqLen;
+        numAnno = setPolyA(flankSeq, annoArray, clt, numAnno, polyA);
     }
 
-    if (insFn != NULL) {free(insFn); insFn=NULL;}
     if (insFa != NULL) {fai_destroy(insFa); insFa=NULL;}
     if (flankSeq != NULL) {free(flankSeq); flankSeq=NULL;}
     return numAnno;
 }
 
 /// @brief Find and record single polyA/polyT
-int getPolyA(char *flankSeq, Anno *annoArray, int numAnno, PolyA polyA)
+int setPolyA(char *flankSeq, Anno *annoArray, Cluster *clt, int numAnno, PolyA *polyA)
 {
-    uint8_t targetChar = (polyA.isA) ? 65 : 84; // A OR T
+    // polyA at right, but right-most TE is reverse
+    if (polyA->isA && annoArray[polyA->rightIdx].strand)
+        return numAnno;
+    // polyT at left, but left-most TE is forward
+    if (!polyA->isA && !annoArray[polyA->leftIdx].strand)
+        return numAnno;
+
     int thisLen = 0, maxLen = 0;
     int thisSum = 0, maxSum = 0;
     int thisNum = 0, maxNum = 0;
-    int end = 0;
+    int numOther = 0, stop = 0;
 
-    for (int i = 0; i < polyA.seqLen; i++)
+    uint8_t targetChar = (polyA->isA) ? 65 : 84;
+    int start = (polyA->isA) ? 0 : polyA->seqLen-1;
+    int end = (polyA->isA) ? polyA->seqLen : -1;
+    int step = (polyA->isA) ? 1 : -1;
+
+    for (int i = start; i != end; i += step)
     {
         thisLen++;
         // Is a/A OR t/T
         if (((flankSeq[i] | 0x20) & 0x5f) == targetChar) {
             thisSum++;
             thisNum++;
-        }
-        else
+        } else {
             thisSum--;
-        
+            numOther++;
+        }
         if (thisSum > maxSum) {
             maxLen = thisLen;
             maxSum = thisSum;
             maxNum = thisNum;
-            end = i + 1;
+            stop = i;
         }
-
-        if (thisSum < 0) {
-            thisSum = 0;
-            thisNum = 0;
-            thisLen = 0;
-        }
+        if (thisSum < 0 || numOther > 3)
+            thisSum = thisNum = thisLen = 0;
     }
-
-    // polyA at the end, but right-most TE is reverse
-    if (polyA.isA && annoArray[polyA.rightIdx].strand)
-        return numAnno;
-
-    // polyT at the start, but left-most TE is forward
-    if ((!polyA.isA) && (!annoArray[polyA.leftIdx].strand))
-        return numAnno;
 
     if(maxLen < 5)
         return numAnno;
-
-    float fracA = (float)maxNum / maxLen;
-    if (fracA < 0.8)
+    if (((float)maxNum / maxLen) < 0.8)
         return numAnno;
 
-    end = (polyA.isA) ? (end + polyA.rightMost) : end;
-    annoArray[numAnno].idx = polyA.idx;
-    annoArray[numAnno].cltTid = polyA.cltTid;
-    annoArray[numAnno].cltIdx = polyA.cltIdx;
-    annoArray[numAnno].queryStart = end - maxLen;
-    annoArray[numAnno].queryEnd = end;
-    annoArray[numAnno].strand = (polyA.isA) ? 0 : 1;
-    annoArray[numAnno].tid = (polyA.isA) ? -1 : -2;
-    numAnno++;
-    return numAnno;
+    if (polyA->isA) {
+        annoArray[numAnno].queryStart = stop + polyA->rightMost + 1 - maxLen;
+        annoArray[numAnno].queryEnd = stop + polyA->rightMost + 1;
+        annoArray[numAnno].strand = 0;
+        annoArray[numAnno].tid = -1;
+        polyA->rightMost = annoArray[numAnno].queryEnd;
+    } else {
+        annoArray[numAnno].queryStart = stop;
+        annoArray[numAnno].queryEnd = stop + maxLen;
+        annoArray[numAnno].strand = 1;
+        annoArray[numAnno].tid = -2;
+        polyA->leftMost = annoArray[numAnno].queryStart;
+    }
+    annoArray[numAnno].idx = polyA->idx;
+    annoArray[numAnno].cltTid = clt->tid;
+    annoArray[numAnno].cltIdx = clt->idx;
+
+    if (polyA->isA && !is3Trunc(annoArray[polyA->rightIdx].flag))
+        clt->flag |= (clt->insLen - annoArray[numAnno].queryEnd < 100) ? CLT_POLYA : 0;
+    if (!polyA->isA && !is3Trunc(annoArray[polyA->leftIdx].flag))
+        clt->flag |= (annoArray[numAnno].queryStart < 100) ? CLT_POLYA : 0;
+
+    return ++numAnno;
+}
+
+/// @brief output tsd-containing-seq for tsd annotation
+void outputTsdSeq(Cluster *clt, PolyA *polyA, Anno *annoArray, int numAnno)
+{
+    if (!isBothFlankMapped(clt->flag))
+        return;
+
+    char assmFn[100] = {'\0'};
+    sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
+    faidx_t *assmFa = fai_load((const char *)assmFn);
+    hts_pos_t seqLen;
+
+    int leftStart = clt->leftMost - 100;
+    int leftEnd = clt->leftMost + polyA->leftMost;
+    int rightStart = clt->rightMost - (clt->insLen - polyA->rightMost);
+    int rightEnd = clt->rightMost + 100;
+    char *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), leftStart, leftEnd-1, &seqLen);
+    char *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), rightStart, rightEnd-1, &seqLen);
+
+    adjustAnno(annoArray, numAnno, -polyA->leftMost);
+    clt->leftMost = leftEnd;
+    clt->rightMost = rightStart;
+    clt->insLen = clt->rightMost - clt->leftMost;
+
+    char outFn[100] = {'\0'};
+    sprintf(outFn, "tmp_anno/%d_%d_tsd.fa", clt->tid, clt->idx);
+    FILE *fp = fopen(outFn, "w");
+    fprintf(fp, ">0\n%s\n", leftSeq);
+    fprintf(fp, ">1\n%s\n", rightSeq);
+    fclose(fp);
+
+    if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
+    if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
+}
+
+/// @brief Adjust annotation position
+void adjustAnno(Anno *annoArray, int numAnno, int leftDelta)
+{
+    for (int i = 0; i < numAnno; i++)
+    {
+        annoArray[i].queryStart += leftDelta;
+        annoArray[i].queryEnd += leftDelta;
+    }
 }
 
 /// @brief Annotate TSD and refine breakpoint by parsing Tsd-To-Local alignments
-void annoTsd(Cluster *cluster)
+void annoTsd(Cluster *cluster, Anno *annoArray, int numAnno)
 {
-    if (!isBothFlankMapped(cluster->flag))
-        return;
-
-    char *inputFn = (char *)malloc(100 * sizeof(char));
+    char inputFn[100] = {'\0'};
     sprintf(inputFn, "tmp_anno/%d_%d_TsdToLocal.bam", cluster->tid, cluster->idx);
     htsFile *inputBam = sam_open(inputFn, "rb");
     sam_hdr_t *header = sam_hdr_read(inputBam);
     bam1_t *bam = bam_init1();
 
     int leftEnd = -1, rightStart = -1;
+    int leftDelta = 0, rightDelta = 0;
     while (1)
     {
         int retValue = bam_read1(inputBam->fp.bgzf, bam);
@@ -210,19 +270,30 @@ void annoTsd(Cluster *cluster)
             break;
         if (bamIsInvalid(bam) || bamIsSup(bam) || bam_is_rev(bam))
             continue;
-
-        if (isLeftFlank(bam))
+        
+        int numCigar = bam->core.n_cigar;
+        uint32_t *cigarArray = bam_get_cigar(bam);
+        
+        if (isLeftFlank(bam)) {
             leftEnd = bam_endpos(bam);
-        else
+            if (bam_cigar_op(cigarArray[numCigar - 1]) == BAM_CSOFT_CLIP)
+                leftDelta = bam_cigar_oplen(cigarArray[numCigar - 1]);
+        } else {
             rightStart = bam->core.pos;
+            if (bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP)
+                rightDelta = bam_cigar_oplen(cigarArray[0]);
+        }
     }
 
     setTsd(cluster, atoi(sam_hdr_tid2name(header, 0)), leftEnd, rightStart);
+    adjustAnno(annoArray, numAnno, leftDelta);
+    cluster->leftMost -= leftDelta;
+    cluster->rightMost += rightDelta;
+    cluster->insLen += leftDelta + rightDelta;
 
     if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
     if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
     if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
-    if (inputFn != NULL) {free(inputFn); inputFn=NULL;}
 }
 
 /// @brief Find TSD and refine breakpoint
@@ -243,17 +314,44 @@ void setTsd(Cluster *cluster, int localStart, int leftEnd, int rightStart)
         return;
     }
 
-    if (rightStart < leftEnd && (leftEnd - rightStart) < 50) {
-        cluster->flag |= CLT_TSD;
+    if (rightStart < leftEnd) {
         cluster->refStart = localStart + rightStart;
         cluster->refEnd = localStart + leftEnd;
+        cluster->flag |= ((leftEnd - rightStart) < 50) ? CLT_TSD : 0;
         return;
     }
+    
+    cluster->refStart = localStart + leftEnd - 1;
+    cluster->refEnd = localStart + rightStart;
+}
 
-    if (rightStart >= leftEnd) {
-        cluster->refStart = localStart + leftEnd - 1;
-        cluster->refEnd = localStart + rightStart;
+/// @brief Check whether large gap exists in ins-seq
+void checkGap(Cluster *clt, Anno *annoArray, int numAnno)
+{
+    if (numAnno == 0)
+        return;
+
+    qsort(annoArray, numAnno, sizeof(Anno), compare);
+    int thisGap = 0, maxGap = annoArray[0].queryStart;
+    for (int i = 1; i < numAnno; i++) {
+        thisGap = annoArray[i].queryStart - annoArray[i-1].queryEnd;
+        maxGap = (thisGap > maxGap) ? thisGap : maxGap;
     }
+    thisGap = clt->insLen - annoArray[numAnno-1].queryEnd;
+    maxGap = (thisGap > maxGap) ? thisGap : maxGap;
+
+    clt->flag |= (maxGap >= 1500) ? CLT_LARGE_GAP : 0;
+}
+
+/// @brief Compare function for sorting annotations
+int compare(const void *a, const void *b)
+{
+    Anno *pa = (Anno *)a;
+    Anno *pb = (Anno *)b;
+    if (pa->queryStart != pb->queryStart)
+        return pa->queryStart - pb->queryStart;
+    else
+        return pa->queryEnd - pb->queryEnd;
 }
 
 

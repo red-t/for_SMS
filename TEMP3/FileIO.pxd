@@ -95,11 +95,16 @@ cdef extern from "src/cluster_utils.h" nogil:
         float       teAlignedFrac
         uint8_t     isInBlacklist
         float       probability
-        uint16_t    flag
+        uint32_t    flag
         int         numSegRaw
         int         numLeft
         int         numMiddle
         int         numRight
+        int         tid1
+        int         leftMost
+        int         tid2
+        int         rightMost
+        int         insLen
     
     ctypedef struct Args:
         int         numThread

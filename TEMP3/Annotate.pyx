@@ -15,6 +15,7 @@ AnnoDt = np.dtype([
     ('tid',         np.int32),
     ('refStart',    np.int32),
     ('refEnd',      np.int32),
+    ('flag',        np.uint32),
 ])
 
 
@@ -27,7 +28,6 @@ cdef annotateAssm(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs
         mapFlankToAssm(cltView[i].tid, cltView[i].idx)
         extractIns(&cltView[i])
         mapInsToTE(cltView[i].tid, cltView[i].idx, cmdArgs)
-        mapTsdToLocal(cltView[i].tid, cltView[i].idx)
         
 
 cdef mapFlankToAssm(int tid, int idx):
@@ -59,6 +59,44 @@ cdef mapInsToTE(int tid, int idx, object cmdArgs):
         raise Exception("Error: minimap2 failed for {}".format(queryFn))
 
 
+##########################
+### Annotate Insertion ###
+##########################
+cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs):
+    cdef int i, numTmp, numAnno=0, maxNum=2900
+    cdef object annoArray = np.zeros(3000, dtype=AnnoDt)
+    cdef Anno[::1] annoView = annoArray
+    cdef str bamFn, assmFn
+
+    for i in range(startIdx, endIdx):
+        assmFn = "tmp_assm/{}_{}.ctg.lay.gz".format(cltView[i].tid, cltView[i].idx)
+        if os.path.isfile(assmFn) != 0:
+                cltView[i].flag |= CLT_ASSEMBLED
+        
+        bamFn = "tmp_anno/{}_{}_InsToTE.bam".format(cltView[i].tid, cltView[i].idx)
+        if os.path.isfile(bamFn) == False:
+            continue
+
+        if numAnno >= maxNum:
+            maxNum = annoView.shape[0] + 3000
+            annoArray.resize((maxNum,), refcheck=False)
+            annoView = annoArray
+            maxNum -= 100
+
+        numTmp = fillAnnoArray(&cltView[i], &annoView[numAnno], i)
+        mapTsdToLocal(cltView[i].tid, cltView[i].idx)
+        bamFn = "tmp_anno/{}_{}_TsdToLocal.bam".format(cltView[i].tid, cltView[i].idx)
+        if os.path.isfile(bamFn) == True:
+            annoTsd(&cltView[i], &annoView[numAnno], numTmp)
+
+        checkGap(&cltView[i], &annoView[numAnno], numTmp)
+        numAnno += numTmp
+    
+    annoArray.resize((numAnno,), refcheck=False)
+    annoArray.sort(order=['idx', 'queryStart', 'queryEnd'])
+    return annoArray
+
+
 cdef mapTsdToLocal(int tid, int idx):
     cdef int exitCode
     cdef str targetFn = "tmp_anno/{}_{}_local.fa".format(tid, idx)
@@ -73,39 +111,6 @@ cdef mapTsdToLocal(int tid, int idx):
     exitCode = process.wait()
     if exitCode != 0:
         raise Exception("Error: minimap2 failed for {}".format(queryFn))
-
-
-##########################
-### Annotate Insertion ###
-##########################
-cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs):
-    cdef int i, retValue, numAnno=0, maxNum=9900
-    cdef object annoArray = np.zeros(10000, dtype=AnnoDt)
-    cdef Anno[::1] annoView = annoArray
-    cdef str bamFn, assmFn
-
-    for i in range(startIdx, endIdx):
-        assmFn = "tmp_assm/{}_{}.ctg.lay.gz".format(cltView[i].tid, cltView[i].idx)
-        if os.path.isfile(assmFn) != 0:
-                cltView[i].flag |= CLT_ASSEMBLED
-        
-        bamFn = "tmp_anno/{}_{}_InsToTE.bam".format(cltView[i].tid, cltView[i].idx)
-        if os.path.isfile(bamFn) == False:
-            continue
-
-        if numAnno >= maxNum:
-            maxNum = annoView.shape[0] + 10000
-            annoArray.resize((maxNum,), refcheck=False)
-            annoView = annoArray
-            maxNum -= 100
-
-        retValue = fillAnnoArray(&cltView[i], &annoView[numAnno], i)
-        annoTsd(&cltView[i])
-        numAnno += retValue
-    
-    annoArray.resize((numAnno,), refcheck=False)
-    annoArray.sort(order=['idx', 'queryStart', 'queryEnd'])
-    return annoArray
 
 
 ###################################

@@ -23,6 +23,16 @@
 #define CLT_TE_MAP              128
 #define CLT_POLYA               256
 #define CLT_TSD                 512
+#define CLT_5_TRUNC             1024
+#define CLT_3_TRUNC             2048
+#define CLT_FULL_LEN            4096
+#define CLT_MULTI_TE            8192
+#define CLT_LARGE_GAP           16384
+
+#define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
+#define isFlankMapped(flag) (((flag) & 120) != 0)
+#define isBothFlankMapped(flag) (((flag) & 96) != 0)
+#define is3Trunc(flag) (((flag) & 96) != 0)
 
 
 /******************
@@ -66,8 +76,10 @@
  @field  isInBlacklist      whether cluster intersects with blacklist
  @field  probability        the probability of the cluster to be a positive insertion
  @field  flag               bitwise flag representing cluster features
- @field  tsdStart           TSD start on reference genome (0-based, included)
- @field  tsdEnd             TSD end on reference genome (0-based, not-included)
+ @field  numSegRaw          number of segments in the cluster (no normalization)
+ @field  numLeft            number of left-clipped segments in the cluster (no normalization)
+ @field  numMiddle          number of mid-inserted segments in the cluster (no normalization)
+ @field  numRight           number of right-clipped segments in the cluster (no normalization)
  */
 typedef struct Cluster
 {
@@ -100,11 +112,16 @@ typedef struct Cluster
     float       teAlignedFrac;
     uint8_t     isInBlacklist;
     float       probability;
-    uint16_t    flag;
+    uint32_t    flag;
     int         numSegRaw;
     int         numLeft;
     int         numMiddle;
     int         numRight;
+    int         tid1;
+    int         leftMost;
+    int         tid2;
+    int         rightMost;
+    int         insLen;
 } __attribute__((packed)) Cluster;
 
 /// @brief Data container for arguments
@@ -203,23 +220,5 @@ void setBackbgInfo(Cluster *cluster, Args args);
 
 /// @brief Check if the cluster inersect with blacklist
 void intersectBlackList(Cluster *cluster, Args args);
-
-
-/*******************
- *** Cluster I/O ***
- *******************/
-#define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
-
-/// @brief Output formated cluster records
-void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn);
-
-/// @brief Fetch TSD sequence from reference genome
-char *fetchTsdSeq(faidx_t *refFa, Cluster *clt);
-
-/// @brief Fetch insertion sequence from temporary file
-char *fetchInsSeq(Cluster *clt, int *tid1, int *end1, int *tid2, int *start2);
-
-/// @brief Fetch flank sequence from temporary file
-void fetchFlankSeq(Cluster *clt, char **leftSeq, char **rightSeq, int tid1, int end1, int tid2, int start2);
 
 #endif // CLUSTER_UTILS_H
