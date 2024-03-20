@@ -200,11 +200,6 @@ int setPolyA(char *flankSeq, Anno *annoArray, Cluster *clt, int numAnno, PolyA *
     annoArray[numAnno].cltTid = clt->tid;
     annoArray[numAnno].cltIdx = clt->idx;
 
-    if (polyA->isA && !is3Trunc(annoArray[polyA->rightIdx].flag))
-        clt->flag |= (clt->insLen - annoArray[numAnno].queryEnd < 100) ? CLT_POLYA : 0;
-    if (!polyA->isA && !is3Trunc(annoArray[polyA->leftIdx].flag))
-        clt->flag |= (annoArray[numAnno].queryStart < 100) ? CLT_POLYA : 0;
-
     return ++numAnno;
 }
 
@@ -339,8 +334,20 @@ void checkGap(Cluster *clt, Anno *annoArray, int numAnno)
     }
     thisGap = clt->insLen - annoArray[numAnno-1].queryEnd;
     maxGap = (thisGap > maxGap) ? thisGap : maxGap;
-
     clt->flag |= (maxGap >= 1500) ? CLT_LARGE_GAP : 0;
+
+    int hasPolyT = (annoArray[0].tid == -2) ? 1 : 0;
+    if (hasPolyT && !is3Trunc(annoArray[1].flag)) {
+        int gap1 = annoArray[1].queryStart - annoArray[0].queryEnd;
+        int gap2 = annoArray[0].queryStart;
+        clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
+    }
+    int hasPolyA = (annoArray[numAnno-1].tid == -1) ? 1 : 0;
+    if (hasPolyA && !is3Trunc(annoArray[numAnno-2].flag)) {
+        int gap1 = annoArray[numAnno-1].queryStart - annoArray[numAnno-2].queryEnd;
+        int gap2 = clt->insLen - annoArray[numAnno-1].queryEnd;
+        clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
+    }
 }
 
 /// @brief Compare function for sorting annotations
