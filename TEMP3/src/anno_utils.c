@@ -175,7 +175,7 @@ int setPolyA(char *flankSeq, Anno *annoArray, Cluster *clt, int numAnno, PolyA *
             stop = i;
         }
         if (thisSum < 0 || numOther > 3)
-            thisSum = thisNum = thisLen = 0;
+            thisSum = thisNum = thisLen = numOther = 0;
     }
 
     if(maxLen < 5)
