@@ -263,6 +263,7 @@ void annoTsd(Cluster *clt, Anno *annoArray, int numAnno)
         int retValue = bam_read1(inputBam->fp.bgzf, bam);
         if (retValue < 0)
             break;
+        // if (bamIsInvalid(bam) || bam_is_rev(bam))
         if (bamIsInvalid(bam) || bamIsSup(bam) || bam_is_rev(bam))
             continue;
         
@@ -270,13 +271,17 @@ void annoTsd(Cluster *clt, Anno *annoArray, int numAnno)
         uint32_t *cigarArray = bam_get_cigar(bam);
         
         if (isLeftFlank(bam)) {
+            // if (bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP && bam_cigar_oplen(cigarArray[0]) > 90)
+            //     continue;
+            if (bam_cigar_op(cigarArray[numCigar-1]) == BAM_CSOFT_CLIP)
+                leftDelta = bam_cigar_oplen(cigarArray[numCigar-1]);
             leftEnd = bam_endpos(bam);
-            if (bam_cigar_op(cigarArray[numCigar - 1]) == BAM_CSOFT_CLIP)
-                leftDelta = bam_cigar_oplen(cigarArray[numCigar - 1]);
         } else {
-            rightStart = bam->core.pos;
+            // if (bam_cigar_op(cigarArray[numCigar-1]) == BAM_CSOFT_CLIP && bam_cigar_oplen(cigarArray[numCigar-1]) > 90)
+            //     continue;
             if (bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP)
                 rightDelta = bam_cigar_oplen(cigarArray[0]);
+            rightStart = bam->core.pos;
         }
     }
 
@@ -335,6 +340,9 @@ void checkGap(Cluster *clt, Anno *annoArray, int numAnno)
     thisGap = clt->insLen - annoArray[numAnno-1].queryEnd;
     maxGap = (thisGap > maxGap) ? thisGap : maxGap;
     clt->flag |= (maxGap >= 1500) ? CLT_LARGE_GAP : 0;
+
+    if (numAnno == 1)
+        return;
 
     int hasPolyT = (annoArray[0].tid == -2) ? 1 : 0;
     if (hasPolyT && !is3Trunc(annoArray[1].flag)) {
