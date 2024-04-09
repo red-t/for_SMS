@@ -44,18 +44,17 @@ void initAnno(bam1_t *bam, sam_hdr_t *header, Cluster *clt, Anno *anno, int idx)
     anno->refStart = bam->core.pos;
     anno->refEnd = bam->core.pos + refLen;
 
-    if (bam_is_rev(bam))
-    {
+    if (bam_is_rev(bam)) {
         anno->queryStart = bam->core.l_qseq - queryEnd;
         anno->queryEnd = bam->core.l_qseq - queryStart;
     }
 
-    if (anno->refStart >= 20)
-        anno->flag |= CLT_5_TRUNC;
-    if ((sam_hdr_tid2len(header, anno->tid) - anno->refEnd) >= 20)
-        anno->flag |= CLT_3_TRUNC;
-    if ((anno->refStart < 20) && ((sam_hdr_tid2len(header, anno->tid) - anno->refEnd) < 20))
-        anno->flag |= CLT_FULL_LEN;
+    int teLen = sam_hdr_tid2len(header, anno->tid);
+    int truncSize = (((float)teLen * 0.08) < 100) ? (teLen * 0.08) : 100;
+    if (anno->refStart < truncSize)
+        anno->flag |= CLT_5P_FULL;
+    if ((teLen - anno->refEnd) < truncSize)
+        anno->flag |= CLT_3P_FULL;
     clt->flag |= anno->flag;
 }
 
@@ -324,37 +323,16 @@ void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart)
     clt->refEnd = localStart + rightStart;
 }
 
-/// @brief Check whether large gap exists in ins-seq
-void checkGap(Cluster *clt, Anno *annoArray, int numAnno)
+/// @brief Set ins-seq structure based on annotations
+void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno)
 {
     if (numAnno == 0)
         return;
 
     qsort(annoArray, numAnno, sizeof(Anno), compare);
-    int thisGap = 0, maxGap = annoArray[0].queryStart;
-    for (int i = 1; i < numAnno; i++) {
-        thisGap = annoArray[i].queryStart - annoArray[i-1].queryEnd;
-        maxGap = (thisGap > maxGap) ? thisGap : maxGap;
-    }
-    thisGap = clt->insLen - annoArray[numAnno-1].queryEnd;
-    maxGap = (thisGap > maxGap) ? thisGap : maxGap;
-    clt->flag |= (maxGap >= 1500) ? CLT_LARGE_GAP : 0;
-
-    if (numAnno == 1)
-        return;
-
-    int hasPolyT = (annoArray[0].tid == -2) ? 1 : 0;
-    if (hasPolyT && !is3Trunc(annoArray[1].flag)) {
-        int gap1 = annoArray[1].queryStart - annoArray[0].queryEnd;
-        int gap2 = annoArray[0].queryStart;
-        clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
-    }
-    int hasPolyA = (annoArray[numAnno-1].tid == -1) ? 1 : 0;
-    if (hasPolyA && !is3Trunc(annoArray[numAnno-2].flag)) {
-        int gap1 = annoArray[numAnno-1].queryStart - annoArray[numAnno-2].queryEnd;
-        int gap2 = clt->insLen - annoArray[numAnno-1].queryEnd;
-        clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
-    }
+    checkGap(annoArray, numAnno, clt);
+    checkPolyA(annoArray, numAnno, clt);
+    checkEnd(annoArray, numAnno, clt);
 }
 
 /// @brief Compare function for sorting annotations
@@ -366,6 +344,57 @@ int compare(const void *a, const void *b)
         return pa->queryStart - pb->queryStart;
     else
         return pa->queryEnd - pb->queryEnd;
+}
+
+/// @brief Check whether the ins-seq contains large gap
+void checkGap(Anno *annoArray, int numAnno, Cluster *clt)
+{
+    int thisGap = 0, maxGap = annoArray[0].queryStart;
+    for (int i = 1; i < numAnno; i++)
+    {
+        thisGap = annoArray[i].queryStart - annoArray[i-1].queryEnd;
+        maxGap = (thisGap > maxGap) ? thisGap : maxGap;
+    }
+    thisGap = clt->insLen - annoArray[numAnno - 1].queryEnd;
+    maxGap = (thisGap > maxGap) ? thisGap : maxGap;
+    clt->flag |= (maxGap >= 1500) ? CLT_LARGE_GAP : 0;
+}
+
+/// @brief Check whether the ins-seq contains valid polyA
+void checkPolyA(Anno *annoArray, int numAnno, Cluster *clt)
+{
+    if (numAnno == 1)
+        return;
+
+    int hasPolyT = (annoArray[0].tid == -2) ? 1 : 0;
+    if (hasPolyT && is3PFull(annoArray[1].flag)) {
+        int gap1 = annoArray[1].queryStart - annoArray[0].queryEnd;
+        int gap2 = annoArray[0].queryStart;
+        clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
+    }
+    int hasPolyA = (annoArray[numAnno-1].tid == -1) ? 1 : 0;
+    if (hasPolyA && is3PFull(annoArray[numAnno-2].flag)) {
+        int gap1 = annoArray[numAnno-1].queryStart - annoArray[numAnno-2].queryEnd;
+        int gap2 = clt->insLen - annoArray[numAnno-1].queryEnd;
+        clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
+    }
+}
+
+/// @brief Check whether the ins-seq contains complete ends
+void checkEnd(Anno *annoArray, int numAnno, Cluster *clt)
+{
+    int leftIdx = (annoArray[0].tid == -2) ? 1 : 0;
+    int rightIdx = (annoArray[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
+
+    if (!isRevAnno(annoArray[leftIdx]) && is5PFull(annoArray[leftIdx].flag))
+        clt->flag |= CLT_5P_FULL;
+    if (isRevAnno(annoArray[leftIdx]) && is3PFull(annoArray[leftIdx].flag))
+        clt->flag |= CLT_3P_FULL;
+
+    if (!isRevAnno(annoArray[rightIdx]) && is3PFull(annoArray[rightIdx].flag))
+        clt->flag |= CLT_3P_FULL;
+    if (isRevAnno(annoArray[rightIdx]) && is5PFull(annoArray[rightIdx].flag))
+        clt->flag |= CLT_5P_FULL;
 }
 
 

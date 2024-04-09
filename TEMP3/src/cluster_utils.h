@@ -13,26 +13,25 @@
 /******************************
  *** Cluster related macros ***
  ******************************/
-#define CLT_REVERSED            1
-#define CLT_IN_BLACKLIST        2
-#define CLT_ASSEMBLED           4
-#define CLT_LEFT_FLANK_MAP      8
-#define CLT_RIGHT_FLANK_MAP     16
-#define CLT_DIFF_FLANK_MAP      32
-#define CLT_SAME_FLANK_MAP      64
-#define CLT_TE_MAP              128
-#define CLT_POLYA               256
-#define CLT_TSD                 512
-#define CLT_5_TRUNC             1024
-#define CLT_3_TRUNC             2048
-#define CLT_FULL_LEN            4096
-#define CLT_MULTI_TE            8192
-#define CLT_LARGE_GAP           16384
+#define CLT_IN_BLACKLIST        1
+#define CLT_ASSEMBLED           2
+#define CLT_LEFT_FLANK_MAP      4
+#define CLT_RIGHT_FLANK_MAP     8
+#define CLT_DIFF_FLANK_MAP      16
+#define CLT_SAME_FLANK_MAP      32
+#define CLT_TE_MAP              64
+#define CLT_POLYA               128
+#define CLT_TSD                 256
+#define CLT_5P_FULL             512
+#define CLT_3P_FULL             1024
+#define CLT_MULTI_TE            2048
+#define CLT_LARGE_GAP           4096
 
 #define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
-#define isFlankMapped(flag) (((flag) & 120) != 0)
-#define isBothFlankMapped(flag) (((flag) & 96) != 0)
-#define is3Trunc(flag) (((flag) & 96) != 0)
+#define isFlankMapped(flag) (((flag) & 60) != 0)
+#define isBothFlankMapped(flag) (((flag) & 48) != 0)
+#define is5PFull(flag) (((flag) & CLT_5P_FULL) != 0)
+#define is3PFull(flag) (((flag) & CLT_3P_FULL) != 0)
 
 
 /******************

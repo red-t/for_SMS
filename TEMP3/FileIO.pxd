@@ -50,8 +50,7 @@ cdef extern from "src/AIList.h" nogil:
 cdef extern from "src/cluster_utils.h" nogil:
     ##############################
     ### Cluster related macros ###
-    ##############################
-    int CLT_REVERSED
+    #############################
     int CLT_IN_BLACKLIST
     int CLT_ASSEMBLED
     int CLT_LEFT_FLANK_MAP

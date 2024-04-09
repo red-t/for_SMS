@@ -41,6 +41,7 @@ typedef struct PolyA
 /***********************************
  *** Annotate Insertion sequence ***
  ***********************************/
+#define isRevAnno(anno) ((anno).strand == 1)
 
 /// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
 int fillAnnoArray(Cluster *clt, Anno *annoArray, int idx);
@@ -63,12 +64,20 @@ void annoTsd(Cluster *clt, Anno *annoArray, int numAnno);
 /// @brief Find TSD and refine breakpoint
 void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart);
 
-/// @brief Check whether large gap exists in ins-seq
-void checkGap(Cluster *clt, Anno *annoArray, int numAnno);
+/// @brief Set ins-seq structure based on annotations
+void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno);
 
 /// @brief Compare function for sorting annotations
 int compare(const void *a, const void *b);
 
+/// @brief Check whether the ins-seq contains large gap
+void checkGap(Anno * annoArray, int numAnno, Cluster * clt);
+
+/// @brief Check whether the ins-seq contains valid polyA
+void checkPolyA(Anno *annoArray, int numAnno, Cluster *clt);
+
+/// @brief Check whether the ins-seq contains complete ends
+void checkEnd(Anno *annoArray, int numAnno, Cluster *clt);
 
 /**********************
  *** Annotation I/O ***

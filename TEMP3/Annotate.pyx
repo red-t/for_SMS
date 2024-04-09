@@ -89,7 +89,7 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
         if os.path.isfile(bamFn) == True:
             annoTsd(&cltView[i], &annoView[numAnno], numTmp)
 
-        checkGap(&cltView[i], &annoView[numAnno], numTmp)
+        setInsStruc(&cltView[i], &annoView[numAnno], numTmp)
         numAnno += numTmp
     
     annoArray.resize((numAnno,), refcheck=False)
