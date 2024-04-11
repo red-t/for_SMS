@@ -1,4 +1,5 @@
 #include "AIList.h"
+#include "htslib/sam.h"
 
 /***************************
  *** AiList Construction ***
@@ -24,7 +25,7 @@ void destroyAiList(AiList *ail)
 	free(ail);
 }
 
-void addInterval(AiList *ail, int start, int end)
+void addInterval(AiList *ail, int start, int end, int repTid)
 {
 	if(start > end) return;
 
@@ -35,27 +36,34 @@ void addInterval(AiList *ail, int start, int end)
 	Interval *newInterval = &firstContig->intervalList[firstContig->numInterval++];
 	newInterval->start = start;
 	newInterval->end = end;
-	return;
+    newInterval->repTid = repTid;
+    return;
 }
 
-void readBED(AiList *ail, const char* bedFileName, const char* targetChrom)
+void readBED(AiList *ail, const char* bedFn, const char* targetChrom)
 {
-    char buffer[1024];
-    char *chrom, *start, *end;
-    FILE* fileHandle = fopen(bedFileName, "r");
+    samFile *teBam = sam_open("tmp_build/tmp.bam", "rb");
+    sam_hdr_t *header = sam_hdr_read(teBam);
+    FILE *fileHandle = fopen(bedFn, "r");
 
+    char buffer[1024];
+    char *chrom, *start, *end, *name;
     while(fgets(buffer, 1024, fileHandle)){
         chrom = strtok(buffer, "\t");
         start = strtok(NULL, "\t");
         end = strtok(NULL, "\t");
+        name = strtok(NULL, "\t");
 
-		if(chrom){
+        if(chrom){
             int ret = strcmp(chrom, targetChrom);
-            if(ret == 0) addInterval(ail, atol(start), atol(end));
+            if(ret == 0)
+                addInterval(ail, atol(start), atol(end), sam_hdr_name2tid(header, name));
         }
 	}
 
-	fclose(fileHandle);
+    if (teBam != NULL) {sam_close(teBam); teBam=NULL;}
+    if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
+    fclose(fileHandle);
 }
 
 void constructAiList(AiList *ail, int minCoverageLen)
@@ -200,10 +208,11 @@ static inline void updateMinDistInterval(Interval *interval, int start, int end,
     (*numOverlap)++;
 }
 
-void ailistQueryInterval(AiList *ailist, int start, int end, int flankSize, int *numOverlap, int *minDistance)
+int ailistQueryInterval(AiList *ailist, int start, int end, int flankSize, int *numOverlap, int *minDistance)
 {
     int queryStart = (start < flankSize) ? 0 : start - flankSize;
     int queryEnd = end + flankSize;
+    int repTid = -1;
     Contig *contig = &ailist->contigList[0];
 
     // search intervals in each component one by one
@@ -214,18 +223,24 @@ void ailistQueryInterval(AiList *ailist, int start, int end, int flankSize, int 
         if(contig->lenComp[i] <= 15) {
             for(int j = compStart; j < compEnd; j++) {
                 Interval *interval = &contig->intervalList[j];
-                if(isOverlap1(queryStart, queryEnd, interval))
+                if(isOverlap1(queryStart, queryEnd, interval)) {
                     updateMinDistInterval(interval, start, end, numOverlap, minDistance);
-			}
+                    repTid = interval->repTid;
+                }
+            }
             continue;
         }
 
         int j = binarySearch(contig->intervalList, compStart, compEnd, queryEnd);
         while(j >= compStart && contig->maxEndList[j] > queryStart) {
             Interval *interval = &contig->intervalList[j];
-            if(isOverlap2(queryStart, interval))
+            if(isOverlap2(queryStart, interval)) {
                 updateMinDistInterval(interval, start, end, numOverlap, minDistance);
+                repTid = interval->repTid;
+            }
             j--;
         }
     }
+
+    return repTid;
 }

@@ -55,7 +55,9 @@ void initAnno(bam1_t *bam, sam_hdr_t *header, Cluster *clt, Anno *anno, int idx)
         anno->flag |= CLT_5P_FULL;
     if ((teLen - anno->refEnd) < truncSize)
         anno->flag |= CLT_3P_FULL;
-    clt->flag |= anno->flag;
+    
+    if (anno->tid == clt->repTid)
+        clt->flag |= CLT_SELF_TO_SELF;
 }
 
 /// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments

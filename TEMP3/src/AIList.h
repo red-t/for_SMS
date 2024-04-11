@@ -34,6 +34,7 @@
 typedef struct {
     int start;
     int end;
+	int repTid;
 } Interval;
 
 typedef struct{
@@ -54,7 +55,7 @@ typedef struct {
  ***************************/
 AiList *initAiList(void);
 void destroyAiList(AiList *ail);
-void readBED(AiList *ail, const char* bedFileName, const char* targetChrom);
+void readBED(AiList *ail, const char *bedFn, const char *targetChrom);
 void constructAiList(AiList *ail, int minCoverageLen);
 
 
@@ -65,6 +66,6 @@ void constructAiList(AiList *ail, int minCoverageLen);
 void ailistQueryPoint(AiList *ailist, int queryPoint, int flankSize, int *numOverlap, int *minDistance);
 
 /// Compute the minimum distance between query interval to the nearest interval
-void ailistQueryInterval(AiList *ailist, int start, int end, int flankSize, int *numOverlap, int *minDistance);
+int ailistQueryInterval(AiList *ailist, int start, int end, int flankSize, int *numOverlap, int *minDistance);
 
 #endif

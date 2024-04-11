@@ -26,6 +26,7 @@
 #define CLT_3P_FULL             1024
 #define CLT_MULTI_TE            2048
 #define CLT_LARGE_GAP           4096
+#define CLT_SELF_TO_SELF        8192
 
 #define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
 #define isFlankMapped(flag) (((flag) & 60) != 0)
@@ -121,6 +122,7 @@ typedef struct Cluster
     int         tid2;
     int         rightMost;
     int         insLen;
+    int         repTid;
 } __attribute__((packed)) Cluster;
 
 /// @brief Data container for arguments

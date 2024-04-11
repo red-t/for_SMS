@@ -43,7 +43,7 @@ cdef extern from "src/AIList.h" nogil:
     
     AiList *initAiList()
     void destroyAiList(AiList *ail)
-    void readBED(AiList *ail, const char* bedFileName, const char* targetChrom)
+    void readBED(AiList *ail, const char *bedFn, const char *targetChrom)
     void constructAiList(AiList *ail, int minCoverageLen)
 
 
@@ -104,6 +104,7 @@ cdef extern from "src/cluster_utils.h" nogil:
         int         tid2
         int         rightMost
         int         insLen
+        int         repTid
     
     ctypedef struct Args:
         int         numThread

@@ -80,6 +80,7 @@ ClusterDt = np.dtype([
     ('tid2',                np.int32),
     ('rightMost',           np.int32),
     ('insLen',              np.int32),
+    ('repTid',              np.int32),
 ])
 
 

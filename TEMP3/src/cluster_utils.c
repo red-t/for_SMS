@@ -189,9 +189,10 @@ void setNumSegType(Cluster *clt)
 /// @brief Set location type of a cluster
 void setCltLocationType(Cluster *clt, Args args)
 {
-    int numOverlap = 0, minDistanceToOverlap = 0x7fffffff;
-    ailistQueryInterval(args.repeatAiList, clt->refStart, clt->refEnd, 50, &numOverlap, &minDistanceToOverlap);
-    ailistQueryInterval(args.gapAiList, clt->refStart, clt->refEnd, 50, &numOverlap, &minDistanceToOverlap);
+    int numOverlap = 0, minDistanceToOverlap = INT_MAX, repTid = -1;
+    repTid = ailistQueryInterval(args.gapAiList, clt->refStart, clt->refEnd, 50, &numOverlap, &minDistanceToOverlap);
+    repTid = ailistQueryInterval(args.repeatAiList, clt->refStart, clt->refEnd, 50, &numOverlap, &minDistanceToOverlap);
+    clt->repTid = repTid;
 
     if (numOverlap == 0) {
         clt->locationType = 1;

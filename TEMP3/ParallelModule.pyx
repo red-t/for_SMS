@@ -1,3 +1,5 @@
+import os
+from subprocess import Popen, DEVNULL
 import numpy as np
 from .FileIO import outputSomaCltSeqs, outputRefFlank, mergeOutput
 from .Cluster import buildCluster
@@ -56,6 +58,21 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
         numAln += 1
 
 
+cdef buildTERef(object cmdArgs):
+    with open("tmp_build/tmp.fa", "w") as outFa:
+        outFa.write('>0\nAAAAAAAAAAAAAA\n')
+    
+    cdef str queryFn = "tmp_build/tmp.fa"
+    cdef str outFn = "tmp_build/tmp.bam"
+    cdef str cmd = "minimap2 -t 1 -aY {} {} | samtools view -bhS -o {} -".format(cmdArgs.teFn, queryFn, outFn)
+    cdef int exitCode
+    
+    process = Popen([cmd], stderr=DEVNULL, shell=True, executable='/bin/bash')
+    exitCode = process.wait()
+    if exitCode != 0:
+        raise Exception("Error: minimap2 failed for {}".format(queryFn))
+
+
 #######################
 ### Parallel Module ###
 #######################
@@ -83,9 +100,12 @@ cpdef object runInParallel(object cmdArgs):
     bgInfo = getBackgroundInfo(cmdArgs.genomeBamFilePath, cmdArgs.numThread)
     print("bg Divergence: {}\nbg coverage: {}\nbg readlen: {}" \
           "".format(bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
+    
+    # 2. Build TE reference
+    buildTERef(cmdArgs)
 
     with ProcessPoolExecutor(max_workers=cmdArgs.numProcess) as executor:
-        # 2. Build Cluster
+        # 3. Build Cluster
         subProcTup = set([executor.submit(buildCluster, \
                                           bgInfo["bgDiv"], \
                                           bgInfo["bgDepth"], \
@@ -95,7 +115,7 @@ cpdef object runInParallel(object cmdArgs):
             tidToCltData = subProc.result()
             allCltData = {**allCltData, **tidToCltData}
         
-        # 3. Local Assembly
+        # 4. Local Assembly
         highQualArray = getHighQualClts(allCltData)
         taskSize, startList = divideTask(highQualArray.shape[0], cmdArgs.numProcess)
         subProcTup = set([executor.submit(assembleCluster, \
@@ -106,7 +126,7 @@ cpdef object runInParallel(object cmdArgs):
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
         
-        # 4. Output sequence for clusters without assembly
+        # 5. Output sequence for clusters without assembly
         subProcTup = set([executor.submit(outputSomaCltSeqs, \
                                           allCltData[tid][0], \
                                           allCltData[tid][1], \
@@ -114,7 +134,7 @@ cpdef object runInParallel(object cmdArgs):
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
         
-        # 5. Output reference flank sequence for high-qual clusters
+        # 6. Output reference flank sequence for high-qual clusters
         subProcTup = set([executor.submit(outputRefFlank, \
                                           highQualArray, \
                                           startIdx, \
@@ -123,7 +143,7 @@ cpdef object runInParallel(object cmdArgs):
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
         
-        # 6. Annotate clusters
+        # 7. Annotate clusters
         subProcTup = set([executor.submit(annotateCluster, \
                                           highQualArray, \
                                           startIdx, \
@@ -132,7 +152,7 @@ cpdef object runInParallel(object cmdArgs):
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
         
-        # 7. Merge Output
+        # 8. Merge Output
         mergeOutput()
     
     return allCltData
