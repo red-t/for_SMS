@@ -62,10 +62,45 @@ cdef mapInsToTE(int tid, int idx, object cmdArgs):
 ##########################
 ### Annotate Insertion ###
 ##########################
+cdef object getClassArray(object cmdArgs):
+    cdef int numTE=0, maxNum=190
+    cdef object classArray = np.zeros(200, dtype=np.uint32)
+    cdef uint32_t[::1] classView = classArray
+
+    for l in open(cmdArgs.classFn, "r"):
+        l = l.strip().split()
+        if len(l) < 2:
+            continue
+        
+        if numTE >= maxNum:
+            maxNum = classView.shape[0] + 200
+            classArray.resize((maxNum,), refcheck=False)
+            classView = classArray
+            maxNum -= 10
+        
+        if l[1] == "DNA":
+            classView[numTE] = 16384
+        elif l[1] == "LTR":
+            classView[numTE] = 32768
+        elif l[1] == "LINE":
+            classView[numTE] = 65536
+        elif l[1] == "SINE":
+            classView[numTE] = 131072
+        elif l[1] == "SVA":
+            classView[numTE] = 262144
+        
+        numTE += 1
+    
+    classArray.resize((numTE,), refcheck=False)
+    return classArray
+
+
 cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs):
     cdef int i, numTmp, numAnno=0, maxNum=2900
     cdef object annoArray = np.zeros(3000, dtype=AnnoDt)
+    cdef object classArray = getClassArray(cmdArgs)
     cdef Anno[::1] annoView = annoArray
+    cdef uint32_t[::1] classView = classArray
     cdef str bamFn, assmFn
 
     for i in range(startIdx, endIdx):
@@ -89,7 +124,7 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
         if os.path.isfile(bamFn) == True:
             annoTsd(&cltView[i], &annoView[numAnno], numTmp)
 
-        setInsStruc(&cltView[i], &annoView[numAnno], numTmp)
+        setInsStruc(&cltView[i], &annoView[numAnno], numTmp, &classView[0])
         numAnno += numTmp
     
     annoArray.resize((numAnno,), refcheck=False)

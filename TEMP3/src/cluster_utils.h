@@ -27,6 +27,11 @@
 #define CLT_MULTI_TE            2048
 #define CLT_LARGE_GAP           4096
 #define CLT_SELF_TO_SELF        8192
+#define CLT_DNA                 16384
+#define CLT_LTR                 32768
+#define CLT_LINE                65536
+#define CLT_SINE                131072
+#define CLT_SVA                 262144
 
 #define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
 #define isFlankMapped(flag) (((flag) & 60) != 0)

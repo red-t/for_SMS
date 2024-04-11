@@ -326,7 +326,7 @@ void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart)
 }
 
 /// @brief Set ins-seq structure based on annotations
-void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno)
+void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray)
 {
     if (numAnno == 0)
         return;
@@ -335,6 +335,7 @@ void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno)
     checkGap(annoArray, numAnno, clt);
     checkPolyA(annoArray, numAnno, clt);
     checkEnd(annoArray, numAnno, clt);
+    checkTEClass(annoArray, numAnno, clt, classArray);
 }
 
 /// @brief Compare function for sorting annotations
@@ -397,6 +398,19 @@ void checkEnd(Anno *annoArray, int numAnno, Cluster *clt)
         clt->flag |= CLT_3P_FULL;
     if (isRevAnno(annoArray[rightIdx]) && is5PFull(annoArray[rightIdx].flag))
         clt->flag |= CLT_5P_FULL;
+}
+
+/// @brief Check which TE class the insertion belongs to
+void checkTEClass(Anno *annoArray, int numAnno, Cluster *clt, uint32_t *classArray)
+{
+    int leftIdx = (annoArray[0].tid == -2) ? 1 : 0;
+    int rightIdx = (annoArray[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
+
+    int leftLen = annoArray[leftIdx].refEnd - annoArray[leftIdx].refStart;
+    int rightLen = annoArray[rightIdx].refEnd - annoArray[rightIdx].refStart;
+    int teTid = (leftLen > rightLen) ? annoArray[leftIdx].tid : annoArray[rightIdx].tid;
+
+    clt->flag |= classArray[teTid];
 }
 
 

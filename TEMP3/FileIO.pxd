@@ -51,15 +51,25 @@ cdef extern from "src/cluster_utils.h" nogil:
     ##############################
     ### Cluster related macros ###
     #############################
-    int CLT_IN_BLACKLIST
-    int CLT_ASSEMBLED
-    int CLT_LEFT_FLANK_MAP
-    int CLT_RIGHT_FLANK_MAP
-    int CLT_DIFF_FLANK_MAP
-    int CLT_SAME_FLANK_MAP
-    int CLT_TE_MAP
-    int CLT_POLYA
-    int CLT_TSD
+    uint32_t CLT_IN_BLACKLIST
+    uint32_t CLT_ASSEMBLED
+    uint32_t CLT_LEFT_FLANK_MAP
+    uint32_t CLT_RIGHT_FLANK_MAP
+    uint32_t CLT_DIFF_FLANK_MAP
+    uint32_t CLT_SAME_FLANK_MAP
+    uint32_t CLT_TE_MAP
+    uint32_t CLT_POLYA
+    uint32_t CLT_TSD
+    uint32_t CLT_5P_FULL
+    uint32_t CLT_3P_FULL
+    uint32_t CLT_MULTI_TE
+    uint32_t CLT_LARGE_GAP
+    uint32_t CLT_SELF_TO_SELF
+    uint32_t CLT_DNA
+    uint32_t CLT_LTR
+    uint32_t CLT_LINE
+    uint32_t CLT_SINE
+    uint32_t CLT_SVA
 
     ##################
     ### Structures ###

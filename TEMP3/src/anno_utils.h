@@ -65,7 +65,7 @@ void annoTsd(Cluster *clt, Anno *annoArray, int numAnno);
 void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart);
 
 /// @brief Set ins-seq structure based on annotations
-void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno);
+void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray);
 
 /// @brief Compare function for sorting annotations
 int compare(const void *a, const void *b);
@@ -78,6 +78,10 @@ void checkPolyA(Anno *annoArray, int numAnno, Cluster *clt);
 
 /// @brief Check whether the ins-seq contains complete ends
 void checkEnd(Anno *annoArray, int numAnno, Cluster *clt);
+
+/// @brief Check which TE class the insertion belongs to
+void checkTEClass(Anno *annoArray, int numAnno, Cluster *clt, uint32_t *classArray);
+
 
 /**********************
  *** Annotation I/O ***
