@@ -79,15 +79,15 @@ cdef object getClassArray(object cmdArgs):
             maxNum -= 10
         
         if l[1] == "DNA":
-            classView[numTE] = 16384
+            classView[numTE] = CLT_DNA
         elif l[1] == "LTR":
-            classView[numTE] = 32768
+            classView[numTE] = CLT_LTR
         elif l[1] == "LINE":
-            classView[numTE] = 65536
+            classView[numTE] = CLT_LINE
         elif l[1] == "SINE":
-            classView[numTE] = 131072
-        elif l[1] == "SVA":
-            classView[numTE] = 262144
+            classView[numTE] = CLT_SINE
+        elif l[1] == "RETROPOSON":
+            classView[numTE] = CLT_RETROPOSON
         
         numTE += 1
     

@@ -69,7 +69,7 @@ cdef extern from "src/cluster_utils.h" nogil:
     uint32_t CLT_LTR
     uint32_t CLT_LINE
     uint32_t CLT_SINE
-    uint32_t CLT_SVA
+    uint32_t CLT_RETROPOSON
 
     ##################
     ### Structures ###

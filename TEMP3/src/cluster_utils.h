@@ -31,7 +31,7 @@
 #define CLT_LTR                 32768
 #define CLT_LINE                65536
 #define CLT_SINE                131072
-#define CLT_SVA                 262144
+#define CLT_RETROPOSON          262144
 
 #define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
 #define isFlankMapped(flag) (((flag) & 60) != 0)
