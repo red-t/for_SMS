@@ -6,7 +6,7 @@ from subprocess import Popen, DEVNULL
 ### Local Assembly ###
 ######################
 cdef int getMinEdge(int numSegRaw):
-    int minEdge = 3
+    cdef int minEdge = 3
 
     if numSegRaw < 5:
         minEdge = 1
