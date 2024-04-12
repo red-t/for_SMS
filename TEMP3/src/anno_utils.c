@@ -236,6 +236,7 @@ void outputTsdSeq(Cluster *clt, PolyA *polyA, Anno *annoArray, int numAnno)
 
     if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
     if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
+    if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
 }
 
 /// @brief Adjust annotation position
