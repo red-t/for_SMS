@@ -48,17 +48,22 @@ void readBED(AiList *ail, const char* bedFn, const char* targetChrom)
 
     char buffer[1024];
     char *chrom, *start, *end, *name;
-    while(fgets(buffer, 1024, fileHandle)){
+    while (fgets(buffer, 1024, fileHandle)) {
         chrom = strtok(buffer, "\t");
         start = strtok(NULL, "\t");
         end = strtok(NULL, "\t");
         name = strtok(NULL, "\t");
 
-        if(chrom){
-            int ret = strcmp(chrom, targetChrom);
-            if(ret == 0)
-                addInterval(ail, atol(start), atol(end), sam_hdr_name2tid(header, name));
-        }
+        if(chrom == NULL)
+            continue;
+        
+        int ret = strcmp(chrom, targetChrom);
+        if (ret != 0)
+            continue;
+
+        size_t length = strlen(name);
+        name[length-1] = (name[length-1] == '\n') ? '\0' : name[length-1];
+        addInterval(ail, atol(start), atol(end), sam_hdr_name2tid(header, name));
 	}
 
     if (teBam != NULL) {sam_close(teBam); teBam=NULL;}
