@@ -428,7 +428,7 @@ void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
     memset(teTable, 0, numTe * sizeof(int));
 
     char queryTmp[100] = {'\0'}, refTmp[100] = {'\0'};
-    char queryStr[500] = {'\0'}, refStr[500] = {'\0'};
+    char queryStr[1000] = {'\0'}, refStr[1000] = {'\0'};
     char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_annoFormated.txt", startIdx);
     FILE *fp = fopen(outFn, "w");
@@ -440,8 +440,8 @@ void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
             prevIdx = annoArray[i].idx;
             strandFlag = 0;
             memset(teTable, 0, numTe * sizeof(int));
-            memset(queryStr, '\0', 500);
-            memset(refStr, '\0', 500);
+            memset(queryStr, '\0', 1000);
+            memset(refStr, '\0', 1000);
         }
         formatSingleAnno(annoArray[i], queryTmp, refTmp, teFa, teTable, &strandFlag);
         strcat(queryStr, queryTmp);
