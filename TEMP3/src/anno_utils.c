@@ -397,13 +397,23 @@ void checkEnd(Anno *annoArray, int numAnno, Cluster *clt)
 
     if (!isRevAnno(annoArray[leftIdx]) && is5PFull(annoArray[leftIdx].flag))
         clt->flag |= CLT_5P_FULL;
-    if (isRevAnno(annoArray[leftIdx]) && is3PFull(annoArray[leftIdx].flag))
-        clt->flag |= CLT_3P_FULL;
-
-    if (!isRevAnno(annoArray[rightIdx]) && is3PFull(annoArray[rightIdx].flag))
-        clt->flag |= CLT_3P_FULL;
     if (isRevAnno(annoArray[rightIdx]) && is5PFull(annoArray[rightIdx].flag))
         clt->flag |= CLT_5P_FULL;
+
+    if (isRevAnno(annoArray[leftIdx]) && is3PFull(annoArray[leftIdx].flag))
+        clt->flag |= CLT_3P_FULL;
+    if (!isRevAnno(annoArray[rightIdx]) && is3PFull(annoArray[rightIdx].flag))
+        clt->flag |= CLT_3P_FULL;
+
+    if ((clt->flag & CLT_5P_FULL) == 0) {
+        clt->flag |= (!isRevAnno(annoArray[leftIdx]) && !isLeftFlankMapped(clt->flag)) ? CLT_5P_UNKNOWN : 0;
+        clt->flag |= (isRevAnno(annoArray[rightIdx]) && !isRightFlankMapped(clt->flag)) ? CLT_5P_UNKNOWN : 0;
+    }
+
+    if ((clt->flag & CLT_3P_FULL) == 0) {
+        clt->flag |= (isRevAnno(annoArray[leftIdx]) && !isLeftFlankMapped(clt->flag)) ? CLT_3P_UNKNOWN : 0;
+        clt->flag |= (!isRevAnno(annoArray[rightIdx]) && !isRightFlankMapped(clt->flag)) ? CLT_3P_UNKNOWN : 0;
+    }
 }
 
 /// @brief Check which TE class the insertion belongs to
