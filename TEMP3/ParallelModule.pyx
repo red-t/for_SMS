@@ -122,6 +122,7 @@ cpdef object runInParallel(object cmdArgs):
                                           highQualArray, \
                                           startIdx, \
                                           taskSize, \
+                                          cmdArgs.minEdge, \
                                           cmdArgs.numThread) for startIdx in startList])
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()

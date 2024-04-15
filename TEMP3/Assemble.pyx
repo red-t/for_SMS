@@ -21,8 +21,8 @@ cdef int getMinEdge(int numSegRaw):
 
     return minEdge
 
-cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, int numThread):
-    cdef int i, exitCode, endIdx, minEdge
+cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, int minEdge, int numThread):
+    cdef int i, exitCode, endIdx
     cdef str cmd, prefix
     cdef object subProcess
 
@@ -34,7 +34,9 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, int numT
         if isSomaClt(&cltView[i]):
             continue
 
-        minEdge = getMinEdge(cltView[i].numSegRaw)
+        if minEdge <= 0:
+            minEdge = getMinEdge(cltView[i].numSegRaw)
+            
         prefix = "tmp_assm/{}_{}".format(cltView[i].tid, cltView[i].idx)
         cmd = "wtdbg2 -l 256 -e {} -S 1 --rescue-low-cov-edges --node-len 256 --ctg-min-length 256 " \
               "--ctg-min-nodes 1 -q -t {} -i {}.fa -fo {}".format(minEdge, numThread, prefix, prefix)

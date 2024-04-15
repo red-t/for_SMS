@@ -12,6 +12,8 @@ def parseArgs():
                                  help='repeat annotation file', default='')
     parser.add_argument('-g', '--gap', dest='gapFn', type=str,
                                  help='gap annotation file', default='')
+    parser.add_argument('-e', '--minEdge', dest='minEdge', type=int,
+                                 help='-e option for wtdbg2 assembling', default=0)
     parser.add_argument('-B', '--blacklist', dest='blackListPath', type=str,
                                  help='blacklist BED file', default='')
     parser.add_argument('-C', '--class', dest='classFn', type=str,
