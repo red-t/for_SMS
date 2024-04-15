@@ -222,6 +222,9 @@ void outputTsdSeq(Cluster *clt, PolyA *polyA, Anno *annoArray, int numAnno)
     char *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), leftStart, leftEnd-1, &seqLen);
     char *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), rightStart, rightEnd-1, &seqLen);
 
+    if ((leftEnd > faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1))) || (rightStart < 0))
+        goto END;
+
     adjustAnno(annoArray, numAnno, -polyA->leftMost);
     clt->leftMost = leftEnd;
     clt->rightMost = rightStart;
@@ -233,7 +236,9 @@ void outputTsdSeq(Cluster *clt, PolyA *polyA, Anno *annoArray, int numAnno)
     fprintf(fp, ">0\n%s\n", leftSeq);
     fprintf(fp, ">1\n%s\n", rightSeq);
     fclose(fp);
+    goto END;
 
+    END:
     if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
     if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
