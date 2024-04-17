@@ -342,6 +342,9 @@ void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArra
     checkPolyA(annoArray, numAnno, clt);
     checkEnd(annoArray, numAnno, clt);
     checkTEClass(annoArray, numAnno, clt, classArray);
+
+    if (isRightFlankMapped(clt->flag))
+        adjustAnno(annoArray, numAnno, 50);
 }
 
 /// @brief Compare function for sorting annotations

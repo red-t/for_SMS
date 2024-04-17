@@ -376,6 +376,39 @@ void fetchSeqs(Cluster *clt, char **insSeq, char **leftSeq, char **rightSeq)
     goto END;
 
     END:
-    *insSeq = getInsSeq(assmFa, clt);
+    *insSeq = getAdjustSeq(assmFa, clt);
     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
+}
+
+/// @brief get adjusted insertion-seq
+char *getAdjustSeq(faidx_t *assmFa, Cluster *clt)
+{
+    char *insSeq = getInsSeq(assmFa, clt);
+    if (isBothFlankMapped(clt->flag))
+        return insSeq;
+
+    int insLen = strlen(insSeq);
+    int adjustLen = strlen(insSeq) + 50;
+    char *adjustSeq = (char *)malloc((adjustLen + 1) * sizeof(char));
+    char *temp = adjustSeq;
+
+    if (isLeftFlankMapped(clt->flag)) {
+        memcpy(temp, insSeq, insLen); temp += insLen;
+        memset(temp, 'N', 50); temp += 50;
+        adjustSeq[adjustLen] = '\0';
+
+        if (insSeq != NULL) {free(insSeq); insSeq=NULL;}
+        return adjustSeq;
+    }
+
+    if (isRightFlankMapped(clt->flag)) {
+        memset(temp, 'N', 50); temp += 50;
+        memcpy(temp, insSeq, insLen); temp += insLen;
+        adjustSeq[adjustLen] = '\0';
+
+        if (insSeq != NULL) {free(insSeq); insSeq=NULL;}
+        return adjustSeq;
+    }
+
+    return NULL;
 }

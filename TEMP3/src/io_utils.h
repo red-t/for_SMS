@@ -94,4 +94,7 @@ char *fetchTsdSeq(faidx_t *refFa, Cluster *clt);
 /// @brief Fetch flank sequence from temporary file
 void fetchSeqs(Cluster *clt, char **insSeq, char **leftSeq, char **rightSeq);
 
+/// @brief get adjusted insertion-seq
+char *getAdjustSeq(faidx_t *assmFa, Cluster *clt);
+
 #endif // IO_UTILS_H
