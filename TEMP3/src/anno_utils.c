@@ -307,28 +307,28 @@ void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart)
 {
     if (leftEnd < 0 && rightStart < 0)
         return;
-    
-    if (leftEnd < 0) {
-        clt->refEnd = localStart + rightStart;
-        clt->refStart = clt->refEnd - 1;
-        return;
+
+    int tmpStart, tmpEnd;
+    uint32_t hasTsd = 0;
+    if (leftEnd < 0 || rightStart < 0) {
+        tmpEnd = localStart;
+        tmpEnd += (leftEnd < 0) ? rightStart : leftEnd;
+        tmpStart = tmpEnd - 1;
     }
 
-    if (rightStart < 0) {
-        clt->refEnd = localStart + leftEnd;
-        clt->refStart = clt->refEnd - 1;
-        return;
+    if (rightStart >= 0 && leftEnd >= 0) {
+        tmpStart = tmpEnd = localStart;
+        tmpStart += (rightStart < leftEnd) ? rightStart : leftEnd;
+        tmpEnd += (rightStart < leftEnd) ? leftEnd : rightStart;
+        hasTsd = ((rightStart < leftEnd) && ((leftEnd - rightStart) < 50)) ? CLT_TSD : 0;
     }
 
-    if (rightStart < leftEnd) {
-        clt->refStart = localStart + rightStart;
-        clt->refEnd = localStart + leftEnd;
-        clt->flag |= ((leftEnd - rightStart) < 50) ? CLT_TSD : 0;
+    if (MIN(abs(tmpStart - clt->refStart), abs(tmpEnd - clt->refEnd)) > 50)
         return;
-    }
-    
-    clt->refStart = localStart + leftEnd - 1;
-    clt->refEnd = localStart + rightStart;
+
+    clt->flag |= hasTsd;
+    clt->refStart = tmpStart;
+    clt->refEnd = tmpEnd;
 }
 
 /// @brief Set ins-seq structure based on annotations
