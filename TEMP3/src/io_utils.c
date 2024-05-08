@@ -150,29 +150,32 @@ InsRegion initInsRegion()
     return region;
 }
 
-/// @brief output insertion-seq and tsd-containing-seq from contig
+/// @brief output insertion-seq from contig
 void extractIns(Cluster *clt)
 {
     InsRegion region = initInsRegion();
-    setInsRegion(clt->tid, clt->idx, &region);
-    clt->flag |= region.flag;
-    if (!isFlankMapped(region.flag))
+    setInsRegion(clt, &region);
+    if (!isFlankMapped(clt->flag))
         return;
 
     char assmFn[100] = {'\0'};
     sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
     faidx_t *assmFa = fai_load((const char *)assmFn);
-    outputInsSeq(clt, assmFa, region);
+
+    if (isBothFlankMapped(clt->flag))
+        outputInsSeq(assmFa, clt);
+    else
+        outputAssmFlank(assmFa, clt);
 
     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
     return;
 }
 
 /// @brief define insertion-seq region by Flank-To-Assm alignments
-void setInsRegion(int cltTid, int cltIdx, InsRegion *region)
+void setInsRegion(Cluster *clt, InsRegion *region)
 {
     char inputFn[100] = {'\0'};
-    sprintf(inputFn, "tmp_anno/%d_%d_FlankToAssm.bam", cltTid, cltIdx);
+    sprintf(inputFn, "tmp_anno/%d_%d_FlankToAssm.bam", clt->tid, clt->idx);
     htsFile *inputBam = sam_open(inputFn, "rb");
     sam_hdr_t *header = sam_hdr_read(inputBam);
     bam1_t *bam = bam_init1();
@@ -204,6 +207,11 @@ void setInsRegion(int cltTid, int cltIdx, InsRegion *region)
     if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
 
     adjustInsRegion(region);
+    clt->tid1 = region->tid1;
+    clt->leftMost = region->leftMost;
+    clt->tid2 = region->tid2;
+    clt->rightMost = region->rightMost;
+    clt->flag |= region->flag;
 }
 
 /// @brief adjust region->flag
@@ -213,7 +221,7 @@ void adjustInsRegion(InsRegion *region)
         return;
 
     // Large clip in both flank
-    if (isClipInFlank(region->cigar1) && isClipInFlank(region->cigar2))
+    if (isClipInFlank(region->cigar1, 400) && isClipInFlank(region->cigar2, 400))
         return;
 
     if (region->tid2 < 0) { // Only left lank mapped
@@ -226,12 +234,12 @@ void adjustInsRegion(InsRegion *region)
         return;
     }
 
-    if (isClipInFlank(region->cigar2)) { // Large flank in right flank
+    if (isClipInFlank(region->cigar2, 400)) { // Large flank in right flank
         region->flag |= CLT_LEFT_FLANK_MAP;
         return;
     }
 
-    if (isClipInFlank(region->cigar1)) { // Large flank in left flank
+    if (isClipInFlank(region->cigar1, 400)) { // Large flank in left flank
         region->flag |= CLT_RIGHT_FLANK_MAP;
         return;
     }
@@ -247,16 +255,14 @@ void adjustInsRegion(InsRegion *region)
 }
 
 /// @brief output insertion-seq for annotation
-void outputInsSeq(Cluster *clt, faidx_t *assmFa, InsRegion region)
+void outputInsSeq(faidx_t *assmFa, Cluster *clt)
 {
-    clt->tid1 = region.tid1; clt->leftMost = region.leftMost;
-    clt->tid2 = region.tid2; clt->rightMost = region.rightMost;
     char *insSeq = getInsSeq(assmFa, clt);
     char outFn[100] = {'\0'};
     sprintf(outFn, "tmp_anno/%d_%d_insertion.fa", clt->tid, clt->idx);
 
     FILE *fp = fopen(outFn, "w");
-    fprintf(fp, ">%d_%d_%d_%d\n%s\n", region.tid1, region.leftMost, region.tid2, region.rightMost, insSeq);
+    fprintf(fp, ">%d_%d_%d_%d\n%s\n", clt->tid1, clt->leftMost, clt->tid2, clt->rightMost, insSeq);
     fclose(fp);
 
     if (insSeq != NULL) {free(insSeq); insSeq=NULL;}
@@ -296,6 +302,122 @@ char *getInsSeq(faidx_t *assmFa, Cluster *clt)
     return NULL;
 }
 
+/// @brief output flank-seqs of insertion-seq from assembled-contig for re-defining insertion region
+void outputAssmFlank(faidx_t *assmFa, Cluster *clt)
+{
+    int insLen = isLeftFlankMapped(clt->flag) ? (faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1)) - clt->leftMost) : clt->rightMost;
+    if (insLen < 250) {
+        outputInsSeq(assmFa, clt);
+        return;
+    }
+
+    char *leftSeq = NULL, *rightSeq = NULL;
+    hts_pos_t seqLen;
+
+    if (isLeftFlankMapped(clt->flag)) {
+        int assmLen = faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1));
+        leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), clt->leftMost-200, clt->leftMost-1, &seqLen);
+        rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), assmLen-200, assmLen-1, &seqLen);
+    }
+
+    if (isRightFlankMapped(clt->flag)) {
+        leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), 0, 199, &seqLen);
+        rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), clt->rightMost, clt->rightMost+199, &seqLen);
+    }
+
+    char outFn[100] = {'\0'};
+    sprintf(outFn, "tmp_anno/%d_%d_assmFlank.fa", clt->tid, clt->idx);
+    FILE *fp = fopen(outFn, "w");
+    fprintf(fp, ">0\n%s\n", leftSeq);
+    fprintf(fp, ">1\n%s\n", rightSeq);
+    fclose(fp);
+
+    if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
+    if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
+}
+
+/// @brief refine and ouput insertion-seq for single-flank-mapped cases
+void reExtractIns(Cluster *clt)
+{
+    char assmFn[100] = {'\0'};
+    sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
+    faidx_t *assmFa = fai_load((const char *)assmFn);
+    reSetInsRegion(clt, assmFa);
+    outputInsSeq(assmFa, clt);
+
+    if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
+    return;
+}
+
+/// @brief re-set insertion-seq region
+void reSetInsRegion(Cluster *clt, faidx_t *assmFa)
+{
+    char inputFn[100] = {'\0'};
+    sprintf(inputFn, "tmp_anno/%d_%d_AssmFlankToLocal.bam", clt->tid, clt->idx);
+    htsFile *inputBam = sam_open(inputFn, "rb");
+    sam_hdr_t *header = sam_hdr_read(inputBam);
+    bam1_t *bam = bam_init1();
+    int leftEnd = 0, rightStart = 0, leftLen, rightLen;
+    int localStart = atoi(sam_hdr_tid2name(header, 0));
+    uint32_t leftCigar1 = 0, leftCigar2 = 0;
+    uint32_t rightCigar1 = 0, rightCigar2 = 0;
+
+    while (1)
+    {
+        int retValue = bam_read1(inputBam->fp.bgzf, bam);
+        if (retValue < 0)
+            break;
+        if (bamIsInvalid(bam) || bamIsSup(bam) || bam_is_rev(bam))
+            continue;
+
+        int numCigar = bam->core.n_cigar;
+        uint32_t *cigarArray = bam_get_cigar(bam);
+
+        if (isLeftFlank(bam)) {
+            leftEnd = bam_endpos(bam);
+            leftLen = bam->core.l_qseq;
+            leftCigar1 = cigarArray[0];
+            leftCigar2 = cigarArray[numCigar - 1];
+        } else {
+            rightStart = bam->core.pos;
+            rightLen = bam->core.l_qseq;
+            rightCigar1 = cigarArray[0];
+            rightCigar2 = cigarArray[numCigar - 1];
+        }
+    }
+    
+    if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
+    if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
+    if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
+
+    if (leftEnd == 0 || rightStart == 0 )
+        return;
+
+    if (isClipInFlank(leftCigar1, 50) || isClipInFlank(rightCigar2, 50))
+        return;
+
+    int leftDelta = MIN(abs(leftEnd + localStart - clt->refStart), abs(leftEnd + localStart - clt->refEnd));
+    int rightDelta = MIN(abs(rightStart + localStart - clt->refStart), abs(rightStart + localStart - clt->refEnd));
+    if (leftDelta > 50 || rightDelta > 50)
+        return;
+
+    if (abs(rightStart - leftEnd) > 50)
+        return;
+
+    if (isLeftFlankMapped(clt->flag)) {
+        clt->tid2 = clt->tid1;
+        clt->rightMost = faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1));
+        clt->rightMost -= (rightLen - bam_cigar_oplen(rightCigar1));
+    }
+
+    if (isRightFlankMapped(clt->flag)) {
+        clt->tid1 = clt->tid2;
+        clt->leftMost = leftLen - bam_cigar_oplen(leftCigar2);
+    }
+
+    clt->flag &= 0xfffffff3;
+    clt->flag |= CLT_SAME_FLANK_MAP;
+}
 
 /*******************
  *** Cluster I/O ***

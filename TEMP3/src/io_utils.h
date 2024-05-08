@@ -50,7 +50,7 @@ void outputLocal(Cluster *clt, faidx_t *refFa, FlankRegion region);
  *****************************/
 #define bamIsSup(bam) (((bam)->core.flag & BAM_FSUPPLEMENTARY) != 0)
 #define isLeftFlank(bam) (strcmp(bam_get_qname((bam)), "0") == 0)
-#define isClipInFlank(cigar) (bam_cigar_op((cigar)) == BAM_CSOFT_CLIP && bam_cigar_oplen((cigar)) > 400)
+#define isClipInFlank(cigar, length) (bam_cigar_op((cigar)) == BAM_CSOFT_CLIP && bam_cigar_oplen((cigar)) > (length))
 
 /// @brief Data container for insertion region on assembled contig
 typedef struct InsRegion
@@ -69,17 +69,25 @@ typedef struct InsRegion
 void extractIns(Cluster *clt);
 
 /// @brief define insertion-seq region by Flank-To-Assm alignments
-void setInsRegion(int cltTid, int cltIdx, InsRegion *region);
+void setInsRegion(Cluster *clt, InsRegion *region);
 
 /// @brief adjust region->flag
 void adjustInsRegion(InsRegion *region);
 
 /// @brief output insertion-seq in FASTA format
-void outputInsSeq(Cluster *clt, faidx_t *assmFa, InsRegion region);
+void outputInsSeq(faidx_t *assmFa, Cluster *clt);
 
 /// @brief get insertion-seq
 char *getInsSeq(faidx_t *assmFa, Cluster *clt);
 
+/// @brief output flank-seqs of insertion-seq from assembled-contig for re-deining insertion region
+void outputAssmFlank(faidx_t *assmFa, Cluster *clt);
+
+/// @brief refine and ouput insertion-seq for single-flank-mapped cases
+void reExtractIns(Cluster *clt);
+
+/// @brief re-set insertion-seq region
+void reSetInsRegion(Cluster *clt, faidx_t *assmFa);
 
 /*******************
  *** Cluster I/O ***

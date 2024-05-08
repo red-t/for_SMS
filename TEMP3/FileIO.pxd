@@ -195,6 +195,7 @@ cdef extern from "src/io_utils.h" nogil:
     ### Insertion Sequence IO ###
     #############################
     void extractIns(Cluster *clt)
+    void reExtractIns(Cluster *clt)
 
 
 cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs)

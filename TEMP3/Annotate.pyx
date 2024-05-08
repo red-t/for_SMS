@@ -27,6 +27,9 @@ cdef annotateAssm(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs
     for i in range(startIdx, endIdx):
         mapFlankToAssm(cltView[i].tid, cltView[i].idx)
         extractIns(&cltView[i])
+        mapAssmFlankToLocal(cltView[i].tid, cltView[i].idx)
+        if os.path.isfile("tmp_anno/{}_{}_AssmFlankToLocal.bam".format(cltView[i].tid, cltView[i].idx)) == True:
+            reExtractIns(&cltView[i])
         mapInsToTE(cltView[i].tid, cltView[i].idx, cmdArgs)
         
 
@@ -37,6 +40,22 @@ cdef mapFlankToAssm(int tid, int idx):
     cdef str outFn = "tmp_anno/{}_{}_FlankToAssm.bam".format(tid, idx)
     cdef str cmd = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t 1 -aY {} {} | " \
                    "samtools view -bhS -o {} -".format(targetFn, queryFn, outFn)
+
+    process = Popen([cmd], stderr=DEVNULL, shell=True, executable='/bin/bash')
+    exitCode = process.wait()
+    if exitCode != 0:
+        raise Exception("Error: minimap2 failed for {}".format(queryFn))
+
+
+cdef mapAssmFlankToLocal(int tid, int idx):
+    cdef int exitCode
+    cdef str targetFn = "tmp_anno/{}_{}_local.fa".format(tid, idx)
+    cdef str queryFn = "tmp_anno/{}_{}_assmFlank.fa".format(tid, idx)
+    cdef str outFn = "tmp_anno/{}_{}_AssmFlankToLocal.bam".format(tid, idx)
+    cdef str cmd = "minimap2 -x sr --secondary=no -t 1 -aY {} {} | " \
+                   "samtools view -bhS -o {} -".format(targetFn, queryFn, outFn)
+    if os.path.isfile(queryFn) == False:
+        return
 
     process = Popen([cmd], stderr=DEVNULL, shell=True, executable='/bin/bash')
     exitCode = process.wait()
