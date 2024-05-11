@@ -82,6 +82,13 @@ void checkEnd(Anno *annoArray, int numAnno, Cluster *clt);
 /// @brief Check which TE class the insertion belongs to
 void checkTEClass(Anno *annoArray, int numAnno, Cluster *clt, uint32_t *classArray);
 
+/// @brief Check whether left-/right- assm-flank-seq contains valid polyT/A
+void checkFlankPolyA(Anno *annoArray, int numAnno, Cluster *clt);
+
+/// @brief Search polyT/polyA in left-/right- assm-flank-seq sequence
+int searchFlankPolyA(char *flankSeq, int isA, int seqLen);
+
+
 
 /**********************
  *** Annotation I/O ***

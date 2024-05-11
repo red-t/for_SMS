@@ -26,7 +26,7 @@
 #define CLT_3P_FULL             1024
 #define CLT_5P_UNKNOWN          2048
 #define CLT_3P_UNKNOWN          4096
-#define CLT_MULTI_TE            8192
+#define CLT_SINGLE_TE           8192
 #define CLT_LARGE_GAP           16384
 #define CLT_SELF_TO_SELF        32768
 #define CLT_DNA                 65536
@@ -34,6 +34,7 @@
 #define CLT_LINE                262144
 #define CLT_SINE                524288
 #define CLT_RETROPOSON          1048576
+#define CLT_AT_RICH             2097152
 
 #define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
 #define isFlankMapped(flag) (((flag) & 60) != 0)
@@ -42,6 +43,8 @@
 #define isRightFlankMapped(flag) (((flag) & CLT_RIGHT_FLANK_MAP) != 0)
 #define is5PFull(flag) (((flag) & CLT_5P_FULL) != 0)
 #define is3PFull(flag) (((flag) & CLT_3P_FULL) != 0)
+#define hasTSD(flag) (((flag) & CLT_TSD) != 0)
+#define hasPolyA(flag) (((flag) & CLT_POLYA) != 0)
 
 
 /******************

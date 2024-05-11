@@ -357,7 +357,7 @@ void reSetInsRegion(Cluster *clt, faidx_t *assmFa)
     htsFile *inputBam = sam_open(inputFn, "rb");
     sam_hdr_t *header = sam_hdr_read(inputBam);
     bam1_t *bam = bam_init1();
-    int leftEnd = 0, rightStart = 0, leftLen, rightLen;
+    int leftEnd = 0, rightStart = 0, leftLen = 0, rightLen = 0;
     int localStart = atoi(sam_hdr_tid2name(header, 0));
     uint32_t leftCigar1 = 0, leftCigar2 = 0;
     uint32_t rightCigar1 = 0, rightCigar2 = 0;
@@ -462,7 +462,7 @@ char *fetchTsdSeq(faidx_t *refFa, Cluster *clt)
 {
     hts_pos_t seqLen;
     char *tsdSeq = NULL;
-    if ((clt->flag & CLT_TSD) != 0)
+    if (hasTSD(clt->flag))
         tsdSeq = faidx_fetch_seq64(refFa, faidx_iseq(refFa, clt->tid), clt->refStart, clt->refEnd-1, &seqLen);
     else {
         tsdSeq = faidx_fetch_seq64(refFa, faidx_iseq(refFa, clt->tid), 0, 0, &seqLen);
@@ -479,14 +479,14 @@ void fetchSeqs(Cluster *clt, char **insSeq, char **leftSeq, char **rightSeq)
     sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
     faidx_t *assmFa = fai_load((const char *)assmFn);
 
-    if ((clt->flag & CLT_LEFT_FLANK_MAP) != 0) {
+    if (isLeftFlankMapped(clt->flag)) {
         *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), (clt->leftMost - 500), (clt->leftMost - 1), &seqLen);
         *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, 0), 0, 0, &seqLen);
         **rightSeq = '.';
         goto END;
     }
 
-    if ((clt->flag & CLT_RIGHT_FLANK_MAP) != 0) {
+    if (isRightFlankMapped(clt->flag)) {
         *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, 0), 0, 0, &seqLen);
         *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), clt->rightMost, (clt->rightMost + 499), &seqLen);
         **leftSeq = '.';

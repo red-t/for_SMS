@@ -94,8 +94,8 @@ int fillAnnoArray(Cluster *clt, Anno *annoArray, int idx)
     if (numAnno == 0)
         goto END;
 
-    if (numAnno > 1)
-        clt->flag |= CLT_MULTI_TE;
+    if (numAnno == 1)
+        clt->flag |= CLT_SINGLE_TE;
     clt->flag |= CLT_TE_MAP;
     numAnno = annoPolyA(clt, annoArray, numAnno, &polyA);
     outputTsdSeq(clt, &polyA, annoArray, numAnno);
@@ -141,11 +141,11 @@ int annoPolyA(Cluster *clt, Anno *annoArray, int numAnno, PolyA *polyA)
 /// @brief Find and record single polyA/polyT
 int setPolyA(char *flankSeq, Anno *annoArray, Cluster *clt, int numAnno, PolyA *polyA)
 {
-    // polyA at right, but right-most TE is reverse
-    if (polyA->isA && annoArray[polyA->rightIdx].strand)
+    // If right-most TE is reverse, polyA is invalid
+    if (polyA->isA && isRevAnno(annoArray[polyA->rightIdx]))
         return numAnno;
-    // polyT at left, but left-most TE is forward
-    if (!polyA->isA && !annoArray[polyA->leftIdx].strand)
+    // If left-most TE is forward, polyT is invalid
+    if (!polyA->isA && !isRevAnno(annoArray[polyA->leftIdx]))
         return numAnno;
 
     int thisLen = 0, maxLen = 0;
@@ -277,13 +277,13 @@ void annoTsd(Cluster *clt, Anno *annoArray, int numAnno)
         uint32_t *cigarArray = bam_get_cigar(bam);
         
         if (isLeftFlank(bam)) {
-            if (bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP && bam_cigar_oplen(cigarArray[0]) > 90)
+            if(isClipInFlank(cigarArray[0], 90))
                 continue;
             if (bam_cigar_op(cigarArray[numCigar-1]) == BAM_CSOFT_CLIP)
                 leftDelta = bam_cigar_oplen(cigarArray[numCigar-1]);
             leftEnd = bam_endpos(bam);
         } else {
-            if (bam_cigar_op(cigarArray[numCigar-1]) == BAM_CSOFT_CLIP && bam_cigar_oplen(cigarArray[numCigar-1]) > 90)
+            if(isClipInFlank(cigarArray[numCigar-1], 90))
                 continue;
             if (bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP)
                 rightDelta = bam_cigar_oplen(cigarArray[0]);
@@ -342,6 +342,7 @@ void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArra
     checkPolyA(annoArray, numAnno, clt);
     checkEnd(annoArray, numAnno, clt);
     checkTEClass(annoArray, numAnno, clt, classArray);
+    checkFlankPolyA(annoArray, numAnno, clt);
 
     if (isRightFlankMapped(clt->flag))
         adjustAnno(annoArray, numAnno, 50);
@@ -432,6 +433,87 @@ void checkTEClass(Anno *annoArray, int numAnno, Cluster *clt, uint32_t *classArr
     clt->flag |= classArray[teTid];
 }
 
+/// @brief Check whether left-/right- assm-flank-seq contains valid polyT/A
+void checkFlankPolyA(Anno *annoArray, int numAnno, Cluster *clt)
+{
+    if (hasPolyA(clt->flag))
+        return;
+
+    char assmFn[100] = {'\0'};
+    sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
+    faidx_t *assmFa = fai_load((const char *)assmFn);
+    hts_pos_t leftLen = 0, rightLen = 0;
+    char *leftSeq = NULL, *rightSeq = NULL;
+
+    if (isLeftFlankMapped(clt->flag) || isBothFlankMapped(clt->flag))
+        leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), (clt->leftMost - 20), (clt->leftMost - 1), &leftLen);
+    
+    if (isRightFlankMapped(clt->flag) || isBothFlankMapped(clt->flag))
+        rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), clt->rightMost, (clt->rightMost + 19), &rightLen);
+
+    int existPolyT = searchFlankPolyA(leftSeq, 0, leftLen);
+    int existPolyA = searchFlankPolyA(rightSeq, 1, rightLen);
+    int leftIdx = (annoArray[0].tid == -2) ? 1 : 0;
+    int rightIdx = (annoArray[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
+
+    if (existPolyT && isRevAnno(annoArray[leftIdx]) && is3PFull(annoArray[leftIdx].flag))
+        clt->flag |= CLT_AT_RICH;
+    if (existPolyA && !isRevAnno(annoArray[rightIdx]) && is3PFull(annoArray[rightIdx].flag))
+        clt->flag |= CLT_AT_RICH;
+
+    if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
+    if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
+    if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
+}
+
+/// @brief Search polyT/polyA in left-/right- assm-flank-seq sequence
+int searchFlankPolyA(char *flankSeq, int isA, int seqLen)
+{
+    if (seqLen < 20)
+        return 0;
+
+    int thisLen = 0, maxLen = 0;
+    int thisSum = 0, maxSum = 0;
+    int thisNum = 0, maxNum = 0;
+    int numOther = 0, stop = 0;
+
+    uint8_t targetChar = isA ? 65 : 84;
+    int start = isA ? 0 : seqLen-1;
+    int end = isA ? seqLen : -1;
+    int step = isA ? 1 : -1;
+
+    for (int i = start; i != end; i += step)
+    {
+        thisLen++;
+        // Is a/A OR t/T
+        if (((flankSeq[i] | 0x20) & 0x5f) == targetChar) {
+            thisSum++;
+            thisNum++;
+        } else {
+            thisSum--;
+            numOther++;
+        }
+        if (thisSum > maxSum) {
+            maxLen = thisLen;
+            maxSum = thisSum;
+            maxNum = thisNum;
+            stop = i;
+        }
+        if (thisSum < 0 || numOther > 2)
+            thisSum = thisNum = thisLen = numOther = 0;
+    }
+    int distToEnd = isA ? stop : (seqLen - stop - maxLen);
+
+    if (distToEnd  > 5)
+        return 0;
+    if (maxLen < 10)
+        return 0;
+    if (((float)maxNum / maxLen) < 0.8)
+        return 0;
+
+    return 1;
+}
+
 
 /**********************
  *** Annotation I/O ***
@@ -476,7 +558,7 @@ void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
 /// @brief Change single annotation record into specified format
 void formatSingleAnno(Anno anno, char *queryTmp, char *refTmp, faidx_t *teFa, int *teTable, int *strandFlag)
 {
-    char strand = (anno.strand == 0) ? '+' : '-';
+    char strand = isRevAnno(anno) ? '-' : '+';
     sprintf(queryTmp, "%c:%d-%d,", strand, anno.queryStart, anno.queryEnd);
 
     if (anno.tid == -1)
@@ -487,7 +569,7 @@ void formatSingleAnno(Anno anno, char *queryTmp, char *refTmp, faidx_t *teFa, in
     {
         sprintf(refTmp, "%s:%d-%d,", faidx_iseq(teFa, anno.tid), anno.refStart, anno.refEnd);
         teTable[anno.tid] = 1;
-        *strandFlag += (anno.strand == 0) ? 1 : -1;
+        *strandFlag += isRevAnno(anno) ? -1 : 1;
     }
 }
 
