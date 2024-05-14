@@ -13,7 +13,7 @@
 /******************************
  *** Cluster related macros ***
  ******************************/
-#define CLT_IN_BLACKLIST        1
+#define CLT_PASS                1
 #define CLT_ASSEMBLED           2
 #define CLT_LEFT_FLANK_MAP      4
 #define CLT_RIGHT_FLANK_MAP     8
@@ -27,24 +27,36 @@
 #define CLT_5P_UNKNOWN          2048
 #define CLT_3P_UNKNOWN          4096
 #define CLT_SINGLE_TE           8192
-#define CLT_LARGE_GAP           16384
-#define CLT_SELF_TO_SELF        32768
-#define CLT_DNA                 65536
-#define CLT_LTR                 131072
-#define CLT_LINE                262144
-#define CLT_SINE                524288
-#define CLT_RETROPOSON          1048576
-#define CLT_AT_RICH             2097152
+#define CLT_SELF_TO_SELF        16384
+#define CLT_LINE                32768
+#define CLT_SINE                65536
+#define CLT_RETROPOSON          131072
+#define CLT_LTR                 262144
+#define CLT_DNA                 524288
+#define CLT_AT_RICH             1048576
+#define CLT_LEFT_NEAR_END       2097152
+#define CLT_RIGHT_NEAR_END      4194304
 
 #define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
 #define isFlankMapped(flag) (((flag) & 60) != 0)
 #define isBothFlankMapped(flag) (((flag) & 48) != 0)
 #define isLeftFlankMapped(flag) (((flag) & CLT_LEFT_FLANK_MAP) != 0)
 #define isRightFlankMapped(flag) (((flag) & CLT_RIGHT_FLANK_MAP) != 0)
-#define is5PFull(flag) (((flag) & CLT_5P_FULL) != 0)
-#define is3PFull(flag) (((flag) & CLT_3P_FULL) != 0)
-#define hasTSD(flag) (((flag) & CLT_TSD) != 0)
 #define hasPolyA(flag) (((flag) & CLT_POLYA) != 0)
+#define hasTSD(flag) (((flag) & CLT_TSD) != 0)
+#define hasFull5P(flag) (((flag) & CLT_5P_FULL) != 0)
+#define hasFull3P(flag) (((flag) & CLT_3P_FULL) != 0)
+#define hasUnknown5P(flag) (((flag) & CLT_5P_UNKNOWN) != 0)
+#define hasUnknown3P(flag) (((flag) & CLT_3P_UNKNOWN) != 0)
+#define hasSingleTE(flag) (((flag) & CLT_SINGLE_TE) != 0)
+#define isSelfToSelf(flag) (((flag) & CLT_SELF_TO_SELF) != 0)
+#define isLINE(flag) (((flag) & CLT_LINE) != 0)
+#define isSINE(flag) (((flag) & CLT_SINE) != 0)
+#define isRETROPOSON(flag) (((flag) & CLT_RETROPOSON) != 0)
+#define isLTR(flag) (((flag) & CLT_LTR) != 0)
+#define isDNA(flag) (((flag) & CLT_DNA) != 0)
+#define isATRich(flag) (((flag) & CLT_AT_RICH) != 0)
+#define isRightNearEnd(flag) (((flag) & CLT_RIGHT_NEAR_END) != 0)
 
 
 /******************
@@ -53,11 +65,11 @@
 
 /*! @brief Data container for cluster merged from segments.
  @field  tid                target id of corresponding chromosome
- @field  idx                cluster index in clusters array (0-based)
- @field  refStart           cluster start on reference genome (0-based, included)
- @field  refEnd             cluster end on reference genome (0-based, not-included)
- @field  startIdx           start index in segments array (0-based, include)
- @field  endIdx             end index in segments array (0-based, not-include)
+ @field  idx                cluster index in cluster array (0-based)
+ @field  refStart           cluster start on reference genome (0-based)
+ @field  refEnd             cluster end on reference genome (0-based)
+ @field  startIdx           start index in segment array (0-based, include)
+ @field  endIdx             end index in segment array (0-based, not-include)
  @field  numSeg             number of segments in the cluster (normalized by bg depth)
  @field  cltType            cluster type
                                 0: germline (multiple support reads)
@@ -92,6 +104,12 @@
  @field  numLeft            number of left-clipped segments in the cluster (no normalization)
  @field  numMiddle          number of mid-inserted segments in the cluster (no normalization)
  @field  numRight           number of right-clipped segments in the cluster (no normalization)
+ @field  tid1               tid of the assembled contig which left-genome-flank-seq maps to
+ @field  leftMost           left most position of the insertion seq on the assembled contig (map end of left-genome-flank-seq, included)
+ @field  tid2               tid of the assembled contig which right-genome-flank-seq maps to
+ @field  rightMost          right most position of the insertion seq on the assembled contig (map start of right-genome-flank-seq, not included)
+ @field  insLen             length of insertion sequence
+ @field  repTid             repeat tid, TE tid of the repeat which the cluster overlaps with
  */
 typedef struct Cluster
 {

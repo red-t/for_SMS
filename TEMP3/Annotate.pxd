@@ -34,4 +34,10 @@ cdef extern from "src/anno_utils.h" nogil:
     ######################
     void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
 
+cdef extern from "src/post_filter.h":
+    ###################
+    ### Cluster I/O ###
+    ###################
+    void postFilter(Cluster *clt)
+
 cpdef annotateCluster(Cluster[::1] cltView, int startIdx, int taskSize, object cmdArgs)

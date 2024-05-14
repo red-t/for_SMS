@@ -254,8 +254,6 @@ void intersectBlackList(Cluster *clt, Args args)
 {
     int numOverlap = 0, minDistanceToOverlap = 0x7fffffff;
     ailistQueryInterval(args.blackAiList, clt->refStart, clt->refEnd, 2, &numOverlap, &minDistanceToOverlap);
-    if (numOverlap > 0) {
+    if (numOverlap > 0)
         clt->isInBlacklist = 1;
-        clt->flag |= CLT_IN_BLACKLIST;
-    }
 }

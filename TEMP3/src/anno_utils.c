@@ -359,18 +359,13 @@ int compare(const void *a, const void *b)
         return pa->queryEnd - pb->queryEnd;
 }
 
-/// @brief Check whether the ins-seq contains large gap
+/// @brief Check whether left-/right-most annotation is close to insSeq end
 void checkGap(Anno *annoArray, int numAnno, Cluster *clt)
 {
-    int thisGap = 0, maxGap = annoArray[0].queryStart;
-    for (int i = 1; i < numAnno; i++)
-    {
-        thisGap = annoArray[i].queryStart - annoArray[i-1].queryEnd;
-        maxGap = (thisGap > maxGap) ? thisGap : maxGap;
-    }
-    thisGap = clt->insLen - annoArray[numAnno - 1].queryEnd;
-    maxGap = (thisGap > maxGap) ? thisGap : maxGap;
-    clt->flag |= (maxGap >= 1500) ? CLT_LARGE_GAP : 0;
+    if (annoArray[0].queryStart < 100)
+        clt->flag |= CLT_LEFT_NEAR_END;
+    if ((clt->insLen - annoArray[numAnno-1].queryEnd) < 100)
+        clt->flag |= CLT_RIGHT_NEAR_END;
 }
 
 /// @brief Check whether the ins-seq contains valid polyA
@@ -380,13 +375,13 @@ void checkPolyA(Anno *annoArray, int numAnno, Cluster *clt)
         return;
 
     int hasPolyT = (annoArray[0].tid == -2) ? 1 : 0;
-    if (hasPolyT && is3PFull(annoArray[1].flag)) {
+    if (hasPolyT && hasFull3P(annoArray[1].flag)) {
         int gap1 = annoArray[1].queryStart - annoArray[0].queryEnd;
         int gap2 = annoArray[0].queryStart;
         clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
     }
     int hasPolyA = (annoArray[numAnno-1].tid == -1) ? 1 : 0;
-    if (hasPolyA && is3PFull(annoArray[numAnno-2].flag)) {
+    if (hasPolyA && hasFull3P(annoArray[numAnno-2].flag)) {
         int gap1 = annoArray[numAnno-1].queryStart - annoArray[numAnno-2].queryEnd;
         int gap2 = clt->insLen - annoArray[numAnno-1].queryEnd;
         clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
@@ -399,14 +394,14 @@ void checkEnd(Anno *annoArray, int numAnno, Cluster *clt)
     int leftIdx = (annoArray[0].tid == -2) ? 1 : 0;
     int rightIdx = (annoArray[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
 
-    if (!isRevAnno(annoArray[leftIdx]) && is5PFull(annoArray[leftIdx].flag))
+    if (!isRevAnno(annoArray[leftIdx]) && hasFull5P(annoArray[leftIdx].flag))
         clt->flag |= CLT_5P_FULL;
-    if (isRevAnno(annoArray[rightIdx]) && is5PFull(annoArray[rightIdx].flag))
+    if (isRevAnno(annoArray[rightIdx]) && hasFull5P(annoArray[rightIdx].flag))
         clt->flag |= CLT_5P_FULL;
 
-    if (isRevAnno(annoArray[leftIdx]) && is3PFull(annoArray[leftIdx].flag))
+    if (isRevAnno(annoArray[leftIdx]) && hasFull3P(annoArray[leftIdx].flag))
         clt->flag |= CLT_3P_FULL;
-    if (!isRevAnno(annoArray[rightIdx]) && is3PFull(annoArray[rightIdx].flag))
+    if (!isRevAnno(annoArray[rightIdx]) && hasFull3P(annoArray[rightIdx].flag))
         clt->flag |= CLT_3P_FULL;
 
     if ((clt->flag & CLT_5P_FULL) == 0) {
@@ -456,9 +451,9 @@ void checkFlankPolyA(Anno *annoArray, int numAnno, Cluster *clt)
     int leftIdx = (annoArray[0].tid == -2) ? 1 : 0;
     int rightIdx = (annoArray[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
 
-    if (existPolyT && isRevAnno(annoArray[leftIdx]) && is3PFull(annoArray[leftIdx].flag))
+    if (existPolyT && isRevAnno(annoArray[leftIdx]) && hasFull3P(annoArray[leftIdx].flag))
         clt->flag |= CLT_AT_RICH;
-    if (existPolyA && !isRevAnno(annoArray[rightIdx]) && is3PFull(annoArray[rightIdx].flag))
+    if (existPolyA && !isRevAnno(annoArray[rightIdx]) && hasFull3P(annoArray[rightIdx].flag))
         clt->flag |= CLT_AT_RICH;
 
     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}

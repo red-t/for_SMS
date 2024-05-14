@@ -123,6 +123,7 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
     cdef str bamFn, assmFn
 
     for i in range(startIdx, endIdx):
+        # 1. Check if cluster has assembled insSeq
         assmFn = "tmp_assm/{}_{}.ctg.lay.gz".format(cltView[i].tid, cltView[i].idx)
         if os.path.isfile(assmFn) != 0:
                 cltView[i].flag |= CLT_ASSEMBLED
@@ -137,13 +138,21 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
             annoView = annoArray
             maxNum -= 100
 
+        # 2. Annotate TE fragment, polyA/T for insSeq
         numTmp = fillAnnoArray(&cltView[i], &annoView[numAnno], i)
+
+        # 3. Annotate TSD
         mapTsdToLocal(cltView[i].tid, cltView[i].idx)
         bamFn = "tmp_anno/{}_{}_TsdToLocal.bam".format(cltView[i].tid, cltView[i].idx)
         if os.path.isfile(bamFn) == True:
             annoTsd(&cltView[i], &annoView[numAnno], numTmp)
 
+        # 4. Define insSeq structure
         setInsStruc(&cltView[i], &annoView[numAnno], numTmp, &classView[0])
+
+        # 5. Perform post-filtering
+        postFilter(&cltView[i])
+        
         numAnno += numTmp
     
     annoArray.resize((numAnno,), refcheck=False)
@@ -175,10 +184,14 @@ cpdef annotateCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
     if endIdx > cltView.shape[0]:
         endIdx = cltView.shape[0]
     
+    # 1. Define insertion seq from assembled contig(s)
     annotateAssm(cltView, startIdx, endIdx, cmdArgs)
+
+    # 2. Annotate TE-fragment, PolyA/T, TSD and structure for insSeq
+    #    Also perform post-filtering
     cdef object annoArray = annotateIns(cltView, startIdx, endIdx, cmdArgs)
     
-    # Output formated cluster and annotation records
+    # 3. Output formated cluster and annotation records
     cdef Anno[::1] annoView = annoArray
     cdef bytes teFn = cmdArgs.teFn.encode()
     cdef bytes refFn = cmdArgs.refFn.encode()
