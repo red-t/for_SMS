@@ -29,9 +29,9 @@ typedef struct PolyA
     int idx;
     int cltTid;
     int cltIdx;
-    int leftMost;
+    int leftAnnoStart;
     int leftIdx;
-    int rightMost;
+    int rightAnnoEnd;
     int rightIdx;
     int isA;
     int seqLen;

@@ -9,8 +9,8 @@
 PolyA initPolyA(int idx)
 {
     PolyA polyA;
-    polyA.leftMost = INT_MAX;
-    polyA.rightMost = 0;
+    polyA.leftAnnoStart = INT_MAX;
+    polyA.rightAnnoEnd = 0;
     polyA.idx = idx;
     return polyA;
 }
@@ -80,12 +80,12 @@ int fillAnnoArray(Cluster *clt, Anno *annoArray, int idx)
             continue;
 
         initAnno(bam, header, clt, &annoArray[numAnno], idx);
-        if (annoArray[numAnno].queryStart < polyA.leftMost) {
-            polyA.leftMost = annoArray[numAnno].queryStart;
+        if (annoArray[numAnno].queryStart < polyA.leftAnnoStart) {
+            polyA.leftAnnoStart = annoArray[numAnno].queryStart;
             polyA.leftIdx = numAnno;
         }
-        if (annoArray[numAnno].queryEnd > polyA.rightMost) {
-            polyA.rightMost = annoArray[numAnno].queryEnd;
+        if (annoArray[numAnno].queryEnd > polyA.rightAnnoEnd) {
+            polyA.rightAnnoEnd = annoArray[numAnno].queryEnd;
             polyA.rightIdx = numAnno;
         }
         numAnno++;
@@ -118,16 +118,16 @@ int annoPolyA(Cluster *clt, Anno *annoArray, int numAnno, PolyA *polyA)
     char *flankSeq = NULL;
     hts_pos_t seqLen;
 
-    if (polyA->leftMost >= 5) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, 0, polyA->leftMost-1, &seqLen);
+    if (polyA->leftAnnoStart >= 5) {
+        flankSeq = faidx_fetch_seq64(insFa, insID, 0, polyA->leftAnnoStart-1, &seqLen);
         polyA->isA = 0;
         polyA->seqLen = seqLen;
         numAnno = setPolyA(flankSeq, annoArray, clt, numAnno, polyA);
     }
 
     clt->insLen = faidx_seq_len64(insFa, insID);
-    if ((clt->insLen - polyA->rightMost) >= 5) {
-        flankSeq = faidx_fetch_seq64(insFa, insID, polyA->rightMost, clt->insLen-1, &seqLen);
+    if ((clt->insLen - polyA->rightAnnoEnd) >= 5) {
+        flankSeq = faidx_fetch_seq64(insFa, insID, polyA->rightAnnoEnd, clt->insLen-1, &seqLen);
         polyA->isA = 1;
         polyA->seqLen = seqLen;
         numAnno = setPolyA(flankSeq, annoArray, clt, numAnno, polyA);
@@ -185,17 +185,17 @@ int setPolyA(char *flankSeq, Anno *annoArray, Cluster *clt, int numAnno, PolyA *
         return numAnno;
 
     if (polyA->isA) {
-        annoArray[numAnno].queryStart = stop + polyA->rightMost + 1 - maxLen;
-        annoArray[numAnno].queryEnd = stop + polyA->rightMost + 1;
+        annoArray[numAnno].queryStart = stop + polyA->rightAnnoEnd + 1 - maxLen;
+        annoArray[numAnno].queryEnd = stop + polyA->rightAnnoEnd + 1;
         annoArray[numAnno].strand = 0;
         annoArray[numAnno].tid = -1;
-        polyA->rightMost = annoArray[numAnno].queryEnd;
+        polyA->rightAnnoEnd = annoArray[numAnno].queryEnd;
     } else {
         annoArray[numAnno].queryStart = stop;
         annoArray[numAnno].queryEnd = stop + maxLen;
         annoArray[numAnno].strand = 1;
         annoArray[numAnno].tid = -2;
-        polyA->leftMost = annoArray[numAnno].queryStart;
+        polyA->leftAnnoStart = annoArray[numAnno].queryStart;
     }
     annoArray[numAnno].idx = polyA->idx;
     annoArray[numAnno].cltTid = clt->tid;
@@ -216,8 +216,8 @@ void outputTsdSeq(Cluster *clt, PolyA *polyA, Anno *annoArray, int numAnno)
     hts_pos_t seqLen;
 
     int leftStart = clt->leftMost - 100;
-    int leftEnd = clt->leftMost + polyA->leftMost;
-    int rightStart = clt->rightMost - (clt->insLen - polyA->rightMost);
+    int leftEnd = clt->leftMost + polyA->leftAnnoStart;
+    int rightStart = clt->rightMost - (clt->insLen - polyA->rightAnnoEnd);
     int rightEnd = clt->rightMost + 100;
     char *leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), leftStart, leftEnd-1, &seqLen);
     char *rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), rightStart, rightEnd-1, &seqLen);
@@ -225,7 +225,7 @@ void outputTsdSeq(Cluster *clt, PolyA *polyA, Anno *annoArray, int numAnno)
     if ((leftEnd > faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1))) || (rightStart < 0))
         goto END;
 
-    adjustAnno(annoArray, numAnno, -polyA->leftMost);
+    adjustAnno(annoArray, numAnno, -polyA->leftAnnoStart);
     clt->leftMost = leftEnd;
     clt->rightMost = rightStart;
     clt->insLen = clt->rightMost - clt->leftMost;
