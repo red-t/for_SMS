@@ -65,13 +65,13 @@ void annoTsd(Cluster *clt, Anno *annoArray, int numAnno);
 int setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart);
 
 /// @brief Set ins-seq structure based on annotations
-void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray);
+void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray, int *sizeArray);
 
 /// @brief Compare function for sorting annotations
 int compare(const void *a, const void *b);
 
 /// @brief Check whether the ins-seq contains large gap
-void checkGap(Anno * annoArray, int numAnno, Cluster * clt);
+void checkGap(Anno *annoArray, int numAnno, Cluster *clt, int *sizeArray);
 
 /// @brief Check whether the ins-seq contains valid polyA
 void checkPolyA(Anno *annoArray, int numAnno, Cluster *clt);

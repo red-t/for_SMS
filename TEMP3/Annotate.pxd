@@ -27,7 +27,7 @@ cdef extern from "src/anno_utils.h" nogil:
     ###################################
     int fillAnnoArray(Cluster *clt, Anno *annoArray, int idx)
     void annoTsd(Cluster *clt, Anno *annoArray, int numAnno)
-    void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray)
+    void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray, int *sizeArray)
 
     ######################
     ### Annotation I/O ###

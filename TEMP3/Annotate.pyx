@@ -114,12 +114,38 @@ cdef object getClassArray(object cmdArgs):
     return classArray
 
 
+cdef object getSizeArray(object cmdArgs):
+    cdef int numTE=0, maxNum=190
+    cdef object sizeArray = np.zeros(200, dtype=np.int32)
+    cdef int32_t[::1] sizeView = sizeArray
+    cdef indexFn = cmdArgs.teFn + ".fai"
+
+    for l in open(indexFn, "r"):
+        l = l.strip().split()
+        if len(l) < 1:
+            continue
+        
+        if numTE >= maxNum:
+            maxNum = sizeView.shape[0] + 200
+            sizeArray.resize((maxNum,), refcheck=False)
+            sizeView = sizeArray
+            maxNum -= 10
+        
+        sizeView[numTE] = int(l[1])
+        numTE += 1
+    
+    sizeArray.resize((numTE,), refcheck=False)
+    return sizeArray
+
+
 cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs):
     cdef int i, numTmp, numAnno=0, maxNum=2900
     cdef object annoArray = np.zeros(3000, dtype=AnnoDt)
     cdef object classArray = getClassArray(cmdArgs)
+    cdef object sizeArray = getSizeArray(cmdArgs)
     cdef Anno[::1] annoView = annoArray
     cdef uint32_t[::1] classView = classArray
+    cdef int[::1] sizeView = sizeArray
     cdef str bamFn, assmFn
 
     for i in range(startIdx, endIdx):
@@ -148,7 +174,7 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
             annoTsd(&cltView[i], &annoView[numAnno], numTmp)
 
         # 4. Define insSeq structure
-        setInsStruc(&cltView[i], &annoView[numAnno], numTmp, &classView[0])
+        setInsStruc(&cltView[i], &annoView[numAnno], numTmp, &classView[0], &sizeView[0])
 
         # 5. Perform post-filtering
         postFilter(&cltView[i])

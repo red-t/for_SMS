@@ -350,13 +350,13 @@ int setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart)
 }
 
 /// @brief Set ins-seq structure based on annotations
-void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray)
+void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray, int *sizeArray)
 {
     if (numAnno == 0)
         return;
 
     qsort(annoArray, numAnno, sizeof(Anno), compare);
-    checkGap(annoArray, numAnno, clt);
+    checkGap(annoArray, numAnno, clt, sizeArray);
     checkPolyA(annoArray, numAnno, clt);
     checkEnd(annoArray, numAnno, clt);
     checkTEClass(annoArray, numAnno, clt, classArray);
@@ -378,11 +378,17 @@ int compare(const void *a, const void *b)
 }
 
 /// @brief Check whether left-/right-most annotation is close to insSeq end
-void checkGap(Anno *annoArray, int numAnno, Cluster *clt)
+void checkGap(Anno *annoArray, int numAnno, Cluster *clt, int *sizeArray)
 {
-    if (annoArray[0].queryStart < 100)
+    int leftIdx = (annoArray[0].tid == -2) ? 1 : 0;
+    int rightIdx = (annoArray[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
+
+    int leftCutOff = (int)MAX(sizeArray[annoArray[leftIdx].tid], 100);
+    if (annoArray[0].queryStart < leftCutOff)
         clt->flag |= CLT_LEFT_NEAR_END;
-    if ((clt->insLen - annoArray[numAnno-1].queryEnd) < 100)
+
+    int rightCutOff = (int)MAX(sizeArray[annoArray[rightIdx].tid], 100);
+    if ((clt->insLen - annoArray[numAnno-1].queryEnd) < rightCutOff)
         clt->flag |= CLT_RIGHT_NEAR_END;
 }
 
