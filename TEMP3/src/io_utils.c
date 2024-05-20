@@ -180,22 +180,34 @@ void setInsRegion(Cluster *clt, InsRegion *region)
     sam_hdr_t *header = sam_hdr_read(inputBam);
     bam1_t *bam = bam_init1();
 
+    int minRightClip = INT_MAX;
+    int minLeftClip = INT_MAX;
+    int clipSize = 0;
     while (1)
     {
         int retValue = bam_read1(inputBam->fp.bgzf, bam);
         if (retValue < 0)
             break;
-        if (bamIsInvalid(bam) || bamIsSup(bam) || bam_is_rev(bam))
+        if (bamIsInvalid(bam) || bam_is_rev(bam))
             continue;
 
         int numCigar = bam->core.n_cigar;
         uint32_t *cigarArray = bam_get_cigar(bam);
 
         if (isLeftFlank(bam)) {
+            clipSize = isClipInFlank(cigarArray[numCigar - 1], 0) ? bam_cigar_oplen(cigarArray[numCigar - 1]) : 0;
+            if (clipSize > minRightClip)
+                continue;
+            minRightClip = clipSize;
             region->leftMost = bam_endpos(bam);
             region->tid1 = bam->core.tid;
             region->cigar1 = cigarArray[0];
         } else {
+            clipSize = isClipInFlank(cigarArray[0], 0) ? bam_cigar_oplen(cigarArray[0]) : 0;
+            if (clipSize > minLeftClip)
+                continue;
+            minLeftClip = clipSize;
+            bam_cigar_oplen(cigarArray[0]);
             region->rightMost = bam->core.pos;
             region->tid2 = bam->core.tid;
             region->cigar2 = cigarArray[numCigar - 1];
