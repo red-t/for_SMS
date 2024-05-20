@@ -225,17 +225,17 @@ void outputTsdSeq(Cluster *clt, PolyA *polyA, Anno *annoArray, int numAnno)
     if ((leftEnd > faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1))) || (rightStart < 0))
         goto END;
 
+    char outFn[100] = {'\0'};
+    sprintf(outFn, "tmp_anno/%d_%d_tsd.fa", clt->tid, clt->idx);
+    FILE *fp = fopen(outFn, "w");
+    fprintf(fp, ">0_%i\n%s\n", polyA->leftAnnoStart, leftSeq);
+    fprintf(fp, ">1_%i\n%s\n", (clt->insLen - polyA->rightAnnoEnd), rightSeq);
+    fclose(fp);
+
     adjustAnno(annoArray, numAnno, -polyA->leftAnnoStart);
     clt->leftMost = leftEnd;
     clt->rightMost = rightStart;
     clt->insLen = clt->rightMost - clt->leftMost;
-
-    char outFn[100] = {'\0'};
-    sprintf(outFn, "tmp_anno/%d_%d_tsd.fa", clt->tid, clt->idx);
-    FILE *fp = fopen(outFn, "w");
-    fprintf(fp, ">0\n%s\n", leftSeq);
-    fprintf(fp, ">1\n%s\n", rightSeq);
-    fclose(fp);
     goto END;
 
     END:
@@ -265,33 +265,51 @@ void annoTsd(Cluster *clt, Anno *annoArray, int numAnno)
 
     int leftEnd = -1, rightStart = -1;
     int leftDelta = 0, rightDelta = 0;
+    int orgLeftDelta = 0, orgRightDelta = 0;
+    int mid = (clt->refStart + clt->refEnd) / 2;
+    int localStart = atoi(sam_hdr_tid2name(header, 0));
+
     while (1)
     {
         int retValue = bam_read1(inputBam->fp.bgzf, bam);
         if (retValue < 0)
             break;
+
+        int readId, delta;
+        sscanf((char *)bam->data, "%d_%d", &readId, &delta);
+        if (readId == 0)
+            orgLeftDelta = delta;
+        else
+            orgRightDelta = delta;
+
         if (bamIsInvalid(bam) || bam_is_rev(bam))
             continue;
         
         int numCigar = bam->core.n_cigar;
         uint32_t *cigarArray = bam_get_cigar(bam);
         
-        if (isLeftFlank(bam)) {
-            if(isClipInFlank(cigarArray[0], 90))
+        if (readId == 0) {
+            if (abs(localStart + bam_endpos(bam) - mid) > 50)
                 continue;
-            if (bam_cigar_op(cigarArray[numCigar-1]) == BAM_CSOFT_CLIP)
+            if (isClipInFlank(cigarArray[0], 20))
+                continue;
+            if (isClipInFlank(cigarArray[numCigar-1], 0))
                 leftDelta = bam_cigar_oplen(cigarArray[numCigar-1]);
             leftEnd = bam_endpos(bam);
         } else {
-            if(isClipInFlank(cigarArray[numCigar-1], 90))
+            if (abs(localStart + bam->core.pos - mid) > 50)
                 continue;
-            if (bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP)
+            if (isClipInFlank(cigarArray[numCigar-1], 20))
+                continue;
+            if (isClipInFlank(cigarArray[0], 0))
                 rightDelta = bam_cigar_oplen(cigarArray[0]);
             rightStart = bam->core.pos;
         }
     }
 
-    setTsd(clt, atoi(sam_hdr_tid2name(header, 0)), leftEnd, rightStart);
+    int retValue = setTsd(clt, localStart, leftEnd, rightStart);
+    leftDelta = (retValue == 1 || retValue == 3) ? leftDelta : orgLeftDelta;
+    rightDelta = (retValue == 2 || retValue == 3) ? rightDelta : orgRightDelta;
     adjustAnno(annoArray, numAnno, leftDelta);
     clt->leftMost -= leftDelta;
     clt->rightMost += rightDelta;
@@ -303,17 +321,18 @@ void annoTsd(Cluster *clt, Anno *annoArray, int numAnno)
 }
 
 /// @brief Find TSD and refine breakpoint
-void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart)
+int setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart)
 {
     if (leftEnd < 0 && rightStart < 0)
-        return;
+        return 0;
 
-    int tmpStart, tmpEnd;
+    int tmpStart, tmpEnd, retValue;
     uint32_t hasTsd = 0;
     if (leftEnd < 0 || rightStart < 0) {
         tmpEnd = localStart;
         tmpEnd += (leftEnd < 0) ? rightStart : leftEnd;
         tmpStart = tmpEnd - 1;
+        retValue = (leftEnd < 0) ? 2 : 1;
     }
 
     if (rightStart >= 0 && leftEnd >= 0) {
@@ -321,14 +340,13 @@ void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart)
         tmpStart += (rightStart < leftEnd) ? rightStart : leftEnd;
         tmpEnd += (rightStart < leftEnd) ? leftEnd : rightStart;
         hasTsd = ((rightStart < leftEnd) && ((leftEnd - rightStart) < 50)) ? CLT_TSD : 0;
+        retValue = 3;
     }
-
-    if (MIN(abs(tmpStart - clt->refStart), abs(tmpEnd - clt->refEnd)) > 50)
-        return;
 
     clt->flag |= hasTsd;
     clt->refStart = tmpStart;
     clt->refEnd = tmpEnd;
+    return retValue;
 }
 
 /// @brief Set ins-seq structure based on annotations

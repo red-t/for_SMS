@@ -62,7 +62,7 @@ void adjustAnno(Anno *annoArray, int numAnno, int leftDelta);
 void annoTsd(Cluster *clt, Anno *annoArray, int numAnno);
 
 /// @brief Find TSD and refine breakpoint
-void setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart);
+int setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart);
 
 /// @brief Set ins-seq structure based on annotations
 void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray);
