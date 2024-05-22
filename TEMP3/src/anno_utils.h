@@ -65,7 +65,7 @@ void annoTsd(Cluster *clt, Anno *annoArray, int numAnno);
 int setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart);
 
 /// @brief Set ins-seq structure based on annotations
-void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray, int *sizeArray);
+void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray, int *sizeArray, int *ltrArray);
 
 /// @brief Compare function for sorting annotations
 int compare(const void *a, const void *b);
@@ -88,6 +88,8 @@ void checkFlankPolyA(Anno *annoArray, int numAnno, Cluster *clt);
 /// @brief Search polyT/polyA in left-/right- assm-flank-seq sequence
 int searchFlankPolyA(char *flankSeq, int isA, int seqLen);
 
+/// @brief Check whether the insertion is SOLO LTR
+void checkSoloLtr(Anno *annoArr, int numAnno, Cluster *clt, int *sizeArr, int *ltrArr);
 
 
 /**********************

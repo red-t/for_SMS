@@ -101,11 +101,16 @@ cpdef object runInParallel(object cmdArgs):
     print("bg Divergence: {}\nbg coverage: {}\nbg readlen: {}" \
           "".format(bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
     
-    # 2. Build TE reference
+    # 2. Define LTR size
+    cdef bytes teFn = cmdArgs.teFn.encode()
+    cdef bytes classFn = cmdArgs.classFn.encode()
+    defineLTR(teFn, classFn)
+    
+    # 3. Build TE reference
     buildTERef(cmdArgs)
 
     with ProcessPoolExecutor(max_workers=cmdArgs.numProcess) as executor:
-        # 3. Build Cluster
+        # 4. Build Cluster
         subProcTup = set([executor.submit(buildCluster, \
                                           bgInfo["bgDiv"], \
                                           bgInfo["bgDepth"], \
@@ -115,7 +120,7 @@ cpdef object runInParallel(object cmdArgs):
             tidToCltData = subProc.result()
             allCltData = {**allCltData, **tidToCltData}
         
-        # 4. Local Assembly
+        # 5. Local Assembly
         highQualArray = getHighQualClts(allCltData)
         taskSize, startList = divideTask(highQualArray.shape[0], cmdArgs.numProcess)
         subProcTup = set([executor.submit(assembleCluster, \
@@ -127,7 +132,7 @@ cpdef object runInParallel(object cmdArgs):
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
         
-        # 5. Output sequence for clusters without assembly
+        # 6. Output sequence for clusters without assembly
         subProcTup = set([executor.submit(outputSomaCltSeqs, \
                                           allCltData[tid][0], \
                                           allCltData[tid][1], \
@@ -135,7 +140,7 @@ cpdef object runInParallel(object cmdArgs):
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
         
-        # 6. Output reference flank sequence for high-qual clusters
+        # 7. Output reference flank sequence for high-qual clusters
         subProcTup = set([executor.submit(outputRefFlank, \
                                           highQualArray, \
                                           startIdx, \
@@ -144,7 +149,7 @@ cpdef object runInParallel(object cmdArgs):
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
         
-        # 7. Annotate clusters
+        # 8. Annotate clusters
         subProcTup = set([executor.submit(annotateCluster, \
                                           highQualArray, \
                                           startIdx, \
@@ -153,7 +158,7 @@ cpdef object runInParallel(object cmdArgs):
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
         
-        # 8. Merge Output
+        # 9. Merge Output
         mergeOutput()
     
     return allCltData

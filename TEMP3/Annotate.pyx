@@ -138,14 +138,39 @@ cdef object getSizeArray(object cmdArgs):
     return sizeArray
 
 
+cdef object getLtrArray():
+    cdef int numTE = 0, maxNum = 190
+    cdef object ltrArray = np.zeros(200, dtype=np.int32)
+    cdef int32_t[::1] ltrView = ltrArray
+
+    for l in open("tmp_anno/ltrSize.txt", "r"):
+        l = l.strip().split()
+        if len(l) < 1:
+            continue
+        
+        if numTE >= maxNum:
+            maxNum = ltrView.shape[0] + 200
+            ltrArray.resize((maxNum,), refcheck=False)
+            ltrView = ltrArray
+            maxNum -= 10
+        
+        ltrView[numTE] = int(l[0])
+        numTE += 1
+    
+    ltrArray.resize((numTE,), refcheck=False)
+    return ltrArray
+
+
 cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs):
     cdef int i, numTmp, numAnno=0, maxNum=2900
     cdef object annoArray = np.zeros(3000, dtype=AnnoDt)
     cdef object classArray = getClassArray(cmdArgs)
     cdef object sizeArray = getSizeArray(cmdArgs)
+    cdef object ltrArray = getLtrArray()
     cdef Anno[::1] annoView = annoArray
     cdef uint32_t[::1] classView = classArray
     cdef int[::1] sizeView = sizeArray
+    cdef int[::1] ltrView = ltrArray
     cdef str bamFn, assmFn
 
     for i in range(startIdx, endIdx):
@@ -174,7 +199,7 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
             annoTsd(&cltView[i], &annoView[numAnno], numTmp)
 
         # 4. Define insSeq structure
-        setInsStruc(&cltView[i], &annoView[numAnno], numTmp, &classView[0], &sizeView[0])
+        setInsStruc(&cltView[i], &annoView[numAnno], numTmp, &classView[0], &sizeView[0], &ltrView[0])
 
         # 5. Perform post-filtering
         postFilter(&cltView[i])

@@ -36,6 +36,7 @@
 #define CLT_AT_RICH             1048576
 #define CLT_LEFT_NEAR_END       2097152
 #define CLT_RIGHT_NEAR_END      4194304
+#define CLT_SOLO_LTR            8388608
 
 #define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
 #define isFlankMapped(flag) (((flag) & 60) != 0)
@@ -58,6 +59,7 @@
 #define isATRich(flag) (((flag) & CLT_AT_RICH) != 0)
 #define isRightNearEnd(flag) (((flag) & CLT_RIGHT_NEAR_END) != 0)
 #define isLeftNearEnd(flag) (((flag) & CLT_LEFT_NEAR_END) != 0)
+#define isSoloLtr(flag) (((flag) & CLT_SOLO_LTR) != 0)
 
 
 /******************

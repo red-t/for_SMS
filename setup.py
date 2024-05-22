@@ -20,7 +20,7 @@ ext = [
               libraries = ["hts"]),
     
     Extension(name = "TEMP3.ParallelModule",
-              sources = ["TEMP3/ParallelModule.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c", "TEMP3/src/io_utils.c", "TEMP3/src/anno_utils.c", "TEMP3/src/post_filter.c"],
+              sources = ["TEMP3/ParallelModule.pyx", "TEMP3/src/AIList.c", "TEMP3/src/seg_utils.c", "TEMP3/src/cluster_utils.c", "TEMP3/src/io_utils.c", "TEMP3/src/anno_utils.c", "TEMP3/src/post_filter.c", "TEMP3/src/ltr_utils.c"],
               libraries = ["hts"]),
     ]
 

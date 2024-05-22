@@ -350,7 +350,7 @@ int setTsd(Cluster *clt, int localStart, int leftEnd, int rightStart)
 }
 
 /// @brief Set ins-seq structure based on annotations
-void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray, int *sizeArray)
+void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray, int *sizeArray, int *ltrArray)
 {
     if (numAnno == 0)
         return;
@@ -361,6 +361,7 @@ void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArra
     checkEnd(annoArray, numAnno, clt);
     checkTEClass(annoArray, numAnno, clt, classArray);
     checkFlankPolyA(annoArray, numAnno, clt);
+    checkSoloLtr(annoArray, numAnno, clt, sizeArray, ltrArray);
 
     if (isRightFlankMapped(clt->flag))
         adjustAnno(annoArray, numAnno, 50);
@@ -533,6 +534,28 @@ int searchFlankPolyA(char *flankSeq, int isA, int seqLen)
     return 1;
 }
 
+/// @brief Check whether the insertion is SOLO LTR
+void checkSoloLtr(Anno *annoArr, int numAnno, Cluster *clt, int *sizeArr, int *ltrArr)
+{
+    if (!isLTR(clt->flag) || !hasSingleTE(clt->flag))
+        return;
+
+    int idx = (annoArr[0].tid == -2) ? 1 : 0;
+    Anno anno = annoArr[idx];
+    int ltrLen = ltrArr[anno.tid], teLen = sizeArr[anno.tid];
+
+    // failed to define LTR length
+    if (ltrLen == 0)
+        return;
+
+    // boundary close to left-LTR
+    if (anno.refStart <= 10 && abs(anno.refEnd - ltrLen) <= 10)
+        clt->flag |= CLT_SOLO_LTR;
+
+    // boundary close to right-LTR
+    if (abs(anno.refStart - (teLen - ltrLen)) <= 10 && abs(anno.refEnd - teLen) <= 10)
+        clt->flag |= CLT_SOLO_LTR;
+}
 
 /**********************
  *** Annotation I/O ***
