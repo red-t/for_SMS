@@ -250,6 +250,6 @@ cpdef annotateCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
     outputClt(&cltView[0], startIdx, endIdx, refFn, teFn)
 
     # Output cltArr and annoArr for post-anno-filtering
-    cdef object cltArr = np.asArr(cltView)
+    cdef object cltArr = np.asarray(cltView)
     annoArr.tofile('tmp_anno/{}_annoArr.dat'.format(startIdx))
     cltArr[startIdx:endIdx].tofile('tmp_anno/{}_cltArr.dat'.format(startIdx))

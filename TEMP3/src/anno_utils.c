@@ -549,11 +549,11 @@ void checkSoloLtr(Annotation *annoArr, int numAnno, Cluster *clt, int *sizeArr, 
         return;
 
     // boundary close to left-LTR
-    if (anno.refStart <= 10 && abs(anno.refEnd - ltrLen) <= 10)
+    if (anno.refStart <= 20 && abs(anno.refEnd - ltrLen) <= 20)
         clt->flag |= CLT_SOLO_LTR;
 
     // boundary close to right-LTR
-    if (abs(anno.refStart - (teLen - ltrLen)) <= 10 && abs(anno.refEnd - teLen) <= 10)
+    if (abs(anno.refStart - (teLen - ltrLen)) <= 20 && abs(anno.refEnd - teLen) <= 20)
         clt->flag |= CLT_SOLO_LTR;
 }
 

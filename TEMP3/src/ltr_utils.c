@@ -90,7 +90,7 @@ void outputSeq(int tid, faidx_t *teFa)
 void mapEachOther(int tid)
 {
     char cmd[200] = {'0'};
-    sprintf(cmd, "minimap2 -aY -x map-hifi tmp_anno/%d_left.fa tmp_anno/%d_right.fa | samtools view -bhS -o tmp_anno/%d_rightToLeft.bam - >/dev/null", tid, tid, tid);
+    sprintf(cmd, "minimap2 -aY -x map-ont tmp_anno/%d_left.fa tmp_anno/%d_right.fa | samtools view -bhS -o tmp_anno/%d_rightToLeft.bam - >/dev/null", tid, tid, tid);
     system(cmd);
 }
 
@@ -119,9 +119,7 @@ int getLtrLen(int tid)
         if (isClipInFlank(cigarArr[numCigar - 1], 10))
             continue;
 
-        ltrLen = bam_cigar_oplen(cigarArr[numCigar - 1]);
-        if (isClipInFlank(cigarArr[numCigar - 1], 0))
-            ltrLen += bam_cigar_oplen(cigarArr[numCigar - 2]);
+        ltrLen = bam_endpos(bam) - bam->core.pos;
     }
 
     if (ltrLen == 0)
