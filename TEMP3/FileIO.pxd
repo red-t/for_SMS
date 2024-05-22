@@ -183,13 +183,13 @@ cdef extern from "src/io_utils.h" nogil:
     int isLowQualClt(Cluster *clt)
     int isSomaClt(Cluster *clt)
 
-    int getOuputSegIdx(Cluster *clt, Segment *segArray, Args args)
+    int getOuputSegIdx(Cluster *clt, Segment *segArr, Args args)
     void setTrimRegion(Segment *segment, int *start, int *end, int flankSize)
 
     #########################
     ### Flank Sequence IO ###
     #########################
-    void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
+    void extractRefFlanks(char *refFn, Cluster *cltArr, int startIdx, int endIdx)
 
     #############################
     ### Insertion Sequence IO ###

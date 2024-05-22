@@ -5,17 +5,17 @@
  **********************/
 
 /// @brief Update cluster values by segments features and background info
-void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
+void updateCluster(Cluster *cltArr, Segment *segArr, Args args)
 {
-    Cluster *clt = &cltArray[0];
-    setTeAlignedFrac(clt, segArray, args);
+    Cluster *clt = &cltArr[0];
+    setTeAlignedFrac(clt, segArr, args);
     if (clt->numSeg <= 2)
-        setCltType(clt, segArray, args);
+        setCltType(clt, segArr, args);
         
     if (!isValidCandidate(clt))
         return;
 
-    updateBySegArray(clt, segArray, args);
+    updateBySegArr(clt, segArr, args);
     setCltLocationType(clt, args);
     divideByNumSeg(clt);
     divideByBgInfo(clt, args);
@@ -28,13 +28,13 @@ void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
  ************************/
 
 /// @brief Compute TE-aligned-fraction of a cluster
-void setTeAlignedFrac(Cluster *clt, Segment *segArray, Args args)
+void setTeAlignedFrac(Cluster *clt, Segment *segArr, Args args)
 {
     float numTeAlignedSeg = 0;
     for (int i = clt->startIdx; i < clt->endIdx; i++) {
-        if (segArray[i].overhang < args.minOverhang)
+        if (segArr[i].overhang < args.minOverhang)
             continue;
-        if (segArray[i].numTeAlignment > 0)
+        if (segArr[i].numTeAlignment > 0)
             numTeAlignedSeg += 1;
         clt->numSeg += 1;
     }
@@ -43,7 +43,7 @@ void setTeAlignedFrac(Cluster *clt, Segment *segArray, Args args)
 }
 
 /// @brief Set cluster's cltType, which represent the cluster is germ/soma
-void setCltType(Cluster *clt, Segment *segArray, Args args)
+void setCltType(Cluster *clt, Segment *segArr, Args args)
 {
     if (clt->numSeg == 1) {
         clt->cltType = 1;
@@ -52,7 +52,7 @@ void setCltType(Cluster *clt, Segment *segArray, Args args)
 
     int isFirst = 1;
     for (int i = clt->startIdx; i < clt->endIdx; i++) {
-        Segment *segment = &segArray[i];
+        Segment *segment = &segArr[i];
         if (overhangIsShort(segment, args.minOverhang))
             continue;
         if (isFirst) {
@@ -75,13 +75,13 @@ void setCltType(Cluster *clt, Segment *segArray, Args args)
  **********************************/
 
 /// @brief Update cluster values by all segments
-void updateBySegArray(Cluster *clt, Segment *segArray, Args args)
+void updateBySegArr(Cluster *clt, Segment *segArr, Args args)
 {
     int numLeft = 0, numMiddle = 0, numRight = 0;
 
     for (int i = clt->startIdx; i < clt->endIdx; i++)
     {
-        Segment *segment = &segArray[i];
+        Segment *segment = &segArr[i];
         if (overhangIsShort(segment, args.minOverhang))
             continue;
         countValuesFromSeg(clt, args, segment, &numLeft, &numMiddle, &numRight);

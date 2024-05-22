@@ -81,10 +81,10 @@ cdef mapInsToTE(int tid, int idx, object cmdArgs):
 ##########################
 ### Annotate Insertion ###
 ##########################
-cdef object getClassArray(object cmdArgs):
-    cdef int numTE=0, maxNum=190
-    cdef object classArray = np.zeros(200, dtype=np.uint32)
-    cdef uint32_t[::1] classView = classArray
+cdef object getClassArr(object cmdArgs):
+    cdef int numTE = 0, maxNum = 190
+    cdef object classArr = np.zeros(200, dtype=np.uint32)
+    cdef uint32_t[::1] classView = classArr
 
     for l in open(cmdArgs.classFn, "r"):
         l = l.strip().split()
@@ -93,8 +93,8 @@ cdef object getClassArray(object cmdArgs):
         
         if numTE >= maxNum:
             maxNum = classView.shape[0] + 200
-            classArray.resize((maxNum,), refcheck=False)
-            classView = classArray
+            classArr.resize((maxNum,), refcheck=False)
+            classView = classArr
             maxNum -= 10
         
         if l[1] == "DNA":
@@ -110,14 +110,14 @@ cdef object getClassArray(object cmdArgs):
         
         numTE += 1
     
-    classArray.resize((numTE,), refcheck=False)
-    return classArray
+    classArr.resize((numTE,), refcheck=False)
+    return classArr
 
 
-cdef object getSizeArray(object cmdArgs):
-    cdef int numTE=0, maxNum=190
-    cdef object sizeArray = np.zeros(200, dtype=np.int32)
-    cdef int32_t[::1] sizeView = sizeArray
+cdef object getSizeArr(object cmdArgs):
+    cdef int numTE = 0, maxNum = 190
+    cdef object sizeArr = np.zeros(200, dtype=np.int32)
+    cdef int32_t[::1] sizeView = sizeArr
     cdef indexFn = cmdArgs.teFn + ".fai"
 
     for l in open(indexFn, "r"):
@@ -127,21 +127,21 @@ cdef object getSizeArray(object cmdArgs):
         
         if numTE >= maxNum:
             maxNum = sizeView.shape[0] + 200
-            sizeArray.resize((maxNum,), refcheck=False)
-            sizeView = sizeArray
+            sizeArr.resize((maxNum,), refcheck=False)
+            sizeView = sizeArr
             maxNum -= 10
         
         sizeView[numTE] = int(l[1])
         numTE += 1
     
-    sizeArray.resize((numTE,), refcheck=False)
-    return sizeArray
+    sizeArr.resize((numTE,), refcheck=False)
+    return sizeArr
 
 
-cdef object getLtrArray():
+cdef object getLtrArr():
     cdef int numTE = 0, maxNum = 190
-    cdef object ltrArray = np.zeros(200, dtype=np.int32)
-    cdef int32_t[::1] ltrView = ltrArray
+    cdef object ltrArr = np.zeros(200, dtype=np.int32)
+    cdef int32_t[::1] ltrView = ltrArr
 
     for l in open("tmp_anno/ltrSize.txt", "r"):
         l = l.strip().split()
@@ -150,27 +150,27 @@ cdef object getLtrArray():
         
         if numTE >= maxNum:
             maxNum = ltrView.shape[0] + 200
-            ltrArray.resize((maxNum,), refcheck=False)
-            ltrView = ltrArray
+            ltrArr.resize((maxNum,), refcheck=False)
+            ltrView = ltrArr
             maxNum -= 10
         
         ltrView[numTE] = int(l[0])
         numTE += 1
     
-    ltrArray.resize((numTE,), refcheck=False)
-    return ltrArray
+    ltrArr.resize((numTE,), refcheck=False)
+    return ltrArr
 
 
 cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs):
-    cdef int i, numTmp, numAnno=0, maxNum=2900
-    cdef object annoArray = np.zeros(3000, dtype=AnnoDt)
-    cdef object classArray = getClassArray(cmdArgs)
-    cdef object sizeArray = getSizeArray(cmdArgs)
-    cdef object ltrArray = getLtrArray()
-    cdef Anno[::1] annoView = annoArray
-    cdef uint32_t[::1] classView = classArray
-    cdef int[::1] sizeView = sizeArray
-    cdef int[::1] ltrView = ltrArray
+    cdef int i, numTmp, numAnno = 0, maxNum = 2900
+    cdef object annoArr = np.zeros(3000, dtype=AnnoDt)
+    cdef object classArr = getClassArr(cmdArgs)
+    cdef object sizeArr = getSizeArr(cmdArgs)
+    cdef object ltrArr = getLtrArr()
+    cdef Annotation[::1] annoView = annoArr
+    cdef uint32_t[::1] classView = classArr
+    cdef int[::1] sizeView = sizeArr
+    cdef int[::1] ltrView = ltrArr
     cdef str bamFn, assmFn
 
     for i in range(startIdx, endIdx):
@@ -185,12 +185,12 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
 
         if numAnno >= maxNum:
             maxNum = annoView.shape[0] + 3000
-            annoArray.resize((maxNum,), refcheck=False)
-            annoView = annoArray
+            annoArr.resize((maxNum,), refcheck=False)
+            annoView = annoArr
             maxNum -= 100
 
         # 2. Annotate TE fragment, polyA/T for insSeq
-        numTmp = fillAnnoArray(&cltView[i], &annoView[numAnno], i)
+        numTmp = fillAnnoArr(&cltView[i], &annoView[numAnno], i)
 
         # 3. Annotate TSD
         mapTsdToLocal(cltView[i].tid, cltView[i].idx)
@@ -206,9 +206,9 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
         
         numAnno += numTmp
     
-    annoArray.resize((numAnno,), refcheck=False)
-    annoArray.sort(order=['idx', 'queryStart', 'queryEnd'])
-    return annoArray
+    annoArr.resize((numAnno,), refcheck=False)
+    annoArr.sort(order=['idx', 'queryStart', 'queryEnd'])
+    return annoArr
 
 
 cdef mapTsdToLocal(int tid, int idx):
@@ -240,16 +240,16 @@ cpdef annotateCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
 
     # 2. Annotate TE-fragment, PolyA/T, TSD and structure for insSeq
     #    Also perform post-filtering
-    cdef object annoArray = annotateIns(cltView, startIdx, endIdx, cmdArgs)
+    cdef object annoArr = annotateIns(cltView, startIdx, endIdx, cmdArgs)
     
     # 3. Output formated cluster and annotation records
-    cdef Anno[::1] annoView = annoArray
+    cdef Annotation[::1] annoView = annoArr
     cdef bytes teFn = cmdArgs.teFn.encode()
     cdef bytes refFn = cmdArgs.refFn.encode()
     outputAnno(&annoView[0], annoView.shape[0], startIdx, teFn)
     outputClt(&cltView[0], startIdx, endIdx, refFn, teFn)
 
-    # Output cltArray and annoArray for post-anno-filtering
-    cdef object cltArray = np.asarray(cltView)
-    annoArray.tofile('tmp_anno/{}_annoArray.dat'.format(startIdx))
-    cltArray[startIdx:endIdx].tofile('tmp_anno/{}_cltArray.dat'.format(startIdx))
+    # Output cltArr and annoArr for post-anno-filtering
+    cdef object cltArr = np.asArr(cltView)
+    annoArr.tofile('tmp_anno/{}_annoArr.dat'.format(startIdx))
+    cltArr[startIdx:endIdx].tofile('tmp_anno/{}_cltArr.dat'.format(startIdx))

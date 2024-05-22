@@ -13,7 +13,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 ###########################
 cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
     cdef BamFile genomeBam = BamFile(genomeBamFilePath, "rb", numThread)
-    cdef int i, tid=0, maxChromLen=0
+    cdef int i, tid = 0, maxChromLen = 0
 
     for i in range(genomeBam.header.n_targets):
         if maxChromLen < sam_hdr_tid2len(genomeBam.header, i):
@@ -22,10 +22,10 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
     
     cdef Iterator iterator = Iterator(genomeBam, tid)
     cdef int numAln = 0, maxNumAln = 499900
-    cdef object readLenArray = np.zeros(500000, dtype=np.int32)
-    cdef object divArray = np.zeros(500000, dtype=np.float32)
-    cdef float[::1] divView = divArray
-    cdef int[::1] readLenView = readLenArray
+    cdef object readLenArr = np.zeros(500000, dtype=np.int32)
+    cdef object divArr = np.zeros(500000, dtype=np.float32)
+    cdef float[::1] divView = divArr
+    cdef int[::1] readLenView = readLenArr
     cdef int retValue, alnLen
     cdef int64_t sumAlnLen = 0
     cdef float divergence
@@ -35,20 +35,20 @@ cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
         retValue = iterator.cnext1()
         if retValue < 0:
             bgInfo["numChrom"] = genomeBam.header.n_targets
-            bgInfo["bgDiv"] = np.mean(divArray[:numAln])
+            bgInfo["bgDiv"] = np.mean(divArr[:numAln])
             bgInfo["bgDepth"] = float(sumAlnLen) / maxChromLen
-            bgInfo["bgReadLen"] = np.median(readLenArray[:numAln])
+            bgInfo["bgReadLen"] = np.median(readLenArr[:numAln])
             genomeBam.close(); del iterator; del genomeBam; return bgInfo
 
         if bamIsInvalid(iterator.bamRcord):
             continue
 
         if numAln >= maxNumAln:
-            maxNumAln = divArray.shape[0] + 500000
-            divArray.resize((maxNumAln,), refcheck=False)
-            readLenArray.resize((maxNumAln,), refcheck=False)
-            divView = divArray
-            readLenView = readLenArray
+            maxNumAln = divArr.shape[0] + 500000
+            divArr.resize((maxNumAln,), refcheck=False)
+            readLenArr.resize((maxNumAln,), refcheck=False)
+            divView = divArr
+            readLenView = readLenArr
             maxNumAln -= 100
             
         getMapLenAndDiv(&alnLen, &divergence, iterator.bamRcord)
@@ -92,7 +92,7 @@ cdef tuple divideTask(int numTask, int poolSize):
 cpdef object runInParallel(object cmdArgs):
     cdef set subProcTup
     cdef dict allCltData = {}, tidToCltData, bgInfo
-    cdef object subProc, assembleArray, retValue
+    cdef object subProc, assembleArr, retValue
     cdef int startIdx, taskSize
     cdef list startList
 
@@ -121,10 +121,10 @@ cpdef object runInParallel(object cmdArgs):
             allCltData = {**allCltData, **tidToCltData}
         
         # 5. Local Assembly
-        highQualArray = getHighQualClts(allCltData)
-        taskSize, startList = divideTask(highQualArray.shape[0], cmdArgs.numProcess)
+        highQualArr = getHighQualClts(allCltData)
+        taskSize, startList = divideTask(highQualArr.shape[0], cmdArgs.numProcess)
         subProcTup = set([executor.submit(assembleCluster, \
-                                          highQualArray, \
+                                          highQualArr, \
                                           startIdx, \
                                           taskSize, \
                                           cmdArgs.minEdge, \
@@ -142,7 +142,7 @@ cpdef object runInParallel(object cmdArgs):
         
         # 7. Output reference flank sequence for high-qual clusters
         subProcTup = set([executor.submit(outputRefFlank, \
-                                          highQualArray, \
+                                          highQualArr, \
                                           startIdx, \
                                           taskSize, \
                                           cmdArgs) for startIdx in startList])
@@ -151,7 +151,7 @@ cpdef object runInParallel(object cmdArgs):
         
         # 8. Annotate clusters
         subProcTup = set([executor.submit(annotateCluster, \
-                                          highQualArray, \
+                                          highQualArr, \
                                           startIdx, \
                                           taskSize, \
                                           cmdArgs) for startIdx in startList])

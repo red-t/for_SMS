@@ -5,7 +5,7 @@
  ****************************/
 
 /// @brief select a segment to output as assembled contig
-int getOuputSegIdx(Cluster *clt, Segment *segArray, Args args)
+int getOuputSegIdx(Cluster *clt, Segment *segArr, Args args)
 {
     int clipIdx = -1;
     int insIdx = -1;
@@ -14,7 +14,7 @@ int getOuputSegIdx(Cluster *clt, Segment *segArray, Args args)
 
     for (int i = clt->startIdx; i < clt->endIdx; i++)
     {
-        Segment *segment = &segArray[i];
+        Segment *segment = &segArr[i];
         if (overhangIsShort(segment, args.minOverhang))
             continue;
 
@@ -69,14 +69,14 @@ FlankRegion initFlankRegion()
 }
 
 /// @brief output flank-seq and local-seq for all clusters
-void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx)
+void extractRefFlanks(char *refFn, Cluster *cltArr, int startIdx, int endIdx)
 {
     FlankRegion region = initFlankRegion();
     faidx_t *refFa = fai_load((const char *)refFn);
 
     for (int i = startIdx; i < endIdx; i++)
     {
-        Cluster *clt = &cltArray[i];
+        Cluster *clt = &cltArr[i];
         setFlankRegion(clt, &region);
         outputFlank(clt, refFa, region);
         outputLocal(clt, refFa, region);
@@ -192,25 +192,25 @@ void setInsRegion(Cluster *clt, InsRegion *region)
             continue;
 
         int numCigar = bam->core.n_cigar;
-        uint32_t *cigarArray = bam_get_cigar(bam);
+        uint32_t *cigarArr = bam_get_cigar(bam);
 
         if (isLeftFlank(bam)) {
-            clipSize = isClipInFlank(cigarArray[numCigar - 1], 0) ? bam_cigar_oplen(cigarArray[numCigar - 1]) : 0;
+            clipSize = isClipInFlank(cigarArr[numCigar - 1], 0) ? bam_cigar_oplen(cigarArr[numCigar - 1]) : 0;
             if (clipSize > minRightClip)
                 continue;
             minRightClip = clipSize;
             region->leftMost = bam_endpos(bam);
             region->tid1 = bam->core.tid;
-            region->cigar1 = cigarArray[0];
+            region->cigar1 = cigarArr[0];
         } else {
-            clipSize = isClipInFlank(cigarArray[0], 0) ? bam_cigar_oplen(cigarArray[0]) : 0;
+            clipSize = isClipInFlank(cigarArr[0], 0) ? bam_cigar_oplen(cigarArr[0]) : 0;
             if (clipSize > minLeftClip)
                 continue;
             minLeftClip = clipSize;
-            bam_cigar_oplen(cigarArray[0]);
+            bam_cigar_oplen(cigarArr[0]);
             region->rightMost = bam->core.pos;
             region->tid2 = bam->core.tid;
-            region->cigar2 = cigarArray[numCigar - 1];
+            region->cigar2 = cigarArr[numCigar - 1];
         }
     }
 
@@ -383,18 +383,18 @@ void reSetInsRegion(Cluster *clt, faidx_t *assmFa)
             continue;
 
         int numCigar = bam->core.n_cigar;
-        uint32_t *cigarArray = bam_get_cigar(bam);
+        uint32_t *cigarArr = bam_get_cigar(bam);
 
         if (isLeftFlank(bam)) {
             leftEnd = bam_endpos(bam);
             leftLen = bam->core.l_qseq;
-            leftCigar1 = cigarArray[0];
-            leftCigar2 = cigarArray[numCigar - 1];
+            leftCigar1 = cigarArr[0];
+            leftCigar2 = cigarArr[numCigar - 1];
         } else {
             rightStart = bam->core.pos;
             rightLen = bam->core.l_qseq;
-            rightCigar1 = cigarArray[0];
-            rightCigar2 = cigarArray[numCigar - 1];
+            rightCigar1 = cigarArr[0];
+            rightCigar2 = cigarArr[numCigar - 1];
         }
     }
     
@@ -436,7 +436,7 @@ void reSetInsRegion(Cluster *clt, faidx_t *assmFa)
  *******************/
 
 /// @brief Output formated cluster records
-void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn)
+void outputClt(Cluster *cltArr, int startIdx, int endIdx, const char *refFn, const char *teFn)
 {
     faidx_t *refFa = fai_load(refFn);
     faidx_t *teFa = fai_load(teFn);
@@ -448,7 +448,7 @@ void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, c
     FILE *fp = fopen(outFn, "w");
     for (int i = startIdx; i < endIdx; i++)
     {
-        Cluster *clt = &cltArray[i];
+        Cluster *clt = &cltArr[i];
         if (!isTEMapped(clt->flag))
             continue;
 

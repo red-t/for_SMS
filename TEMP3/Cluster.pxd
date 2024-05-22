@@ -1,7 +1,7 @@
 from .FileIO cimport *
 
 cdef extern from "src/cluster_utils.h" nogil:
-    void updateCluster(Cluster *cltArray, Segment *segArray, Args args)
+    void updateCluster(Cluster *cltArr, Segment *segArr, Args args)
     void intersectBlackList(Cluster *clt, Args args)
 
 
@@ -17,15 +17,15 @@ cdef extern from "src/seg_utils.h" nogil:
         int     mapLen
         float   divergence
     
-    int fillSegArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegmentLength)
-    void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList)
-    void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx)
+    int fillSegArr(bam1_t *bam, Segment *segArr, int64_t fileOffset, int minSegmentLength)
+    void updateSegment(Segment *segArr, AiList *repeatAiList, AiList *gapAiList)
+    void updateSegByTeArr(Segment *segArr, TeAlignment *teArr, int teIdx)
 
     #########################
     ### Alignment records ###
     #########################
     void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bam)
-    void fillTeArray(bam1_t *bam, TeAlignment *teArray)
+    void fillTeArr(bam1_t *bam, TeAlignment *teArr)
     
 
 cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdArgs, int tid)

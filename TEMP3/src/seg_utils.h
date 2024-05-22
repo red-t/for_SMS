@@ -39,8 +39,8 @@
  @field  sumQueryMapLen     summary query mapped-length of the TE alignments (M/I/=/X, no overlap)
  @field  sumAlnScore        summary per base alignment score of the TE alignments
  @field  sumDivergence      summary per base divergence of the TE alignments
- @field  startIdx           start index in TE alignments array (0-based, include)
- @field  endIdx             end index in TE alignments array (0-based, not-include)
+ @field  startIdx           start index in TE alignments arr (0-based, include)
+ @field  endIdx             end index in TE alignments arr (0-based, not-include)
  */
 typedef struct Segment
 {
@@ -83,7 +83,7 @@ typedef struct SegValues
 } SegValues;
 
 /*! @brief Data container for TE alignment.
- @field  segIdx         index of corresponding segment in segments array
+ @field  segIdx         index of corresponding segment in segments arr
  @field  AlnScore       alignment score
  @field  queryStart     query start (original direction of segment)
  @field  queryEnd       query end (original direction of segment)
@@ -109,17 +109,17 @@ typedef struct TeAlignment
 #define RIGHT_CLIP  4
 #define DUAL_CLIP   5
 
-/// @brief Extract all segments from CIGAR, record in segArray
-int fillSegArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen);
+/// @brief Extract all segments from CIGAR, record in segArr
+int fillSegArr(bam1_t *bam, Segment *segArr, int64_t fileOffset, int minSegLen);
 
 /// @brief Init all segments from CIGAR
-SegValues initSegmentsFromCigar(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen);
+SegValues initSegmentsFromCigar(bam1_t *bam, Segment *segArr, int64_t fileOffset, int minSegLen);
 
 /// @brief Init single segment from CIGAR
 void initSegment(Segment *segment, SegValues segValues, int cigarLen);
 
 /// @brief Set same values for segments extracted from the same alignment
-void setSameSegValues(Segment *segArray, SegValues segValues);
+void setSameSegValues(Segment *segArr, SegValues segValues);
 
 
 /***********************
@@ -132,7 +132,7 @@ void setSameSegValues(Segment *segArray, SegValues segValues);
 #define isSingleSegment(segment) ((segment)->numSeg == 1)
 
 /// @brief Update segment's overhang and location type
-void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList);
+void updateSegment(Segment *segArr, AiList *repeatAiList, AiList *gapAiList);
 
 /// @brief Get length of the shorter ref-anchor part as overhang
 int getOverhang(int overhang, int matchLen);
@@ -155,7 +155,7 @@ uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType);
 #define isCover(teAlignment, prevTeAlignment) ((teAlignment)->queryEnd <= (prevTeAlignment)->queryEnd)
 
 /// @brief Update segment values using Seg-To-TE alignments
-void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx);
+void updateSegByTeArr(Segment *segArr, TeAlignment *teArr, int teIdx);
 
 /// @brief Compute query-map-len of a Seg-To-TE alignment
 int getQueryMapLen(TeAlignment *teAlignment);
@@ -175,16 +175,16 @@ void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teId
 #define isCigarAligned(cigar) ((alingnedBits >> (bam_cigar_op((cigar))<<1) & 3) & 1)
 
 /// @brief Parsing and record a Seg-To-TE alignment
-void fillTeArray(bam1_t *bam, TeAlignment *teArray);
+void fillTeArr(bam1_t *bam, TeAlignment *teArr);
 
 /// @brief Get query map region on the original segment sequence
 void getQueryPosition(int *queryStartPtr, int *queryEndPtr, bam1_t *bam);
 
 /// @brief Check if first cigar is clip
-int firstCigarIsClip(uint32_t *cigarArray);
+int firstCigarIsClip(uint32_t *cigarArr);
 
 /// @brief Check if final cigar is clip
-int lastCigarIsClip(uint32_t *cigarArray, int numCigar);
+int lastCigarIsClip(uint32_t *cigarArr, int numCigar);
 
 /// @brief Compute map length and divergence of the alignment
 void getMapLenAndDiv(int *mapLenPtr, float *divergencePtr, bam1_t *bam);

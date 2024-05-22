@@ -13,7 +13,7 @@
 #define isSomaClt(clt) ((clt)->cltType != 0)
 
 /// @brief select a segment to output from cluster
-int getOuputSegIdx(Cluster *clt, Segment *segArray, Args args);
+int getOuputSegIdx(Cluster *clt, Segment *segArr, Args args);
 
 /// @brief get extended region of the segment
 void setTrimRegion(Segment *segment, int *start, int *end, int flankSize);
@@ -33,7 +33,7 @@ typedef struct FlankRegion
 } FlankRegion;
 
 /// @brief output flank-seq and local-seq for all clusters
-void extractRefFlanks(char *refFn, Cluster *cltArray, int startIdx, int endIdx);
+void extractRefFlanks(char *refFn, Cluster *cltArr, int startIdx, int endIdx);
 
 /// @brief define flank region on ref-genome
 void setFlankRegion(Cluster *clt, FlankRegion *region);
@@ -94,7 +94,7 @@ void reSetInsRegion(Cluster *clt, faidx_t *assmFa);
  *******************/
 
 /// @brief Output formated cluster records
-void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn);
+void outputClt(Cluster *cltArr, int startIdx, int endIdx, const char *refFn, const char *teFn);
 
 /// @brief Fetch TSD sequence from reference genome
 char *fetchTsdSeq(faidx_t *refFa, Cluster *clt);

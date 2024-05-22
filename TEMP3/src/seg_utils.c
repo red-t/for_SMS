@@ -4,21 +4,21 @@
  *** Initialize Segments ***
  ***************************/
 
-/// @brief Extract all segments from CIGAR, record in segArray
-int fillSegArray(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen)
+/// @brief Extract all segments from CIGAR, record in segArr
+int fillSegArr(bam1_t *bam, Segment *segArr, int64_t fileOffset, int minSegLen)
 {
-    SegValues sameSegValues = initSegmentsFromCigar(bam, segArray, fileOffset, minSegLen);
+    SegValues sameSegValues = initSegmentsFromCigar(bam, segArr, fileOffset, minSegLen);
     if (sameSegValues.numSeg > 0)
-        setSameSegValues(segArray, sameSegValues);
+        setSameSegValues(segArr, sameSegValues);
     return (int)sameSegValues.numSeg;
 }
 
 /// @brief Init all segments from CIGAR
-SegValues initSegmentsFromCigar(bam1_t *bam, Segment *segArray, int64_t fileOffset, int minSegLen)
+SegValues initSegmentsFromCigar(bam1_t *bam, Segment *segArr, int64_t fileOffset, int minSegLen)
 {
     int numCigar = bam->core.n_cigar;
     int lastCigarIdx = numCigar - 1;
-    uint32_t *cigarArray = bam_get_cigar(bam);
+    uint32_t *cigarArr = bam_get_cigar(bam);
 
     SegValues segValues;
     segValues.numSeg = 0;
@@ -30,8 +30,8 @@ SegValues initSegmentsFromCigar(bam1_t *bam, Segment *segArray, int64_t fileOffs
 
     for (int i = 0; i < numCigar; i++)
     {
-        int cigarLen = bam_cigar_oplen(cigarArray[i]);
-        switch (bam_cigar_op(cigarArray[i]))
+        int cigarLen = bam_cigar_oplen(cigarArr[i]);
+        switch (bam_cigar_op(cigarArr[i]))
         {
             case BAM_CMATCH:
             case BAM_CEQUAL:
@@ -55,7 +55,7 @@ SegValues initSegmentsFromCigar(bam1_t *bam, Segment *segArray, int64_t fileOffs
                 else
                     segValues.segType = MID_INSERT;
                 
-                initSegment(&segArray[segValues.numSeg], segValues, cigarLen);
+                initSegment(&segArr[segValues.numSeg], segValues, cigarLen);
                 segValues.numSeg += 1;
                 segValues.alnType |= segValues.segType;
                 segValues.queryPosition += cigarLen;
@@ -89,11 +89,11 @@ void initSegment(Segment *segment, SegValues segValues, int cigarLen)
 }
 
 /// @brief Set same values for segments extracted from the same alignment
-void setSameSegValues(Segment *segArray, SegValues segValues)
+void setSameSegValues(Segment *segArr, SegValues segValues)
 {
     for (uint8_t i = 0; i < segValues.numSeg; i++)
     {
-        Segment *segment = &segArray[i];
+        Segment *segment = &segArr[i];
         segment->mapQual = segValues.mapQual;
         segment->alnType = segValues.alnType;
         segment->numSeg = segValues.numSeg;
@@ -111,9 +111,9 @@ void setSameSegValues(Segment *segArray, SegValues segValues)
  ***********************/
 
 /// @brief Update segment's overhang and location type
-void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList)
+void updateSegment(Segment *segArr, AiList *repeatAiList, AiList *gapAiList)
 {
-    Segment *segment = &segArray[0];
+    Segment *segment = &segArr[0];
     if (isLeftClip(segment))
         segment->overhang = segment->matchLen;
     else if (isMidInsert(segment))
@@ -124,7 +124,7 @@ void updateSegment(Segment *segArray, AiList *repeatAiList, AiList *gapAiList)
     
     if (isSingleSegment(segment)) return;
     for (uint8_t i = 1; i < segment->numSeg; i++)
-        segArray[i].alnLocationType = segment->alnLocationType;
+        segArr[i].alnLocationType = segment->alnLocationType;
 }
 
 /// @brief Get length of the shorter ref-anchor part as overhang
@@ -179,11 +179,11 @@ uint8_t getAlnLocationType(uint8_t startLocationType, uint8_t endLocationType)
  ***************************************/
 
 /// @brief Update segment values using all Seg-To-TE alignments
-void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx)
+void updateSegByTeArr(Segment *segArr, TeAlignment *teArr, int teIdx)
 {
-    TeAlignment *teAlignment = &teArray[teIdx];
+    TeAlignment *teAlignment = &teArr[teIdx];
     int segIdx = teAlignment->segIdx;
-    Segment *segment = &segArray[segIdx];
+    Segment *segment = &segArr[segIdx];
 
     if (isFirstTeAlign(segment)) {
         segment->startIdx = teIdx;
@@ -193,7 +193,7 @@ void updateSegByTeArray(Segment *segArray, TeAlignment *teArray, int teIdx)
     }
 
     int prevIdx = teIdx - 1;
-    TeAlignment *prevTeAlignment = &teArray[prevIdx];
+    TeAlignment *prevTeAlignment = &teArr[prevIdx];
     
     if (!isOverlap(teAlignment, prevTeAlignment)) {
         int queryMapLen = getQueryMapLen(teAlignment);
@@ -234,7 +234,7 @@ void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teId
  *******************************/
 
 /// @brief Parsing and record a Seg-To-TE alignment
-void fillTeArray(bam1_t *bam, TeAlignment *teArray)
+void fillTeArr(bam1_t *bam, TeAlignment *teArr)
 {
     int queryStart, queryEnd;
     getQueryPosition(&queryStart, &queryEnd, bam);
@@ -243,49 +243,49 @@ void fillTeArray(bam1_t *bam, TeAlignment *teArray)
     float divergence;
     getMapLenAndDiv(&mapLen, &divergence, bam);
 
-    initTeAlignment(&teArray[0], bam, queryStart, queryEnd, mapLen, divergence);
+    initTeAlignment(&teArr[0], bam, queryStart, queryEnd, mapLen, divergence);
 }
 
 /// @brief Get query map region on the original segment sequence
 void getQueryPosition(int *queryStart, int *queryEnd, bam1_t *bam)
 {
     int numCigar = bam->core.n_cigar;
-    uint32_t *cigarArray = bam_get_cigar(bam);
+    uint32_t *cigarArr = bam_get_cigar(bam);
     *queryStart = 0;
     *queryEnd = bam->core.l_qseq;
 
     if (!bam_is_rev(bam)) {
-        if (firstCigarIsClip(cigarArray))
-            *queryStart = bam_cigar_oplen(cigarArray[0]);
-        if (lastCigarIsClip(cigarArray, numCigar))
-            *queryEnd = bam->core.l_qseq - bam_cigar_oplen(cigarArray[numCigar-1]);
+        if (firstCigarIsClip(cigarArr))
+            *queryStart = bam_cigar_oplen(cigarArr[0]);
+        if (lastCigarIsClip(cigarArr, numCigar))
+            *queryEnd = bam->core.l_qseq - bam_cigar_oplen(cigarArr[numCigar-1]);
         return;
     }
 
-    if (lastCigarIsClip(cigarArray, numCigar))
-        *queryStart = bam_cigar_oplen(cigarArray[numCigar-1]);
-    if (firstCigarIsClip(cigarArray))
-        *queryEnd = bam->core.l_qseq - bam_cigar_oplen(cigarArray[0]);
+    if (lastCigarIsClip(cigarArr, numCigar))
+        *queryStart = bam_cigar_oplen(cigarArr[numCigar-1]);
+    if (firstCigarIsClip(cigarArr))
+        *queryEnd = bam->core.l_qseq - bam_cigar_oplen(cigarArr[0]);
 }
 
 /// @brief Check if first cigar is clip
-int firstCigarIsClip(uint32_t *cigarArray)
-{ return bam_cigar_op(cigarArray[0]) == BAM_CSOFT_CLIP; }
+int firstCigarIsClip(uint32_t *cigarArr)
+{ return bam_cigar_op(cigarArr[0]) == BAM_CSOFT_CLIP; }
 
 /// @brief Check if final cigar is clip
-int lastCigarIsClip(uint32_t *cigarArray, int numCigar)
-{ return bam_cigar_op(cigarArray[numCigar - 1]) == BAM_CSOFT_CLIP; }
+int lastCigarIsClip(uint32_t *cigarArr, int numCigar)
+{ return bam_cigar_op(cigarArr[numCigar - 1]) == BAM_CSOFT_CLIP; }
 
 /// @brief Compute map length and divergence of the alignment
 void getMapLenAndDiv(int *mapLen, float *divergence, bam1_t *bam)
 {
-    uint32_t *cigarArray = bam_get_cigar(bam);
+    uint32_t *cigarArr = bam_get_cigar(bam);
     int numCigar = bam->core.n_cigar;
     int i, len;
 
     for (i=len=0; i < numCigar; i++)
-        if (isCigarAligned(cigarArray[i]))
-            len += bam_cigar_oplen(cigarArray[i]);
+        if (isCigarAligned(cigarArr[i]))
+            len += bam_cigar_oplen(cigarArr[i]);
 
     *mapLen = len;
     *divergence = getDivergence(bam, len);

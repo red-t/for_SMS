@@ -4,13 +4,13 @@ cdef extern from "src/io_utils.h":
     ###################
     ### Cluster I/O ###
     ###################
-    void outputClt(Cluster *cltArray, int startIdx, int endIdx, const char *refFn, const char *teFn)
+    void outputClt(Cluster *cltArr, int startIdx, int endIdx, const char *refFn, const char *teFn)
 
 cdef extern from "src/anno_utils.h" nogil:
     ##################
     ### Structures ###
     ##################
-    ctypedef packed struct Anno:
+    ctypedef packed struct Annotation:
         int         idx
         int         cltTid
         int         cltIdx
@@ -25,14 +25,14 @@ cdef extern from "src/anno_utils.h" nogil:
     ###################################
     ### Annotate Insertion sequence ###
     ###################################
-    int fillAnnoArray(Cluster *clt, Anno *annoArray, int idx)
-    void annoTsd(Cluster *clt, Anno *annoArray, int numAnno)
-    void setInsStruc(Cluster *clt, Anno *annoArray, int numAnno, uint32_t *classArray, int *sizeArray, int *ltrArray)
+    int fillAnnoArr(Cluster *clt, Annotation *annoArr, int idx)
+    void annoTsd(Cluster *clt, Annotation *annoArr, int numAnno)
+    void setInsStruc(Cluster *clt, Annotation *annoArr, int numAnno, uint32_t *classArr, int *sizeArr, int *ltrArr)
 
     ######################
     ### Annotation I/O ###
     ######################
-    void outputAnno(Anno *annoArray, int numAnno, int startIdx, const char *teFn)
+    void outputAnno(Annotation *annoArr, int numAnno, int startIdx, const char *teFn)
 
 cdef extern from "src/post_filter.h":
     ###################

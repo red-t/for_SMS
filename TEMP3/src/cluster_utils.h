@@ -68,11 +68,11 @@
 
 /*! @brief Data container for cluster merged from segments.
  @field  tid                target id of corresponding chromosome
- @field  idx                cluster index in cluster array (0-based)
+ @field  idx                cluster index in cluster arr (0-based)
  @field  refStart           cluster start on reference genome (0-based)
  @field  refEnd             cluster end on reference genome (0-based)
- @field  startIdx           start index in segment array (0-based, include)
- @field  endIdx             end index in segment array (0-based, not-include)
+ @field  startIdx           start index in segment arr (0-based, include)
+ @field  endIdx             end index in segment arr (0-based, not-include)
  @field  numSeg             number of segments in the cluster (normalized by bg depth)
  @field  cltType            cluster type
                                 0: germline (multiple support reads)
@@ -183,7 +183,7 @@ typedef struct Args
  **********************/
 
 /// @brief Update cluster values by segments features and background info
-void updateCluster(Cluster *cltArray, Segment *segArray, Args args);
+void updateCluster(Cluster *cltArr, Segment *segArr, Args args);
 
 
 /************************
@@ -194,10 +194,10 @@ void updateCluster(Cluster *cltArray, Segment *segArray, Args args);
 #define isValidCandidate(clt) ((clt)->teAlignedFrac >= 0.8)
 
 /// @brief Compute TE-aligned-fraction of a cluster
-void setTeAlignedFrac(Cluster *clt, Segment *segArray, Args args);
+void setTeAlignedFrac(Cluster *clt, Segment *segArr, Args args);
 
 /// @brief Set cluster's cltType, which represent the cluster is germ/soma
-void setCltType(Cluster *clt, Segment *segArray, Args args);
+void setCltType(Cluster *clt, Segment *segArr, Args args);
 
 
 /**********************************
@@ -207,7 +207,7 @@ void setCltType(Cluster *clt, Segment *segArray, Args args);
 #define noTeAlignment(segment) ((segment)->numTeAlignment == 0)
 
 /// @brief Update cluster values by all segments
-void updateBySegArray(Cluster *clt, Segment *segArray, Args args);
+void updateBySegArr(Cluster *clt, Segment *segArr, Args args);
 
 /// @brief Update cluster values by single segment
 void countValuesFromSeg(Cluster *clt, Args args, Segment *segment, int *numLeft, int *numMiddle, int *numRight);

@@ -84,57 +84,57 @@ ClusterDt = np.dtype([
 ])
 
 
-##########################
-### Construct SegArray ###
-##########################
-cdef object getSegArray(BamFile genomeBam, Args args):
-    cdef int retValue, numSeg=0, maxNum=9900
-    cdef object segArray = np.zeros(10000, dtype=SegmentDt)
-    cdef Segment[::1] segView = segArray
+########################
+### Construct SegArr ###
+########################
+cdef object getSegArr(BamFile genomeBam, Args args):
+    cdef int retValue, numSeg = 0, maxNum = 9900
+    cdef object segArr = np.zeros(10000, dtype=SegmentDt)
+    cdef Segment[::1] segView = segArr
     cdef Iterator iterator = Iterator(genomeBam, args.tid)
     
     while True:
         retValue = iterator.cnext1()
         if retValue < 0:
             del iterator
-            segArray.resize((numSeg,), refcheck=False)
-            return segArray
+            segArr.resize((numSeg,), refcheck=False)
+            return segArr
 
         if bamIsInvalid(iterator.bamRcord):
             continue
 
         if numSeg >= maxNum:
             maxNum = segView.shape[0] + 10000
-            segArray.resize((maxNum,), refcheck=False)
-            segView = segArray
+            segArr.resize((maxNum,), refcheck=False)
+            segView = segArr
             maxNum -= 100
 
-        retValue = fillSegArray(iterator.bamRcord, &segView[numSeg], iterator.offset, args.minSegLen)
+        retValue = fillSegArr(iterator.bamRcord, &segView[numSeg], iterator.offset, args.minSegLen)
         numSeg += retValue
 
 
-cdef updateSegArray(Segment[::1] segView, Args args):
+cdef updateSegArr(Segment[::1] segView, Args args):
     cdef int i
     for i in range(segView.shape[0]):
         updateSegment(&segView[i], args.repeatAiList, args.gapAiList)
 
 
-cdef updateSegArrayByTe(Segment[::1] segView, Args args):
+cdef updateSegArrByTe(Segment[::1] segView, Args args):
     cdef BamFile teBam = BamFile("tmp_build/all_seg_{}.bam".format(args.tid), "rb", args.numThread)
     cdef Iterator iterator = Iterator(teBam)
-    cdef object teArray = getTeArray(iterator)
-    cdef TeAlignment[::1] teView = teArray
+    cdef object teArr = getTeArr(iterator)
+    cdef TeAlignment[::1] teView = teArr
     cdef int i
 
-    teArray.sort(order=['segIdx', 'queryStart'])
+    teArr.sort(order=['segIdx', 'queryStart'])
     for i in range(teView.shape[0]):
-        updateSegByTeArray(&segView[0], &teView[0], i)
+        updateSegByTeArr(&segView[0], &teView[0], i)
 
     del iterator; teBam.close(); del teBam
 
 
 #########################
-### Construct TeArray ###
+### Construct TeArr ###
 #########################
 cdef mapSegToTE(str teFn, Args args):
     cdef int exitCode
@@ -147,46 +147,46 @@ cdef mapSegToTE(str teFn, Args args):
         raise Exception("Error: minimap2 failed for tmp_build/all_seg_{}.fa".format(args.tid))
 
 
-cdef object getTeArray(Iterator iterator):
+cdef object getTeArr(Iterator iterator):
     cdef int retValue, numTeAln=0, maxNum=9900
-    cdef object teArray = np.zeros(10000, dtype=TeAlignmentDt)
-    cdef TeAlignment[::1] teView = teArray
+    cdef object teArr = np.zeros(10000, dtype=TeAlignmentDt)
+    cdef TeAlignment[::1] teView = teArr
     
     while True:
         retValue = iterator.cnext2()
         if retValue < 0:
-            teArray.resize((numTeAln,), refcheck=False)
-            return teArray
+            teArr.resize((numTeAln,), refcheck=False)
+            return teArr
 
         if bamIsInvalid(iterator.bamRcord):
             continue
 
         if numTeAln >= maxNum:
-            maxNum = teArray.shape[0] + 10000
-            teArray.resize((maxNum,), refcheck=False)
-            teView = teArray
+            maxNum = teArr.shape[0] + 10000
+            teArr.resize((maxNum,), refcheck=False)
+            teView = teArr
             maxNum -= 100
 
-        fillTeArray(iterator.bamRcord, &teView[numTeAln])
+        fillTeArr(iterator.bamRcord, &teView[numTeAln])
         numTeAln += 1
 
 
 ##########################
-### Construct CltArray ###
+### Construct CltArr ###
 ##########################
-cdef object getCltArray(Segment[::1] segView, Args args):
+cdef object getCltArr(Segment[::1] segView, Args args):
     cdef int startIdx=0, endIdx, numClt=0, maxNum=9900
-    cdef object cltArray = np.zeros(10000, dtype=ClusterDt)
-    cdef Cluster[::1] cltView = cltArray
+    cdef object cltArr = np.zeros(10000, dtype=ClusterDt)
+    cdef Cluster[::1] cltView = cltArr
     
     while startIdx < segView.shape[0]:
         if overhangIsShort(&segView[startIdx], args.minOverhang):
             startIdx += 1; continue
 
         if numClt > maxNum:
-            maxNum = cltArray.shape[0] + 10000
-            cltArray.resize((maxNum,), refcheck=False)
-            cltView = cltArray
+            maxNum = cltArr.shape[0] + 10000
+            cltArr.resize((maxNum,), refcheck=False)
+            cltView = cltArr
             maxNum -= 100
         
         # Initialize numClt-th cluster
@@ -210,11 +210,11 @@ cdef object getCltArray(Segment[::1] segView, Args args):
         cltView[numClt].refEnd = cltView[numClt].refEnd - args.maxDistance
         startIdx = endIdx; numClt += 1
     
-    cltArray.resize((numClt,), refcheck=False)
-    return cltArray
+    cltArr.resize((numClt,), refcheck=False)
+    return cltArr
 
 
-cdef updateCltArray(Cluster[::1] cltView, Segment[::1] segView, BamFile genomeBam, Args args):
+cdef updateCltArr(Cluster[::1] cltView, Segment[::1] segView, BamFile genomeBam, Args args):
     cdef int i
     
     args.genomeBam = genomeBam.htsFile
@@ -239,8 +239,8 @@ cdef filterByBlacklist(Cluster[::1] cltView, Args args):
     destroyAiList(args.blackAiList)
 
 
-cdef object filterByModel(object cltArray, object cmdArgs):
-    cdef object cltDf = pd.DataFrame(cltArray)
+cdef object filterByModel(object cltArr, object cmdArgs):
+    cdef object cltDf = pd.DataFrame(cltArr)
     
     filterGermByModel(cltDf, cmdArgs.germModelPath)
     filterSomaByModel(cltDf, cmdArgs.somaModelPath)
@@ -271,36 +271,36 @@ cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdA
     # 1. Construct segments
     cdef Args args = newArgs(tid, bgDiv, bgDepth, bgReadLen, cmdArgs)
     cdef BamFile genomeBam = BamFile(cmdArgs.genomeBamFilePath, "rb", cmdArgs.numThread)
-    cdef object segArray = getSegArray(genomeBam, args)
+    cdef object segArr = getSegArr(genomeBam, args)
 
     # 2. Compute segment features
     cdef const char *chrom = sam_hdr_tid2name(genomeBam.header, tid)
     args.repeatAiList = newAiList(cmdArgs.repeatFn, chrom)
     args.gapAiList = newAiList(cmdArgs.gapFn, chrom)
 
-    updateSegArray(segArray, args)
-    segArray.sort(order='refPosition')
-    ouputAllSegSeqs(segArray, genomeBam, args)
+    updateSegArr(segArr, args)
+    segArr.sort(order='refPosition')
+    ouputAllSegSeqs(segArr, genomeBam, args)
 
     mapSegToTE(cmdArgs.teFn, args)
-    updateSegArrayByTe(segArray, args)
+    updateSegArrByTe(segArr, args)
     
     # 3. Construct cluster
     cdef tidToCltData = {}
-    cdef object cltArray = getCltArray(segArray, args)
+    cdef object cltArr = getCltArr(segArr, args)
 
     # 4. Compute cluster features
-    updateCltArray(cltArray, segArray, genomeBam, args)
+    updateCltArr(cltArr, segArr, genomeBam, args)
 
     # 5. Filter clusters
     args.blackAiList = newAiList(cmdArgs.blackListPath, chrom)
-    filterByBlacklist(cltArray, args)
-    cltArray = filterByModel(cltArray, cmdArgs)
+    filterByBlacklist(cltArr, args)
+    cltArr = filterByModel(cltArr, cmdArgs)
 
     # 6. Output cluster seqs for assembling
-    outputGermCltSeqs(cltArray, segArray, genomeBam, args)
+    outputGermCltSeqs(cltArr, segArr, genomeBam, args)
 
-    tidToCltData[tid] = (cltArray, segArray)
+    tidToCltData[tid] = (cltArr, segArr)
     genomeBam.close(); del genomeBam
     return tidToCltData
 
@@ -310,8 +310,8 @@ cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdA
 ##############################
 cdef object getHighQualClts(dict allCltData):
     cdef int i, tid, numClt = 0, maxNum = 1900
-    cdef object highQualArray = np.zeros(2000, dtype=ClusterDt)
-    cdef Cluster[::1] highQualView = highQualArray
+    cdef object highQualArr = np.zeros(2000, dtype=ClusterDt)
+    cdef Cluster[::1] highQualView = highQualArr
     cdef Cluster[::1] cltView
 
     for tid in range(len(allCltData)):
@@ -324,13 +324,13 @@ cdef object getHighQualClts(dict allCltData):
                 continue
             
             if numClt >= maxNum:
-                maxNum = highQualArray.shape[0] + 2000
-                highQualArray.resize((maxNum,), refcheck=False)
-                highQualView = highQualArray
+                maxNum = highQualArr.shape[0] + 2000
+                highQualArr.resize((maxNum,), refcheck=False)
+                highQualView = highQualArr
                 maxNum -= 100
             
             highQualView[numClt] = cltView[i]
             numClt += 1
 
-    highQualArray.resize((numClt,), refcheck=False)
-    return highQualArray
+    highQualArr.resize((numClt,), refcheck=False)
+    return highQualArr
