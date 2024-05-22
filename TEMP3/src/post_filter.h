@@ -9,7 +9,10 @@ void postFilter(Cluster *clt);
 // Perform post-filtering for LINE, SINE, RETROPOSON
 void filterLINE(Cluster *clt);
 
-// Perform post-filtering for LTR, DNA
+// Perform post-filtering for LTR
 void filterLTR(Cluster *clt);
+
+// Perform post-filtering for DNA
+void filterDNA(Cluster *clt);
 
 #endif // POST_FILTER_H
