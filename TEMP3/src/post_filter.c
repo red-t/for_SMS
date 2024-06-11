@@ -3,14 +3,24 @@
 // Perform post-filtering for different TE class
 void postFilter(Cluster *clt)
 {
-    if ((clt->flag & (CLT_LINE|CLT_SINE|CLT_RETROPOSON)) != 0)
+    uint32_t CLT_CLASS_MASK = 0xf8000;
+    switch (clt->flag & CLT_CLASS_MASK)
+    {
+    case CLT_LINE:
+    case CLT_SINE:
+    case CLT_RETROPOSON:
         filterLINE(clt);
-    
-    if ((clt->flag & CLT_LTR) != 0)
+        break;
+    case CLT_LTR:
         filterLTR(clt);
-
-    if ((clt->flag & CLT_DNA) != 0)
+        break;
+    case CLT_DNA:
         filterDNA(clt);
+        break;
+    default:
+        filterDNA(clt);
+        break;
+    }
 }
 
 // Perform post-filtering for LINE, SINE, RETROPOSON
