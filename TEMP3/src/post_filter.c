@@ -27,7 +27,7 @@ void postFilter(Cluster *clt)
 void filterLINE(Cluster *clt)
 {
     // For all cluster
-    if ((hasPolyA(clt->flag) || isATRich(clt->flag)) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)) && hasTSD(clt->flag))
+    if ((hasPolyA(clt->flag) || isATRich(clt->flag)) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
         clt->flag |= CLT_PASS;
 
     // For cluster locates in normal region
