@@ -515,8 +515,9 @@ void checkEnd(Annotation *annoArr, int numAnno, Cluster *clt)
 /// @brief Check which TE class the insertion belongs to
 void checkTEClass(Annotation *annoArr, int numAnno, Cluster *clt, uint32_t *classArr)
 {
-    int leftIdx = (annoArr[0].tid == -2) ? 1 : 0;
-    int rightIdx = (annoArr[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
+    // Find left-/right-most TE annotation
+    int leftIdx = getLeftIdx(annoArr, numAnno);
+    int rightIdx = getRightIdx(annoArr, numAnno);
 
     int leftLen = annoArr[leftIdx].refEnd - annoArr[leftIdx].refStart;
     int rightLen = annoArr[rightIdx].refEnd - annoArr[rightIdx].refStart;
