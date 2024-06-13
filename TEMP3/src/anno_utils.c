@@ -151,17 +151,19 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
     int thisLen = 0, maxLen = 0;
     int thisSum = 0, maxSum = 0;
     int thisNum = 0, maxNum = 0;
-    int numOther = 0, stop = 0;
+    int numOther = 0, position = 0;
 
     uint8_t targetChar = (polyA->isA) ? 65 : 84;
     int start = (polyA->isA) ? 0 : polyA->seqLen-1;
     int end = (polyA->isA) ? polyA->seqLen : -1;
     int step = (polyA->isA) ? 1 : -1;
+    int numPolyA = 0;
+    PolyACandidate candidateArr[2] = {{0, 0}, {0, 0}};
 
     for (int i = start; i != end; i += step)
     {
         thisLen++;
-        // Is a/A OR t/T
+        // Is this base a/A or t/T ?
         if (((flankSeq[i] | 0x20) & 0x5f) == targetChar) {
             thisSum++;
             thisNum++;
@@ -169,39 +171,80 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
             thisSum--;
             numOther++;
         }
+
+        // Update maxSum
         if (thisSum > maxSum) {
             maxLen = thisLen;
             maxSum = thisSum;
             maxNum = thisNum;
-            stop = i;
+            position = i;
         }
-        if (thisSum < 0 || numOther > 3)
-            thisSum = thisNum = thisLen = numOther = 0;
+
+        // Search from the new start
+        if (thisSum < 0 || numOther > 5) {
+            if (maxSum < 5 || ((float)maxNum / maxLen) < 0.8)
+                goto RESET;
+
+            addCandidate(candidateArr, position, maxLen);
+            numPolyA++;
+
+            RESET:
+            thisLen = maxLen = 0;
+            thisSum = maxSum = 0;
+            thisNum = maxNum = 0;
+            numOther = 0;
+        }
     }
 
-    if(maxLen < 5)
+    if (numPolyA == 0)
         return numAnno;
-    if (((float)maxNum / maxLen) < 0.8)
-        return numAnno;
+    
+    if (numPolyA == 1)
+        addPolyA(annoArr, numAnno++, clt, polyA, candidateArr[0]);
 
+    if (numPolyA >= 2) {
+        addPolyA(annoArr, numAnno++, clt, polyA, candidateArr[0]);
+        addPolyA(annoArr, numAnno++, clt, polyA, candidateArr[1]);
+    }
+
+    polyA->rightAnnoEnd = polyA->isA ? annoArr[numAnno-1].queryEnd : polyA->rightAnnoEnd;
+    polyA->leftAnnoStart = polyA->isA ? polyA->leftAnnoStart : annoArr[numAnno-1].queryStart;
+    return numAnno;
+}
+
+/// @brief Store first && final polyA candidate
+void addCandidate(PolyACandidate candidateArr[], int position, int length)
+{
+    // Store first candidate, if candidateArr[0] is empty
+    if (candidateArr[0].length == 0) {
+        candidateArr[0].position = position;
+        candidateArr[0].length = length;
+        return;
+    }
+
+    // Store final candidate
+    candidateArr[1].position = position;
+    candidateArr[1].length = length;
+}
+
+/// @brief Add polyA candidate to annoArr
+void addPolyA(Annotation *annoArr, int numAnno, Cluster *clt, PolyA *polyA, PolyACandidate candidate)
+{
     if (polyA->isA) {
-        annoArr[numAnno].queryStart = stop + polyA->rightAnnoEnd + 1 - maxLen;
-        annoArr[numAnno].queryEnd = stop + polyA->rightAnnoEnd + 1;
+        annoArr[numAnno].queryStart = candidate.position + polyA->rightAnnoEnd + 1 - candidate.length;
+        annoArr[numAnno].queryEnd = candidate.position + polyA->rightAnnoEnd + 1;
         annoArr[numAnno].strand = 0;
         annoArr[numAnno].tid = -1;
-        polyA->rightAnnoEnd = annoArr[numAnno].queryEnd;
-    } else {
-        annoArr[numAnno].queryStart = stop;
-        annoArr[numAnno].queryEnd = stop + maxLen;
+    }
+    else {
+        annoArr[numAnno].queryStart = candidate.position;
+        annoArr[numAnno].queryEnd = candidate.position + candidate.length;
         annoArr[numAnno].strand = 1;
         annoArr[numAnno].tid = -2;
-        polyA->leftAnnoStart = annoArr[numAnno].queryStart;
     }
     annoArr[numAnno].idx = polyA->idx;
     annoArr[numAnno].cltTid = clt->tid;
     annoArr[numAnno].cltIdx = clt->idx;
-
-    return ++numAnno;
 }
 
 /// @brief output tsd-containing-seq for tsd annotation
