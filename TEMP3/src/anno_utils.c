@@ -487,8 +487,9 @@ void checkPolyA(Annotation *annoArr, int numAnno, Cluster *clt)
 /// @brief Check whether the ins-seq contains complete ends
 void checkEnd(Annotation *annoArr, int numAnno, Cluster *clt)
 {
-    int leftIdx = (annoArr[0].tid == -2) ? 1 : 0;
-    int rightIdx = (annoArr[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
+    // Find left-/right-most TE annotation
+    int leftIdx = getLeftIdx(annoArr, numAnno);
+    int rightIdx = getRightIdx(annoArr, numAnno);
 
     if (!isRevAnno(annoArr[leftIdx]) && hasFull5P(annoArr[leftIdx].flag))
         clt->flag |= CLT_5P_FULL;
