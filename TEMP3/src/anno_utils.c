@@ -613,7 +613,7 @@ void checkSoloLtr(Annotation *annoArr, int numAnno, Cluster *clt, int *sizeArr, 
     if (!isLTR(clt->flag) || !hasSingleTE(clt->flag))
         return;
 
-    int idx = (annoArr[0].tid == -2) ? 1 : 0;
+    int idx = getLeftIdx(annoArr, numAnno);
     Annotation anno = annoArr[idx];
     int ltrLen = ltrArr[anno.tid], teLen = sizeArr[anno.tid];
 
