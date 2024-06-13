@@ -49,7 +49,7 @@ typedef struct PolyACandidate
 #define isRevAnno(anno) ((anno).strand == 1)
 
 /// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
-int fillAnnoArr(Cluster *clt, Annotation *annoArr, int idx);
+int fillAnnoArr(Cluster *clt, Annotation *annoArr, uint32_t *classArr, int idx);
 
 /// @brief Find and record all polyA/polyT
 int annoPolyA(Cluster *clt, Annotation *annoArr, int numAnno, PolyA *polyA);

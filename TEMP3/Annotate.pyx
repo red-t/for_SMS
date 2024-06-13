@@ -190,7 +190,7 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
             maxNum -= 100
 
         # 2. Annotate TE fragment, polyA/T for insSeq
-        numTmp = fillAnnoArr(&cltView[i], &annoView[numAnno], i)
+        numTmp = fillAnnoArr(&cltView[i], &annoView[numAnno], &classView[0], i)
 
         # 3. Annotate TSD
         mapTsdToLocal(cltView[i].tid, cltView[i].idx)

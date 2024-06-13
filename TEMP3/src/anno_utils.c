@@ -16,7 +16,7 @@ PolyA initPolyA(int idx)
 }
 
 /// @brief Record single TE annotation
-void initAnno(bam1_t *bam, sam_hdr_t *header, Cluster *clt, Annotation *anno, int idx)
+void initAnno(bam1_t *bam, sam_hdr_t *header, Cluster *clt, Annotation *anno, int idx, uint32_t *classArr)
 {
     int numCigar = bam->core.n_cigar;
     uint32_t *cigarArr = bam_get_cigar(bam);
@@ -43,6 +43,7 @@ void initAnno(bam1_t *bam, sam_hdr_t *header, Cluster *clt, Annotation *anno, in
     anno->tid = bam->core.tid;
     anno->refStart = bam->core.pos;
     anno->refEnd = bam->core.pos + refLen;
+    anno->flag |= classArr[anno->tid];
 
     if (bam_is_rev(bam)) {
         anno->queryStart = bam->core.l_qseq - queryEnd;
@@ -61,7 +62,7 @@ void initAnno(bam1_t *bam, sam_hdr_t *header, Cluster *clt, Annotation *anno, in
 }
 
 /// @brief Find and record all TE annotations and polyA/polyT by parsing Ins-To-TE alignments
-int fillAnnoArr(Cluster *clt, Annotation *annoArr, int idx)
+int fillAnnoArr(Cluster *clt, Annotation *annoArr, uint32_t *classArr, int idx)
 {
     char inputFn[100] = {'\0'};
     sprintf(inputFn, "tmp_anno/%d_%d_InsToTE.bam", clt->tid, clt->idx);
@@ -79,7 +80,7 @@ int fillAnnoArr(Cluster *clt, Annotation *annoArr, int idx)
         if (bamIsInvalid(bam))
             continue;
 
-        initAnno(bam, header, clt, &annoArr[numAnno], idx);
+        initAnno(bam, header, clt, &annoArr[numAnno], idx, classArr);
         if (annoArr[numAnno].queryStart < polyA.leftAnnoStart) {
             polyA.leftAnnoStart = annoArr[numAnno].queryStart;
             polyA.leftIdx = numAnno;
@@ -141,11 +142,11 @@ int annoPolyA(Cluster *clt, Annotation *annoArr, int numAnno, PolyA *polyA)
 /// @brief Find and record single polyA/polyT
 int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, PolyA *polyA)
 {
-    // If right-most TE is reverse, polyA is invalid
-    if (polyA->isA && isRevAnno(annoArr[polyA->rightIdx]))
+    // 1) Right-most TE is reverse OR 2) Is not retro-TE --> polyA is invalid
+    if (polyA->isA && (isRevAnno(annoArr[polyA->rightIdx]) || !isRetroTE(annoArr[polyA->rightIdx].flag)))
         return numAnno;
-    // If left-most TE is forward, polyT is invalid
-    if (!polyA->isA && !isRevAnno(annoArr[polyA->leftIdx]))
+    // 1) Left-most TE is forward OR 2) Is not retro-TE --> polyT is invalid
+    if (!polyA->isA && (!isRevAnno(annoArr[polyA->leftIdx]) || !isRetroTE(annoArr[polyA->leftIdx].flag)))
         return numAnno;
 
     int thisLen = 0, maxLen = 0;
@@ -549,9 +550,12 @@ void checkFlankPolyA(Annotation *annoArr, int numAnno, Cluster *clt)
     int leftIdx = getLeftIdx(annoArr, numAnno);
     int rightIdx = getRightIdx(annoArr, numAnno);
 
-    if (existPolyT && isRevAnno(annoArr[leftIdx]) && hasFull3P(annoArr[leftIdx].flag))
+    // 1) Left-most TE is reverse AND 2) Has full-3-Prime AND 3) Is retro-TE --> T-Rich is valid
+    if (existPolyT && isRevAnno(annoArr[leftIdx]) && hasFull3P(annoArr[leftIdx].flag) && isRetroTE(annoArr[leftIdx].flag))
         clt->flag |= CLT_AT_RICH;
-    if (existPolyA && !isRevAnno(annoArr[rightIdx]) && hasFull3P(annoArr[rightIdx].flag))
+
+    // 1) Right-most TE is forward AND 2) Has full-3-Prime AND 3) Is retro-TE --> A-Rich is valid
+    if (existPolyA && !isRevAnno(annoArr[rightIdx]) && hasFull3P(annoArr[rightIdx].flag) && isRetroTE(annoArr[rightIdx].flag))
         clt->flag |= CLT_AT_RICH;
 
     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}

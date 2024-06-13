@@ -56,6 +56,7 @@
 #define isRETROPOSON(flag) (((flag) & CLT_RETROPOSON) != 0)
 #define isLTR(flag) (((flag) & CLT_LTR) != 0)
 #define isDNA(flag) (((flag) & CLT_DNA) != 0)
+#define isRetroTE(flag) (((flag) & (CLT_LINE | CLT_SINE | CLT_RETROPOSON)) != 0)
 #define isATRich(flag) (((flag) & CLT_AT_RICH) != 0)
 #define isRightNearEnd(flag) (((flag) & CLT_RIGHT_NEAR_END) != 0)
 #define isLeftNearEnd(flag) (((flag) & CLT_LEFT_NEAR_END) != 0)

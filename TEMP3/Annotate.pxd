@@ -25,7 +25,7 @@ cdef extern from "src/anno_utils.h" nogil:
     ###################################
     ### Annotate Insertion sequence ###
     ###################################
-    int fillAnnoArr(Cluster *clt, Annotation *annoArr, int idx)
+    int fillAnnoArr(Cluster *clt, Annotation *annoArr, uint32_t *classArr, int idx)
     void annoTsd(Cluster *clt, Annotation *annoArr, int numAnno)
     void setInsStruc(Cluster *clt, Annotation *annoArr, int numAnno, uint32_t *classArr, int *sizeArr, int *ltrArr)
 
