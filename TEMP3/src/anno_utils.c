@@ -546,8 +546,8 @@ void checkFlankPolyA(Annotation *annoArr, int numAnno, Cluster *clt)
 
     int existPolyT = searchFlankPolyA(leftSeq, 0, leftLen);
     int existPolyA = searchFlankPolyA(rightSeq, 1, rightLen);
-    int leftIdx = (annoArr[0].tid == -2) ? 1 : 0;
-    int rightIdx = (annoArr[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
+    int leftIdx = getLeftIdx(annoArr, numAnno);
+    int rightIdx = getRightIdx(annoArr, numAnno);
 
     if (existPolyT && isRevAnno(annoArr[leftIdx]) && hasFull3P(annoArr[leftIdx].flag))
         clt->flag |= CLT_AT_RICH;
