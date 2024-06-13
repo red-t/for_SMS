@@ -424,6 +424,7 @@ int compare(const void *a, const void *b)
 /// @brief Check whether left-/right-most annotation is close to insSeq end
 void checkGap(Annotation *annoArr, int numAnno, Cluster *clt, int *sizeArr)
 {
+    // Find left-/right-most TE annotation
     int leftIdx = getLeftIdx(annoArr, numAnno);
     int rightIdx = getRightIdx(annoArr, numAnno);
 
@@ -462,15 +463,22 @@ void checkPolyA(Annotation *annoArr, int numAnno, Cluster *clt)
     if (numAnno == 1)
         return;
 
+    // Find left-/right-most TE annotation
+    int leftIdx = getLeftIdx(annoArr, numAnno);
+    int rightIdx = getRightIdx(annoArr, numAnno);
+
+    // Define valid polyT
     int hasPolyT = (annoArr[0].tid == -2) ? 1 : 0;
-    if (hasPolyT && hasFull3P(annoArr[1].flag)) {
-        int gap1 = annoArr[1].queryStart - annoArr[0].queryEnd;
+    if (hasPolyT && hasFull3P(annoArr[leftIdx].flag)) {
+        int gap1 = annoArr[leftIdx].queryStart - annoArr[leftIdx-1].queryEnd;
         int gap2 = annoArr[0].queryStart;
         clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
     }
+
+    // Define valid polyA
     int hasPolyA = (annoArr[numAnno-1].tid == -1) ? 1 : 0;
-    if (hasPolyA && hasFull3P(annoArr[numAnno-2].flag)) {
-        int gap1 = annoArr[numAnno-1].queryStart - annoArr[numAnno-2].queryEnd;
+    if (hasPolyA && hasFull3P(annoArr[rightIdx].flag)) {
+        int gap1 = annoArr[rightIdx+1].queryStart - annoArr[rightIdx].queryEnd;
         int gap2 = clt->insLen - annoArr[numAnno-1].queryEnd;
         clt->flag |= (gap1 < 20 && gap2 < 100) ? CLT_POLYA : 0;
     }
