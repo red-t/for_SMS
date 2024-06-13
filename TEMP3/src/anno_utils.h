@@ -84,6 +84,12 @@ int compare(const void *a, const void *b);
 /// @brief Check whether the ins-seq contains large gap
 void checkGap(Annotation *annoArr, int numAnno, Cluster *clt, int *sizeArr);
 
+/// @brief Get index of the left-most TE annotation
+int getLeftIdx(Annotation *annoArr, int numAnno);
+
+/// @brief Get index of the right-most TE annotation
+int getRightIdx(Annotation *annoArr, int numAnno);
+
 /// @brief Check whether the ins-seq contains valid polyA
 void checkPolyA(Annotation *annoArr, int numAnno, Cluster *clt);
 

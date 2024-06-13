@@ -424,16 +424,36 @@ int compare(const void *a, const void *b)
 /// @brief Check whether left-/right-most annotation is close to insSeq end
 void checkGap(Annotation *annoArr, int numAnno, Cluster *clt, int *sizeArr)
 {
-    int leftIdx = (annoArr[0].tid == -2) ? 1 : 0;
-    int rightIdx = (annoArr[numAnno-1].tid == -1) ? numAnno-2 : numAnno-1;
+    int leftIdx = getLeftIdx(annoArr, numAnno);
+    int rightIdx = getRightIdx(annoArr, numAnno);
 
-    int leftCutOff = (int)MAX(sizeArr[annoArr[leftIdx].tid], 100);
+    int leftCutOff = (int)MAX(0.2 * sizeArr[annoArr[leftIdx].tid], 100);
     if (annoArr[0].queryStart < leftCutOff)
         clt->flag |= CLT_LEFT_NEAR_END;
 
-    int rightCutOff = (int)MAX(sizeArr[annoArr[rightIdx].tid], 100);
+    int rightCutOff = (int)MAX(0.2 * sizeArr[annoArr[rightIdx].tid], 100);
     if ((clt->insLen - annoArr[numAnno-1].queryEnd) < rightCutOff)
         clt->flag |= CLT_RIGHT_NEAR_END;
+}
+
+/// @brief Get index of the left-most TE annotation
+int getLeftIdx(Annotation *annoArr, int numAnno)
+{
+    for (int i = 0; i < numAnno; i++) {
+        if (annoArr[i].tid != -2)
+            return i;
+    }
+    return 0;
+}
+
+/// @brief Get index of the right-most TE annotation
+int getRightIdx(Annotation *annoArr, int numAnno)
+{
+    for (int i = numAnno-1; i >= 0; i--) {
+        if (annoArr[i].tid != -1)
+            return i;
+    }
+    return numAnno - 1;
 }
 
 /// @brief Check whether the ins-seq contains valid polyA
