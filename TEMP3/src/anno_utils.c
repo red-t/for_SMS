@@ -153,7 +153,6 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
 
     int thisLen = 0, maxLen = 0;
     int thisSum = 0, maxSum = 0;
-    int thisNum = 0, maxNum = 0;
     int numOther = 0, position = 0;
 
     char targetChar = (polyA->isA) ? 'A' : 'T';
@@ -169,7 +168,6 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
         thisLen++;
         if (toupper(flankSeq[i]) == targetChar) {
             thisSum++;
-            thisNum++;
         } else {
             thisSum -= toupper(flankSeq[i]) == altChar ? 1 : 3;
             numOther++;
@@ -179,17 +177,13 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
         if (thisSum > maxSum) {
             maxLen = thisLen;
             maxSum = thisSum;
-            maxNum = thisNum;
             position = i;
         }
 
         // Search from the new start
         if (thisSum < 0 || numOther > 10) {
-            // double fdr = (polyA->seqLen - maxLen + 1) * pow(0.25, maxLen);
-            // if (maxLen < 5 || fdr > 0.01)
-            //     goto RESET;
-
-            if (maxLen < 5 || ((float)maxNum / maxLen) < 0.8)
+            double fdr = (polyA->seqLen - maxLen + 1) * pow(0.25, maxLen);
+            if (maxLen < 5 || fdr > 0.01)
                 goto RESET;
 
             addCandidate(candidateArr, position, maxLen);
@@ -198,15 +192,13 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
             RESET:
             thisLen = maxLen = 0;
             thisSum = maxSum = 0;
-            thisNum = maxNum = 0;
             numOther = 0;
         }
     }
 
     // The final polyA candiadte
-    // double fdr = (polyA->seqLen - maxLen + 1) * pow(0.25, maxLen);
-    // if (maxLen >= 5 && fdr <= 0.01) {
-    if (maxLen >= 5 && ((float)maxNum / maxLen) >= 0.8) {
+    double fdr = (polyA->seqLen - maxLen + 1) * pow(0.25, maxLen);
+    if (maxLen >= 5 && fdr <= 0.01) {
         addCandidate(candidateArr, position, maxLen);
         numPolyA++;
     }
@@ -585,7 +577,6 @@ int searchFlankPolyA(char *flankSeq, int isA, int seqLen)
 
     int thisLen = 0, maxLen = 0;
     int thisSum = 0, maxSum = 0;
-    int thisNum = 0, maxNum = 0;
     int numOther = 0, position = 0;
 
     char targetChar = isA ? 'A' : 'T';
@@ -599,7 +590,6 @@ int searchFlankPolyA(char *flankSeq, int isA, int seqLen)
         thisLen++;
         if (toupper(flankSeq[i]) == targetChar) {
             thisSum++;
-            thisNum++;
         } else {
             thisSum -= toupper(flankSeq[i]) == altChar ? 1 : 3;
             numOther++;
@@ -608,19 +598,17 @@ int searchFlankPolyA(char *flankSeq, int isA, int seqLen)
         if (thisSum > maxSum) {
             maxLen = thisLen;
             maxSum = thisSum;
-            maxNum = thisNum;
             position = i;
         }
 
         if (thisSum < 0 || numOther > 10)
-            thisSum = thisNum = thisLen = numOther = 0;
+            thisSum = thisLen = numOther = 0;
     }
 
     int gapToStart = isA ? position : (seqLen - position - maxLen);
-    // double fdr = (seqLen - maxLen + 1) * pow(0.25, maxLen);
+    double fdr = (seqLen - maxLen + 1) * pow(0.25, maxLen);
 
-    // if (gapToStart > 5 || maxLen < 5 || fdr > 0.01)
-    if (gapToStart > 5 || maxLen < 5 || (((float)maxNum / maxLen) < 0.8))
+    if (gapToStart > 5 || maxLen < 5 || fdr > 0.01)
         return 0;
 
     return 1;

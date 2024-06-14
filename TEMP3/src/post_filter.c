@@ -32,9 +32,6 @@ void filterLINE(Cluster *clt)
 
     // For cluster locates in normal region
     if (!isSelfToSelf(clt->flag)) {
-        if ((hasPolyA(clt->flag) || isATRich(clt->flag)) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
-            clt->flag |= CLT_PASS;
-
         if ((hasFull5P(clt->flag) && hasFull3P(clt->flag)) && hasSingleTE(clt->flag) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
             clt->flag |= CLT_PASS;
     }
