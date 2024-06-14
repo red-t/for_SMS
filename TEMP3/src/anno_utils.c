@@ -182,8 +182,8 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
         }
 
         // Search from the new start
-        if (thisSum < 0 || numOther > 5) {
-            if (maxSum < 5 || ((float)maxNum / maxLen) < 0.8)
+        if (thisSum < 0 || numOther > 3) {
+            if (maxLen < 5 || ((float)maxNum / maxLen) < 0.8)
                 goto RESET;
 
             addCandidate(candidateArr, position, maxLen);
@@ -195,6 +195,12 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
             thisNum = maxNum = 0;
             numOther = 0;
         }
+    }
+
+    // The final polyA candiadte
+    if (maxLen >= 5 && ((float)maxNum / maxLen) >= 0.8) {
+        addCandidate(candidateArr, position, maxLen);
+        numPolyA++;
     }
 
     if (numPolyA == 0)
