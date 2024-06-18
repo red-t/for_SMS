@@ -182,7 +182,7 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
 
         // Search from the new start
         if (thisSum < 0 || numOther > 10) {
-            double fdr = (thisLen - maxLen + 1) * pow(0.25, maxLen);
+            double fdr = (polyA->seqLen - maxLen + 1) * pow(0.25, maxLen);
             if (maxLen < 5 || fdr > 0.01)
                 goto RESET;
 
@@ -197,7 +197,7 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
     }
 
     // The final polyA candiadte
-    double fdr = (thisLen - maxLen + 1) * pow(0.25, maxLen);
+    double fdr = (polyA->seqLen - maxLen + 1) * pow(0.25, maxLen);
     if (maxLen >= 5 && fdr <= 0.01) {
         addCandidate(candidateArr, position, maxLen);
         numPolyA++;
@@ -606,7 +606,7 @@ int searchFlankPolyA(char *flankSeq, int isA, int seqLen)
     }
 
     int gapToStart = isA ? position : (seqLen - position - maxLen);
-    double fdr = (thisLen - maxLen + 1) * pow(0.25, maxLen);
+    double fdr = (seqLen - maxLen + 1) * pow(0.25, maxLen);
 
     if (gapToStart > 5 || maxLen < 5 || fdr > 0.01)
         return 0;
