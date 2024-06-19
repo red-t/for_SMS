@@ -174,7 +174,7 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
         }
 
         // Update maxSum
-        if (thisSum > maxSum) {
+        if (thisSum >= maxSum) {
             maxLen = thisLen;
             maxSum = thisSum;
             position = i;
@@ -595,7 +595,7 @@ int searchFlankPolyA(char *flankSeq, int isA, int seqLen)
             numOther++;
         }
         
-        if (thisSum > maxSum) {
+        if (thisSum >= maxSum) {
             maxLen = thisLen;
             maxSum = thisSum;
             position = i;
