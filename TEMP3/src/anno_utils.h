@@ -37,11 +37,6 @@ typedef struct PolyA
     int seqLen;
 } PolyA;
 
-typedef struct PolyACandidate
-{
-    int position;
-    int length;
-} PolyACandidate;
 
 /***********************************
  *** Annotate Insertion sequence ***
@@ -57,11 +52,8 @@ int annoPolyA(Cluster *clt, Annotation *annoArr, int numAnno, PolyA *polyA);
 /// @brief Find and record single polyA/polyT
 int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, PolyA *polyA);
 
-/// @brief Store first && final polyA candidate
-void addCandidate(PolyACandidate candidateArr[], int position, int length);
-
 /// @brief Add polyA candidate to annoArr
-void addPolyA(Annotation *annoArr, int numAnno, Cluster *clt, PolyA *polyA, PolyACandidate candidate);
+void addPolyA(Annotation *annoArr, int numAnno, Cluster *clt, PolyA *polyA, int position, int length);
 
 /// @brief output tsd-containing-seq for tsd annotation
 void outputTsdSeq(Cluster *clt, PolyA *polyA, Annotation *annoArr, int numAnno);

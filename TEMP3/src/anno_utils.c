@@ -160,8 +160,7 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
     int start = (polyA->isA) ? 0 : polyA->seqLen-1;
     int end = (polyA->isA) ? polyA->seqLen : -1;
     int step = (polyA->isA) ? 1 : -1;
-    int numPolyA = 0;
-    PolyACandidate candidateArr[2] = {{0, 0}, {0, 0}};
+    int numOrigin = numAnno;
 
     for (int i = start; i != end; i += step)
     {
@@ -174,7 +173,7 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
         }
 
         // Update maxSum
-        if (thisSum >= maxSum) {
+        if (thisSum > maxSum) {
             maxLen = thisLen;
             maxSum = thisSum;
             position = i;
@@ -186,8 +185,7 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
             if (maxLen < 5 || fdr > 0.01)
                 goto RESET;
 
-            addCandidate(candidateArr, position, maxLen);
-            numPolyA++;
+            addPolyA(annoArr, numAnno++, clt, polyA, position, maxLen);
 
             RESET:
             thisLen = maxLen = 0;
@@ -198,54 +196,29 @@ int setPolyA(char *flankSeq, Annotation *annoArr, Cluster *clt, int numAnno, Pol
 
     // The final polyA candiadte
     double fdr = (polyA->seqLen - maxLen + 1) * pow(0.25, maxLen);
-    if (maxLen >= 5 && fdr <= 0.01) {
-        addCandidate(candidateArr, position, maxLen);
-        numPolyA++;
-    }
+    if (maxLen >= 5 && fdr <= 0.01)
+        addPolyA(annoArr, numAnno++, clt, polyA, position, maxLen);
 
-    if (numPolyA == 0)
+    if (numAnno - numOrigin == 0)
         return numAnno;
-    
-    if (numPolyA == 1)
-        addPolyA(annoArr, numAnno++, clt, polyA, candidateArr[0]);
-
-    if (numPolyA >= 2) {
-        addPolyA(annoArr, numAnno++, clt, polyA, candidateArr[0]);
-        addPolyA(annoArr, numAnno++, clt, polyA, candidateArr[1]);
-    }
 
     polyA->rightAnnoEnd = polyA->isA ? annoArr[numAnno-1].queryEnd : polyA->rightAnnoEnd;
     polyA->leftAnnoStart = polyA->isA ? polyA->leftAnnoStart : annoArr[numAnno-1].queryStart;
     return numAnno;
 }
 
-/// @brief Store first && final polyA candidate
-void addCandidate(PolyACandidate candidateArr[], int position, int length)
-{
-    // Store first candidate, if candidateArr[0] is empty
-    if (candidateArr[0].length == 0) {
-        candidateArr[0].position = position;
-        candidateArr[0].length = length;
-        return;
-    }
-
-    // Store final candidate
-    candidateArr[1].position = position;
-    candidateArr[1].length = length;
-}
-
 /// @brief Add polyA candidate to annoArr
-void addPolyA(Annotation *annoArr, int numAnno, Cluster *clt, PolyA *polyA, PolyACandidate candidate)
+void addPolyA(Annotation *annoArr, int numAnno, Cluster *clt, PolyA *polyA, int position, int length)
 {
     if (polyA->isA) {
-        annoArr[numAnno].queryStart = candidate.position + polyA->rightAnnoEnd + 1 - candidate.length;
-        annoArr[numAnno].queryEnd = candidate.position + polyA->rightAnnoEnd + 1;
+        annoArr[numAnno].queryStart = position + polyA->rightAnnoEnd + 1 - length;
+        annoArr[numAnno].queryEnd = position + polyA->rightAnnoEnd + 1;
         annoArr[numAnno].strand = 0;
         annoArr[numAnno].tid = -1;
     }
     else {
-        annoArr[numAnno].queryStart = candidate.position;
-        annoArr[numAnno].queryEnd = candidate.position + candidate.length;
+        annoArr[numAnno].queryStart = position;
+        annoArr[numAnno].queryEnd = position + length;
         annoArr[numAnno].strand = 1;
         annoArr[numAnno].tid = -2;
     }
@@ -595,7 +568,7 @@ int searchFlankPolyA(char *flankSeq, int isA, int seqLen)
             numOther++;
         }
         
-        if (thisSum >= maxSum) {
+        if (thisSum > maxSum) {
             maxLen = thisLen;
             maxSum = thisSum;
             position = i;
