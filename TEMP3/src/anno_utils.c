@@ -482,13 +482,13 @@ void checkEnd(Annotation *annoArr, int numAnno, Cluster *clt)
         clt->flag |= CLT_3P_FULL;
 
     if ((clt->flag & CLT_5P_FULL) == 0) {
-        clt->flag |= (!isRevAnno(annoArr[leftIdx]) && !isLeftFlankMapped(clt->flag)) ? CLT_5P_UNKNOWN : 0;
-        clt->flag |= (isRevAnno(annoArr[rightIdx]) && !isRightFlankMapped(clt->flag)) ? CLT_5P_UNKNOWN : 0;
+        clt->flag |= (!isRevAnno(annoArr[leftIdx]) && isRightFlankMapped(clt->flag)) ? CLT_5P_UNKNOWN : 0;
+        clt->flag |= (isRevAnno(annoArr[rightIdx]) && isLeftFlankMapped(clt->flag)) ? CLT_5P_UNKNOWN : 0;
     }
 
     if ((clt->flag & CLT_3P_FULL) == 0) {
-        clt->flag |= (isRevAnno(annoArr[leftIdx]) && !isLeftFlankMapped(clt->flag)) ? CLT_3P_UNKNOWN : 0;
-        clt->flag |= (!isRevAnno(annoArr[rightIdx]) && !isRightFlankMapped(clt->flag)) ? CLT_3P_UNKNOWN : 0;
+        clt->flag |= (isRevAnno(annoArr[leftIdx]) && isRightFlankMapped(clt->flag)) ? CLT_3P_UNKNOWN : 0;
+        clt->flag |= (!isRevAnno(annoArr[rightIdx]) && isLeftFlankMapped(clt->flag)) ? CLT_3P_UNKNOWN : 0;
     }
 }
 

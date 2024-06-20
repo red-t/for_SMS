@@ -15,4 +15,7 @@ void filterLTR(Cluster *clt);
 // Perform post-filtering for DNA
 void filterDNA(Cluster *clt);
 
+// Extra filtering for insertions with low-frequency
+void filterLowFreq(Cluster *clt);
+
 #endif // POST_FILTER_H

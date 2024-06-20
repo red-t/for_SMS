@@ -38,6 +38,9 @@ void filterLINE(Cluster *clt)
         if ((hasFull5P(clt->flag) && hasFull3P(clt->flag)) && hasSingleTE(clt->flag) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
             clt->flag |= CLT_PASS;
     }
+
+    // For low-freq cluster
+    filterLowFreq(clt);
 }
 
 // Perform post-filtering for LTR
@@ -58,6 +61,9 @@ void filterLTR(Cluster *clt)
         if (isSoloLtr(clt->flag) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
             clt->flag |= CLT_PASS;
     }
+
+    // For low-freq cluster
+    filterLowFreq(clt);
 }
 
 // Perform post-filtering for DNA
@@ -72,4 +78,25 @@ void filterDNA(Cluster *clt)
         if ((hasFull5P(clt->flag) && hasFull3P(clt->flag)) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
             clt->flag |= CLT_PASS;
     }
+
+    // For low-freq cluster
+    filterLowFreq(clt);
+}
+
+// Extra filtering for insertions with low-frequency
+void filterLowFreq(Cluster *clt)
+{
+    if (isHighFreq(clt))
+        return;
+
+    // For all cluster
+    if ((hasFull5P(clt->flag) && hasUnknown3P(clt->flag)) && hasSingleTE(clt->flag) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
+        clt->flag |= CLT_SECONDARY;
+
+    // For LINE/SINE/RETROPOSON, polyA is necessary when full-3P exist
+    if (isRetroTE(clt->flag))
+        return;
+
+    if ((hasUnknown5P(clt->flag) && hasFull3P(clt->flag)) && hasSingleTE(clt->flag) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
+        clt->flag |= CLT_SECONDARY;
 }
