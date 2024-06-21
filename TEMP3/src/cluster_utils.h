@@ -38,6 +38,7 @@
 #define CLT_RIGHT_NEAR_END      4194304
 #define CLT_SOLO_LTR            8388608
 #define CLT_SECONDARY           16777216
+#define CLT_POLYA_ONLY          33554432
 
 #define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
 #define isFlankMapped(flag) (((flag) & 60) != 0)

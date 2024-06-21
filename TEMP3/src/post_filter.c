@@ -27,10 +27,7 @@ void postFilter(Cluster *clt)
 void filterLINE(Cluster *clt)
 {
     // For all cluster
-    if (hasPolyA(clt->flag))
-        clt->flag |= CLT_PASS;
-
-    if (isATRich(clt->flag) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
+    if ((hasPolyA(clt->flag) || isATRich(clt->flag)) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
         clt->flag |= CLT_PASS;
 
     // For cluster locates in normal region
@@ -38,6 +35,10 @@ void filterLINE(Cluster *clt)
         if ((hasFull5P(clt->flag) && hasFull3P(clt->flag)) && hasSingleTE(clt->flag) && (isLeftNearEnd(clt->flag) && isRightNearEnd(clt->flag)))
             clt->flag |= CLT_PASS;
     }
+
+    // For cluster with large non-TE fragment
+    if (hasPolyA(clt->flag) && (isLeftNearEnd(clt->flag) ^ isRightNearEnd(clt->flag)))
+        clt->flag |= CLT_POLYA_ONLY;
 
     // For low-freq cluster
     filterLowFreq(clt);
