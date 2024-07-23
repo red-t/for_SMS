@@ -246,8 +246,11 @@ cpdef annotateCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
     cdef Annotation[::1] annoView = annoArr
     cdef bytes teFn = cmdArgs.teFn.encode()
     cdef bytes refFn = cmdArgs.refFn.encode()
-    outputAnno(&annoView[0], annoView.shape[0], startIdx, teFn)
-    outputClt(&cltView[0], startIdx, endIdx, refFn, teFn)
+    if (annoView.shape[0] > 0):
+        outputAnno(&annoView[0], annoView.shape[0], startIdx, teFn)
+    
+    if (cltView.shape[0] > 0):
+        outputClt(&cltView[0], startIdx, endIdx, refFn, teFn)
 
     # Output cltArr and annoArr for post-anno-filtering
     cdef object cltArr = np.asarray(cltView)
