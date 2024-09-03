@@ -13,7 +13,9 @@ def parseArgs():
     parser.add_argument('-g', '--gap', dest='gapFn', type=str,
                                  help='gap annotation file', default='')
     parser.add_argument('-e', '--minEdge', dest='minEdge', type=int,
-                                 help='-e option for wtdbg2 assembling', default=0)
+                                 help='min read depth of a valid edge for wtdbg2', default=0)
+    parser.add_argument('-n', '--nodeLen', dest='nodeLen', type=int,
+                                 help='node length for wtdbg2, times of 256bp', default=256)
     parser.add_argument('-B', '--blacklist', dest='blackListPath', type=str,
                                  help='blacklist BED file', default='')
     parser.add_argument('-C', '--class', dest='classFn', type=str,
@@ -36,7 +38,7 @@ def parseArgs():
                                  help='min segment length, cigar operation with length < minSegLen will not be used to create segment.', default=100)
     parser.add_argument('-L', '--maxdist', dest='maxDistance', type=int,
                                  help='max merging distance, segments with distance larger than maxdist will not be merged in to the same cluster.', default=50)
-    parser.add_argument('--overhang', dest='minOverhang', type=int,
+    parser.add_argument('-O', '--overhang', dest='minOverhang', type=int,
                                  help='min overhang length', default=200)
     
     args = parser.parse_args()

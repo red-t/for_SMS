@@ -1,11 +1,11 @@
 import os
-from subprocess import Popen, DEVNULL
+import subprocess
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from .FileIO import outputSomaCltSeqs, outputRefFlank, mergeOutput
 from .Cluster import buildCluster
 from .Assemble import assembleCluster
 from .Annotate import annotateCluster
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 ###########################
@@ -65,12 +65,7 @@ cdef buildTERef(object cmdArgs):
     cdef str queryFn = "tmp_build/tmp.fa"
     cdef str outFn = "tmp_build/tmp.bam"
     cdef str cmd = "minimap2 -t 1 -aY {} {} | samtools view -bhS -o {} -".format(cmdArgs.teFn, queryFn, outFn)
-    cdef int exitCode
-    
-    process = Popen([cmd], stderr=DEVNULL, shell=True, executable='/bin/bash')
-    exitCode = process.wait()
-    if exitCode != 0:
-        raise Exception("Error: minimap2 failed for {}".format(queryFn))
+    subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
 
 #######################
@@ -127,8 +122,7 @@ cpdef object runInParallel(object cmdArgs):
                                           highQualArr, \
                                           startIdx, \
                                           taskSize, \
-                                          cmdArgs.minEdge, \
-                                          cmdArgs.numThread) for startIdx in startList])
+                                          cmdArgs) for startIdx in startList])
         for subProc in as_completed(subProcTup):
             retValue = subProc.result()
         

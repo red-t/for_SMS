@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-from subprocess import Popen, DEVNULL
+import subprocess
 from autogluon.tabular import TabularPredictor
 
 ##################
@@ -137,14 +137,9 @@ cdef updateSegArrByTe(Segment[::1] segView, Args args):
 ### Construct TeArr ###
 #########################
 cdef mapSegToTE(str teFn, Args args):
-    cdef int exitCode
-    cdef str cmd = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t {} -aY {} tmp_build/all_seg_{}.fa | " \
-                   "samtools view -@ {} -bhS -o tmp_build/all_seg_{}.bam -".format(args.numThread, teFn, args.tid, args.numThread, args.tid)
-
-    process = Popen([cmd], stderr=DEVNULL, shell=True, executable='/bin/bash')
-    exitCode = process.wait()
-    if exitCode != 0:
-        raise Exception("Error: minimap2 failed for tmp_build/all_seg_{}.fa".format(args.tid))
+    cdef str cmd = "minimap2 -k11 -w5 --sr -O4,8 -n2 -m20 --secondary=no -t {0} -aY {1} tmp_build/all_seg_{2}.fa | " \
+                   "samtools view -@ {0} -bhS -o tmp_build/all_seg_{2}.bam -".format(args.numThread, teFn, args.tid)
+    subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
 
 cdef object getTeArr(Iterator iterator):
