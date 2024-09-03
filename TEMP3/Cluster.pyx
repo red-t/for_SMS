@@ -237,8 +237,8 @@ cdef filterByBlacklist(Cluster[::1] cltView, Args args):
 cdef object filterByModel(object cltArr, object cmdArgs):
     cdef object cltDf = pd.DataFrame(cltArr)
     
-    filterGermByModel(cltDf, cmdArgs.germModelPath)
-    filterSomaByModel(cltDf, cmdArgs.somaModelPath)
+    filterGermByModel(cltDf, cmdArgs.highFreqModel)
+    filterSomaByModel(cltDf, cmdArgs.lowFreqModel)
 
     return cltDf.to_records(index=False)
 
@@ -265,7 +265,7 @@ cdef filterSomaByModel(object cltDf, str modelPath):
 cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdArgs, int tid):
     # 1. Construct segments
     cdef Args args = newArgs(tid, bgDiv, bgDepth, bgReadLen, cmdArgs)
-    cdef BamFile genomeBam = BamFile(cmdArgs.genomeBamFilePath, "rb", cmdArgs.numThread)
+    cdef BamFile genomeBam = BamFile(cmdArgs.genomeBamFn, "rb", cmdArgs.numThread)
     cdef object segArr = getSegArr(genomeBam, args)
 
     # 2. Compute segment features
@@ -288,7 +288,7 @@ cpdef dict buildCluster(float bgDiv, float bgDepth, float bgReadLen, object cmdA
     updateCltArr(cltArr, segArr, genomeBam, args)
 
     # 5. Filter clusters
-    args.blackAiList = newAiList(cmdArgs.blackListPath, chrom)
+    args.blackAiList = newAiList(cmdArgs.blacklistFn, chrom)
     filterByBlacklist(cltArr, args)
     cltArr = filterByModel(cltArr, cmdArgs)
 

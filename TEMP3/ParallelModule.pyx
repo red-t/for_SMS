@@ -11,8 +11,8 @@ from .Annotate import annotateCluster
 ###########################
 ### Get Background Info ###
 ###########################
-cdef dict getBackgroundInfo(str genomeBamFilePath, int numThread):
-    cdef BamFile genomeBam = BamFile(genomeBamFilePath, "rb", numThread)
+cdef dict getBackgroundInfo(str genomeBamFn, int numThread):
+    cdef BamFile genomeBam = BamFile(genomeBamFn, "rb", numThread)
     cdef int i, tid = 0, maxChromLen = 0
 
     for i in range(genomeBam.header.n_targets):
@@ -92,8 +92,8 @@ cpdef object runInParallel(object cmdArgs):
     cdef list startList
 
     # 1. Get Background Info
-    bgInfo = getBackgroundInfo(cmdArgs.genomeBamFilePath, cmdArgs.numThread)
-    print("bg Divergence: {}\nbg coverage: {}\nbg readlen: {}" \
+    bgInfo = getBackgroundInfo(cmdArgs.genomeBamFn, cmdArgs.numThread)
+    print("Background divergence: {}\nBackground depth: {}\nBackground read length: {}" \
           "".format(bgInfo["bgDiv"], bgInfo["bgDepth"], bgInfo["bgReadLen"]))
     
     # 2. Define LTR size

@@ -226,7 +226,7 @@ cpdef outputSomaCltSeqs(Cluster[::1] cltView, Segment[::1] segView, object cmdAr
     cdef Args args
     cdef str outputFn
     cdef BamFile outputFa
-    cdef BamFile genomeBam = BamFile(cmdArgs.genomeBamFilePath, "rb", cmdArgs.numThread)
+    cdef BamFile genomeBam = BamFile(cmdArgs.genomeBamFn, "rb", cmdArgs.numThread)
     cdef Iterator iterator = Iterator(genomeBam, tid)
     cdef bam1_t *destRecord = bam_init1()
 

@@ -19,10 +19,9 @@ cdef int getMinEdge(int numSegRaw):
 
 
 cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object cmdArgs):
-    cdef int minEdge = cmdArgs.minEdge
     cdef int numThread = cmdArgs.numThread
     cdef int nodeLen = cmdArgs.nodeLen
-    cdef int i, endIdx
+    cdef int i, endIdx, minEdge
     cdef str cmd, prefix
 
     endIdx = startIdx + taskSize
@@ -33,8 +32,9 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
         if isSomaClt(&cltView[i]):
             continue
 
-        if minEdge <= 0:
-            minEdge = getMinEdge(cltView[i].numSegRaw)
+        minEdge = getMinEdge(cltView[i].numSegRaw)
+        if cmdArgs.minEdge > 0:
+            minEdge = cmdArgs.minEdge
 
         # Primary assembling    
         prefix = "tmp_assm/{}_{}".format(cltView[i].tid, cltView[i].idx)

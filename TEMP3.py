@@ -1,71 +1,131 @@
 #!/usr/bin/python
 import os
 import argparse
+import shutil
 from TEMP3.ParallelModule import runInParallel
 
 def parseArgs():
-    parser = argparse.ArgumentParser(description="Demo of argparse")
-
-    parser.add_argument('-b', '--bam', dest='genomeBamFilePath', type=str,
-                                 help='path of input BAM file, mapped by minimap2 -Y', default='')
-    parser.add_argument('-r', '--repeat', dest='repeatFn', type=str,
-                                 help='repeat annotation file', default='')
-    parser.add_argument('-g', '--gap', dest='gapFn', type=str,
-                                 help='gap annotation file', default='')
-    parser.add_argument('-e', '--minEdge', dest='minEdge', type=int,
-                                 help='min read depth of a valid edge for wtdbg2', default=0)
-    parser.add_argument('-n', '--nodeLen', dest='nodeLen', type=int,
-                                 help='node length for wtdbg2, times of 256bp', default=256)
-    parser.add_argument('-B', '--blacklist', dest='blackListPath', type=str,
-                                 help='blacklist BED file', default='')
-    parser.add_argument('-C', '--class', dest='classFn', type=str,
-                                 help='transposon class file', default='')
-    parser.add_argument('-T', '--refTe', dest='teFn', type=str,
-                                 help='transposon reference fasta file', default='')
-    parser.add_argument('-R', '--refFa', dest='refFn', type=str,
-                                 help='reference genome fasta file', default='')
-    parser.add_argument('--germ', dest='germModelPath', type=str,
-                                 help='path of germline insertion model', default='')
-    parser.add_argument('--soma', dest='somaModelPath', type=str,
-                                 help='path of somatic insertion model', default='')
-    parser.add_argument('-o', '--outpath', dest='outPath', type=str,
-                                 help='output directory', default='./')
-    parser.add_argument('-p', '--numprocess', dest='numProcess', type=int,
-                                 help='max number of worker processes.', default=1)
-    parser.add_argument('-t', '--numthread', dest='numThread', type=int,
-                                 help='max number of extra threads to use in each sub process.', default=1)
-    parser.add_argument('-l', '--minSegLen', dest='minSegLen', type=int,
-                                 help='min segment length, cigar operation with length < minSegLen will not be used to create segment.', default=100)
-    parser.add_argument('-L', '--maxdist', dest='maxDistance', type=int,
-                                 help='max merging distance, segments with distance larger than maxdist will not be merged in to the same cluster.', default=50)
-    parser.add_argument('-O', '--overhang', dest='minOverhang', type=int,
-                                 help='min overhang length', default=200)
-    
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument('-b', '--bam', dest='genomeBamFn', type=str, required=True,
+                                    help='Genomic alignment in BAM format, aligned by minimap2 -Y')
+    parser.add_argument('-r', '--repeat', dest='repeatFn', type=str, required=True,
+                                    help='Repeat annotation in BED format, annotated by RepeatMasker')
+    parser.add_argument('-g', '--gap', dest='gapFn', type=str, required=True,
+                                    help='Gap annotation in BED format')
+    parser.add_argument('-C', '--class', dest='classFn', type=str, required=True,
+                                    help='Tab-delimited TE class file, the order should be consistent with the TE consensus fasta')
+    parser.add_argument('-T', '--teFn', dest='teFn', type=str, required=True,
+                                    help='Transposon consensus sequences in FASTA format')
+    parser.add_argument('-R', '--refFa', dest='refFn', type=str, required=True,
+                                    help='Reference genome in FASTA format')
+    parser.add_argument('-H', '--high', dest='highFreqModel', type=str, required=True,
+                                    help='Path to autogluon model for high frequency insertions')
+    parser.add_argument('-L', '--low', dest='lowFreqModel', type=str, required=True,
+                                    help='Path to autogluon model for low frequency insertions')
+    parser.add_argument('-B', '--blacklist', dest='blacklistFn', type=str, default='',
+                                    help='Blacklist in BED format')
+    parser.add_argument('-e', '--minEdge', dest='minEdge', type=int, default=0,
+                                    help='Min read depth of a valid edge for wtdbg2, automatically estimated if not provided')
+    parser.add_argument('-n', '--nodeLen', dest='nodeLen', type=int, default=256,
+                                    help='Node length for wtdbg2, times of 256bp')
+    parser.add_argument('-o', '--outpath', dest='outPath', type=str, default='./',
+                                    help='Output directory')
+    parser.add_argument('-p', '--numProcess', dest='numProcess', type=int, default=1,
+                                    help='Max number of worker processes')
+    parser.add_argument('-t', '--numThread', dest='numThread', type=int, default=1,
+                                    help='Max number of extra threads to use in each sub-process')
+    parser.add_argument('-l', '--minSegLen', dest='minSegLen', type=int, default=100,
+                                    help='Min segment length, reads with clip-/insert-segment < minSegLen will be ignored')
+    parser.add_argument('-d', '--maxDist', dest='maxDistance', type=int, default=50,
+                                    help='Reads (breakpoints) within maxDist will be merged as a cluster')
+    parser.add_argument('-O', '--overhang', dest='minOverhang', type=int, default=200,
+                                    help='Min overhang length, reads with genomic-mapping-length < overhang will be ignored')
     args = parser.parse_args()
     return args
 
 
 if __name__ == '__main__':
+    # 1. Parse command args
     cmdArgs = parseArgs()
+    
+    # 2. Check args
+    if not os.path.exists(cmdArgs.genomeBamFn):
+        raise FileNotFoundError(f"No such file or directory: {cmdArgs.genomeBamFn}")
+    if not os.path.exists(cmdArgs.repeatFn):
+        raise FileNotFoundError(f"No such file or directory: {cmdArgs.repeatFn}")
+    if not os.path.exists(cmdArgs.gapFn):
+        raise FileNotFoundError(f"No such file or directory: {cmdArgs.gapFn}")
+    if not os.path.exists(cmdArgs.classFn):
+        raise FileNotFoundError(f"No such file or directory: {cmdArgs.classFn}")
+    if not os.path.exists(cmdArgs.teFn):
+        raise FileNotFoundError(f"No such file or directory: {cmdArgs.teFn}")
+    if not os.path.exists(cmdArgs.refFn):
+        raise FileNotFoundError(f"No such file or directory: {cmdArgs.refFn}")
+    if not os.path.exists(cmdArgs.highFreqModel):
+        raise FileNotFoundError(f"No such file or directory: {cmdArgs.highFreqModel}")
+    if not os.path.exists(cmdArgs.lowFreqModel):
+        raise FileNotFoundError(f"No such file or directory: {cmdArgs.lowFreqModel}")
+    if not os.path.exists(cmdArgs.blacklistFn) and cmdArgs.blacklistFn:
+        raise FileNotFoundError(f"No such file or directory: {cmdArgs.blacklistFn}")
+    if cmdArgs.minEdge < 0:
+        raise ValueError(f"minEdge less than 0: {cmdArgs.minEdge}")
+    if cmdArgs.nodeLen <= 0 or (cmdArgs.nodeLen % 256) != 0:
+        raise ValueError(f"nodeLen should be times of 256: {cmdArgs.nodeLen}")
+    if cmdArgs.minSegLen <= 0:
+        raise ValueError(f"minSegLen less or equal to 0: {cmdArgs.minSegLen}")
+    if cmdArgs.maxDistance <= 0:
+        raise ValueError(f"maxDistance less or equal to 0: {cmdArgs.maxDistance}")
+    if cmdArgs.minOverhang <= 0:
+        raise ValueError(f"minOverhang less or equal to 0: {cmdArgs.minOverhang}")
+    
+    # 3. Convert to absolute path
+    cmdArgs.genomeBamFn = os.path.abspath(cmdArgs.genomeBamFn)
+    cmdArgs.repeatFn = os.path.abspath(cmdArgs.repeatFn)
+    cmdArgs.gapFn = os.path.abspath(cmdArgs.gapFn)
+    cmdArgs.classFn = os.path.abspath(cmdArgs.classFn)
+    cmdArgs.refFn = os.path.abspath(cmdArgs.refFn)
+    cmdArgs.teFn = os.path.abspath(cmdArgs.teFn)
+    cmdArgs.refFn = os.path.abspath(cmdArgs.refFn)
+    cmdArgs.highFreqModel = os.path.abspath(cmdArgs.highFreqModel) + "/"
+    cmdArgs.lowFreqModel = os.path.abspath(cmdArgs.lowFreqModel) + "/"
+    if cmdArgs.blacklistFn:
+        cmdArgs.blacklistFn = os.path.abspath(cmdArgs.blacklistFn)
+    
+    # 4. Change working directory
+    try:
+        if os.path.exists(cmdArgs.outPath) == False:
+            os.makedirs(cmdArgs.outPath)
+        os.chdir(cmdArgs.outPath)
+        print("Current working directory:", os.getcwd())
+    except:
+        raise OSError(f"Failed to change working dierectory: {cmdArgs.outPath}")
+    
+    # 5. Make temporary directories
+    try:
+        if os.path.exists("tmp_build"):
+            shutil.rmtree("tmp_build")
+            os.makedirs("tmp_build")
+        else:
+            os.makedirs("tmp_build")
 
-    if cmdArgs.germModelPath.endswith('/') == False:
-        cmdArgs.germModelPath += '/'
-    
-    if cmdArgs.somaModelPath.endswith('/') == False:
-        cmdArgs.somaModelPath += '/'
-    
-    if os.path.exists('tmp_build') == False:
-        os.mkdir('tmp_build')
-    
-    if os.path.exists('tmp_assm') == False:
-        os.mkdir('tmp_assm')
-    
-    if os.path.exists('tmp_anno') == False:
-        os.mkdir('tmp_anno')
+        if os.path.exists("tmp_assm"):
+            shutil.rmtree("tmp_assm")
+            os.makedirs("tmp_assm")
+        else:
+            os.makedirs("tmp_assm")
 
+        if os.path.exists("tmp_anno"):
+            shutil.rmtree("tmp_anno")
+            os.makedirs("tmp_anno")
+        else:
+            os.makedirs("tmp_anno")
+    except:
+        raise OSError("Failed to temporary directories")
+    
+    # 6. Run all jobs
     tidToResult = runInParallel(cmdArgs)
-
-    # Log
+    
+    # 7. Simple overview
     print("当前版本构建的 clusters 总数:")
     numCluster = 0
     for i in range(len(tidToResult)):
