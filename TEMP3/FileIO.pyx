@@ -175,7 +175,10 @@ cdef AiList* newAiList(str bedFn, const char *chrom):
     cdef bytes bedFnBytes = bedFn.encode()
     cdef AiList *aiList = initAiList()
 
-    readBED(aiList, bedFnBytes, chrom)
+    # Load intervals only if bedFn exists
+    if bedFn:
+        readBED(aiList, bedFnBytes, chrom)
+
     constructAiList(aiList, 20)
     return aiList
 

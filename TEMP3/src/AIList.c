@@ -180,6 +180,10 @@ void ailistQueryPoint(AiList *ailist, int queryPoint, int flankSize, int *numOve
     int queryEnd = queryPoint + flankSize;
     Contig *contig = &ailist->contigList[0];
     
+    // when there're no intervals, skip
+    if (contig->lenComp[0] <= 0)
+        return;
+
     // search intervals in each component one by one
     for(int i = 0; i < contig->numComp; i++){
         int compStart = contig->idxComp[i];
@@ -219,6 +223,10 @@ int ailistQueryInterval(AiList *ailist, int start, int end, int flankSize, int *
     int queryEnd = end + flankSize;
     int repTid = -1;
     Contig *contig = &ailist->contigList[0];
+
+    // when there're no intervals, skip
+    if (contig->lenComp[0] <= 0)
+        return repTid;
 
     // search intervals in each component one by one
     for(int i = 0; i < contig->numComp; i++){
