@@ -8,9 +8,9 @@ def parseArgs():
     parser = argparse.ArgumentParser(description="")
     parser.add_argument('-b', '--bam', dest='genomeBamFn', type=str, required=True,
                                     help='Genomic alignment in BAM format, aligned by minimap2 -Y')
-    parser.add_argument('-r', '--repeat', dest='repeatFn', type=str, required=True,
+    parser.add_argument('-r', '--repeat', dest='repeatFn', type=str, default='',
                                     help='Repeat annotation in BED format, annotated by RepeatMasker')
-    parser.add_argument('-g', '--gap', dest='gapFn', type=str, required=True,
+    parser.add_argument('-g', '--gap', dest='gapFn', type=str, default='',
                                     help='Gap annotation in BED format')
     parser.add_argument('-C', '--class', dest='classFn', type=str, required=True,
                                     help='Tab-delimited TE class file, the order should be consistent with the TE consensus fasta')
@@ -51,9 +51,9 @@ if __name__ == '__main__':
     # 2. Check args
     if not os.path.exists(cmdArgs.genomeBamFn):
         raise FileNotFoundError(f"No such file or directory: {cmdArgs.genomeBamFn}")
-    if not os.path.exists(cmdArgs.repeatFn):
+    if not os.path.exists(cmdArgs.repeatFn) and cmdArgs.repeatFn:
         raise FileNotFoundError(f"No such file or directory: {cmdArgs.repeatFn}")
-    if not os.path.exists(cmdArgs.gapFn):
+    if not os.path.exists(cmdArgs.gapFn) and cmdArgs.gapFn:
         raise FileNotFoundError(f"No such file or directory: {cmdArgs.gapFn}")
     if not os.path.exists(cmdArgs.classFn):
         raise FileNotFoundError(f"No such file or directory: {cmdArgs.classFn}")
@@ -80,8 +80,10 @@ if __name__ == '__main__':
     
     # 3. Convert to absolute path
     cmdArgs.genomeBamFn = os.path.abspath(cmdArgs.genomeBamFn)
-    cmdArgs.repeatFn = os.path.abspath(cmdArgs.repeatFn)
-    cmdArgs.gapFn = os.path.abspath(cmdArgs.gapFn)
+    if cmdArgs.repeatFn:
+        cmdArgs.repeatFn = os.path.abspath(cmdArgs.repeatFn)
+    if cmdArgs.gapFn:
+        cmdArgs.gapFn = os.path.abspath(cmdArgs.gapFn)
     cmdArgs.classFn = os.path.abspath(cmdArgs.classFn)
     cmdArgs.refFn = os.path.abspath(cmdArgs.refFn)
     cmdArgs.teFn = os.path.abspath(cmdArgs.teFn)
