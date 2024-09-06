@@ -406,3 +406,67 @@ void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr
     memcpy(destDataPtr, sourceSeqPtr, (destSeqLen+1) >> 1);
     destRecord->core.l_qseq = (int)destSeqLen + 1;
 }
+
+
+/*********************
+ *** Alinged Pairs ***
+ *********************/
+
+/// @brief Get aligned pairs of the read(alignment)
+int getAlignedPairs(bam1_t *read, int *queryArr, int *refArr)
+{
+    uint32_t *cigarArr = bam_get_cigar(read);
+    int numCigar = read->core.n_cigar;
+    int refPos = read->core.pos;
+    int queryPos = 0;
+    int size = 0;
+
+    for (int i = 0; i < numCigar; i++)
+    {
+        int cigarLen = bam_cigar_oplen(cigarArr[i]);
+        int end = refPos + cigarLen;
+
+        switch (bam_cigar_op(cigarArr[i]))
+        {
+        case BAM_CSOFT_CLIP:
+            queryPos += cigarLen;
+
+        case BAM_CMATCH:
+        case BAM_CEQUAL:
+        case BAM_CDIFF:
+            for (int j = refPos; j < end; j++)
+            {
+                queryArr[size] = queryPos++;
+                refArr[size] = j;
+                size++;
+            }
+            refPos += cigarLen;
+            break;
+
+        case BAM_CINS:
+            for (int j = refPos; j < end; j++)
+            {
+                queryArr[size] = queryPos++;
+                refArr[size] = -1;
+                size++;
+            }
+            break;
+
+        case BAM_CDEL:
+        case BAM_CREF_SKIP:
+            for (int j = refPos; j < end; j++)
+            {
+                queryArr[size] = -1;
+                refArr[size] = j;
+                size++;
+            }
+            refPos += cigarLen;
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return size;
+}

@@ -228,4 +228,12 @@ uint8_t *setDestName(bam1_t *destRecord, char *destName, int destNameLen, int nu
 /// @brief Copy sequence from sourceRecord to destRecord
 void copySequence(bam1_t *sourceRecord, bam1_t *destRecord, uint8_t *destDataPtr, int sourceStart, int destSeqLen);
 
+
+/*********************
+ *** Alinged Pairs ***
+ *********************/
+
+/// @brief Get aligned pairs of the read(alignment)
+int getAlignedPairs(bam1_t *read, int *queryArr, int *refArr);
+
 #endif // SEG_UTILS_H

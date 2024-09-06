@@ -175,6 +175,11 @@ cdef extern from "src/seg_utils.h" nogil:
     ####################
     int trimSegment(bam1_t *sourceRecord, bam1_t *destRecord, int segIdx, int sourceStart, int sourceEnd)
 
+    #####################
+    ### Alinged Pairs ###
+    #####################
+    int getAlignedPairs(bam1_t *read, int *queryArr, int *refArr)
+
 
 cdef extern from "src/io_utils.h" nogil:
     ###########################
