@@ -57,7 +57,8 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
             os.rename("{}_assm.fa".format(prefix), "{}_assembled.fa".format(prefix))
             continue
 
-        cmd = "samtools consensus --homopoly-score 0.1 --low-MQ 10 --scale-MQ 1 --het-scale 0 --P-indel 2e-4 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
+        cmd = "samtools consensus --ff 3332 --homopoly-score 0.1 --low-MQ 10 --scale-MQ 1 --het-scale 0 --P-indel 2e-4 " \
+              "{0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
         # 3. Remove N-bases
@@ -115,21 +116,17 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
             del iterator
             return
 
-        # 2. Skip unmapped, secondary, supplementary, duplicate
-        if (iterator.bamRcord.core.flag & 3332):
-            continue
-
-        # 3. Get aligned-pairs
+        # 2. Get aligned-pairs
         numPairs = getAlignedPairs(iterator.bamRcord, &queryArr[0], &refArr[0])
         readLen = iterator.bamRcord.core.l_qseq
         refEnd = -2
 
-        # 4. Collect homo-polymer lengths
+        # 3. Collect homo-polymer lengths
         for i in range(numPairs):
             queryPos = queryArr[i]
             refPos = refArr[i]
 
-            # 5. Read cover homo-polymer start
+            # 4. Read cover homo-polymer start
             if refPos in polymerRegions:
                 queryStart = queryPos
                 refStart = refPos
@@ -146,7 +143,7 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
                     if queryPos >= 0:
                         queryStart = queryPos + 1            
             
-            # 6. Read cover homo-polymer end
+            # 5. Read cover homo-polymer end
             elif refPos == refEnd:
                 queryEnd = queryPos
                 if queryEnd < 0:
@@ -161,7 +158,7 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
                     if queryPos >= 0:
                         queryEnd = queryPos - 1
                 
-                # 7. Collect query homo-polymer length
+                # 6. Collect query homo-polymer length
                 polymerRegions[refStart].append(queryEnd - queryStart + 1)
                 refEnd = -2
 
@@ -196,7 +193,7 @@ cdef recalibration(str prefix, object cmdArgs):
     # 1. Map raw reads to polished seqs
     os.rename(f"{prefix}_assembled.fa", f"{prefix}_polished.fa")
     cmd = "minimap2 -aY {0}_polished.fa {0}.fa | " \
-          "samtools sort | samtools view -bhS -o {0}_RawToPolish.bam && " \
+          "samtools sort | samtools view -bhS -F 3332 -o {0}_RawToPolish.bam && " \
           "samtools index {0}_RawToPolish.bam".format(prefix)
     subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
     if not os.path.exists(f"{prefix}_RawToPolish.bam.bai"):
@@ -233,8 +230,8 @@ cdef recalibration(str prefix, object cmdArgs):
             refArr.resize((newCapacity,), refcheck=False)
 
         # 7. Output original sequence if no homopolymer
+        refName = cRefName.decode('utf-8')
         if len(polymerRegions) == 0:
-            refName = cRefName.decode('utf-8')
             outputFa.write(">" + refName + "\n" + refSeq + "\n")
             continue
         

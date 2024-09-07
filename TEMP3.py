@@ -40,8 +40,7 @@ def parseArgs():
                                     help='Reads (breakpoints) within maxDist will be merged as a cluster')
     parser.add_argument('-O', '--overhang', dest='minOverhang', type=int, default=200,
                                     help='Min overhang length, reads with genomic-mapping-length < overhang will be ignored')
-    parser.add_argument('--recalibration', dest='recalibration', type=bool, default=False,
-                                    help='Whether perform recalibration of homopolymer')
+    parser.add_argument('--recalibration', dest='recalibration', action='store_true', help='Enable recalibration')
     parser.add_argument('--minPolymerLen', dest='minPolymerLen', type=int, default=3,
                                     help='Homopolymer with >=minPolymerLen will be recalibrated')
     args = parser.parse_args()

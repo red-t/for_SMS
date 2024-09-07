@@ -430,6 +430,7 @@ int getAlignedPairs(bam1_t *read, int *queryArr, int *refArr)
         {
         case BAM_CSOFT_CLIP:
             queryPos += cigarLen;
+            break;
 
         case BAM_CMATCH:
         case BAM_CEQUAL:
