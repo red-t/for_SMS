@@ -42,19 +42,19 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
         cmd = "wtdbg2 -p 5 -k 15 -l 256 -e {0} -S 1 -A --rescue-low-cov-edges --node-len {1} --ctg-min-length {1} " \
             "--ctg-min-nodes 1 -q -t {2} -i {3}.fa -fo {3}".format(minEdge, nodeLen, numThread, prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-
-        if os.path.isfile("{}.ctg.lay.gz".format(prefix)) == False:
+        if os.path.isfile(f"{prefix}.ctg.lay.gz") == False:
             continue
         
         cmd = "wtpoa-cns -q -c 1 -t {0} -i {1}.ctg.lay.gz -fo {1}_assm.fa".format(numThread, prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+        if os.path.getsize(f"{prefix}_assm.fa") == 0:
+            continue
 
         # 2. Polishing
         cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -o {0}_RawToAssm.bam".format(prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-
-        if os.path.isfile("{}_RawToAssm.bam".format(prefix)) == False:
-            os.rename("{}_assm.fa".format(prefix), "{}_assembled.fa".format(prefix))
+        if os.path.isfile("f{prefix}_RawToAssm.bam") == False:
+            os.rename(f"{prefix}_assm.fa", "f{prefix}_assembled.fa")
             continue
 
         cmd = "samtools consensus --ff 3332 --homopoly-score 0.1 --low-MQ 10 --scale-MQ 1 --het-scale 0 --P-indel 2e-4 " \
