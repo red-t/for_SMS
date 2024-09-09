@@ -132,6 +132,7 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
                 refStart = refPos
                 refEnd = polymerRegions[refPos][0]
                 if queryStart < 0:
+                    # Correction for boundary deletion
                     queryPos = checkRightSide(queryArr, refArr, numPairs, i+1, refEnd)
                     if queryPos < 0:
                         refEnd = -2
@@ -139,6 +140,7 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
                         queryStart = queryPos
                     continue
                 else:
+                    # Correction for boundary insertion
                     queryPos = checkLeftSide(queryArr, refArr, i-1, 0)
                     if queryPos >= 0:
                         queryStart = queryPos + 1            
@@ -147,6 +149,7 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
             elif refPos == refEnd:
                 queryEnd = queryPos
                 if queryEnd < 0:
+                    # Correction for boundary deletion
                     queryPos = checkLeftSide(queryArr, refArr, i-1, refStart)
                     if queryPos < 0:
                         refEnd = -2
@@ -157,6 +160,7 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
                     # No correction for boundary insertion when followed by another homopolymer
                     queryEnd = queryPos
                 else:
+                    # Correction for boundary insertion
                     queryPos = checkRightSide(queryArr, refArr, numPairs, i+1, readLen)
                     if queryPos >= 0:
                         queryEnd = queryPos - 1
