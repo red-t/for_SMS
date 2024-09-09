@@ -53,7 +53,7 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
         # 2. Polishing
         cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -o {0}_RawToAssm.bam".format(prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-        if os.path.isfile("f{prefix}_RawToAssm.bam") == False:
+        if os.path.isfile(f"{prefix}_RawToAssm.bam") == False:
             os.rename(f"{prefix}_assm.fa", f"{prefix}_assembled.fa")
             continue
 
