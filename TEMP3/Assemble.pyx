@@ -54,7 +54,7 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
         cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -o {0}_RawToAssm.bam".format(prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
         if os.path.isfile("f{prefix}_RawToAssm.bam") == False:
-            os.rename(f"{prefix}_assm.fa", "f{prefix}_assembled.fa")
+            os.rename(f"{prefix}_assm.fa", f"{prefix}_assembled.fa")
             continue
 
         cmd = "samtools consensus --ff 3332 --homopoly-score 0.1 --low-MQ 10 --scale-MQ 1 --het-scale 0 --P-indel 2e-4 " \
