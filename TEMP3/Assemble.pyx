@@ -173,6 +173,7 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
 cdef object getPolymerRegions(str refSeq, int refLen, int minPolymerLen):
     cdef int start = 0
     cdef int end = 0
+    cdef int prevStart = -1
     cdef object regions = OrderedDict()
 
     # 1. Find all homo-polymer region
@@ -181,14 +182,23 @@ cdef object getPolymerRegions(str refSeq, int refLen, int minPolymerLen):
             end += 1
             continue
         if end - start >= minPolymerLen:
-            regions[start] = [end-1]
+            if (prevStart > 0) and ((start - regions[prevStart]) == 1):
+                # Merge adjacent homo-polymer
+                regions[prevStart] = [end-1]
+            else:
+                # Add new homo-polymer
+                regions[start] = [end-1]
+                prevStart = start
         
         start = end
         end += 1
     
     # 2. Check final homo-polymer
     if (refSeq[end-1] == refSeq[start]) and (end - start >= minPolymerLen):
-        regions[start] = [end-1]
+        if (prevStart > 0) and ((start - regions[prevStart]) == 1):
+            regions[prevStart] = [end-1]
+        else:
+            regions[start] = [end-1]
         
     return regions
 
