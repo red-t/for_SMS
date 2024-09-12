@@ -231,7 +231,7 @@ cdef extern from "htslib/sam.h" nogil:
     int bam_is_rev(bam1_t *b)
     char *bam_get_qname(bam1_t *b)
     uint32_t *bam_get_cigar(bam1_t *b)
-    uint8_t *bam_get_seq(bam1_t *b)
+    char *bam_get_seq(bam1_t *b)
     uint8_t *bam_get_qual(bam1_t *b)
     char bam_seqi(char *s, int i)
 

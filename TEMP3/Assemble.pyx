@@ -1,7 +1,8 @@
 import os
 import numpy as np
 import subprocess
-from collections import OrderedDict, Counter
+from collections import OrderedDict, Counter, defaultdict
+from cpython cimport PyBytes_FromStringAndSize
 
 ######################
 ### Local Assembly ###
@@ -51,7 +52,7 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
             continue
 
         # 2. Polishing
-        cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -o {0}_RawToAssm.bam".format(prefix)
+        cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam".format(prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
         if os.path.isfile(f"{prefix}_RawToAssm.bam") == False:
             os.rename(f"{prefix}_assm.fa", f"{prefix}_assembled.fa")
@@ -61,7 +62,10 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
               "{0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
-        # 3. Remove N-bases
+        # 3. Recalibration
+        recalibration(prefix, cmdArgs)
+
+        # 4. Remove N-bases
         cmd = (
             "sed 's/N//g' {0}_assembled.fa | "
             "awk '{{if($1~/^>/){{ctg=$1; a[ctg]=\"\"}} else{{a[ctg]=a[ctg]\"\"$1}}}} "
@@ -70,51 +74,52 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
         ).format(prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
-        # 4. Recalibration
-        recalibration(prefix, cmdArgs)
 
+cdef object getPolymerRegions(str refSeq, int refLen, int minPolymerLen):
+    cdef int start = 0
+    cdef int end = 0
+    cdef int prevStart = -1
+    cdef object regions = OrderedDict()
 
-cdef int checkLeftSide(int[::1] queryArr, int[::1] refArr,  int i, int leftMost):
-    while i >= 0:
-        queryPos = queryArr[i]
-        refPos = refArr[i]
-        if (refPos > 0) and (refPos < leftMost):
-            return -1
-        if (queryPos < 0) or (refPos < 0):
-            i -= 1
+    # 1. Find all homo-polymer region
+    while end < refLen:
+        if refSeq[end] == refSeq[start]:
+            end += 1
             continue
-        return queryPos
+        if end - start >= minPolymerLen:
+            if (prevStart > 0) and ((start - regions[prevStart]) == 1):
+                # Merge adjacent homo-polymer
+                regions[prevStart] = end - 1
+            else:
+                # Add new homo-polymer
+                regions[start] = end - 1
+                prevStart = start
+        
+        start = end
+        end += 1
+    
+    # 2. Check final homo-polymer
+    if (refSeq[end-1] == refSeq[start]) and (end - start >= minPolymerLen):
+        if (prevStart > 0) and ((start - regions[prevStart]) == 1):
+            regions[prevStart] = end - 1
+        else:
+            regions[start] = end - 1
+        
+    return regions
 
-    return -1
 
-
-cdef int checkRightSide(int[::1] queryArr, int[::1] refArr, int numPairs,  int i, int rightMost):
-    while i < numPairs:
-        queryPos = queryArr[i]
-        refPos = refArr[i]
-        if (refPos > 0) and (refPos > rightMost):
-            return -1
-        if (queryPos < 0) or (refPos < 0):
-            i += 1
-            continue
-        return queryPos
-
-    return -1
-
-
-cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] refArr, object polymerRegions):
-    cdef Iterator iterator = Iterator(inputBam, tid)
+cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refArr, object polymerRegions):
     cdef int queryPos, refPos
     cdef int refStart, refEnd
     cdef int queryStart, queryEnd
     cdef int i, retValue, readLen, numPairs
+    cdef object queryPolymers = OrderedDict()
     
     while True:
         # 1. Load read
         retValue = iterator.cnext1()
         if retValue < 0:
-            del iterator
-            return
+            return queryPolymers
 
         # 2. Get aligned-pairs
         numPairs = getAlignedPairs(iterator.bamRcord, &queryArr[0], &refArr[0])
@@ -130,7 +135,7 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
             if refPos in polymerRegions:
                 queryStart = queryPos
                 refStart = refPos
-                refEnd = polymerRegions[refPos][0]
+                refEnd = polymerRegions[refPos]
                 if queryStart < 0:
                     # Correction for boundary deletion
                     queryPos = checkRightSide(queryArr, refArr, numPairs, i+1, refEnd)
@@ -165,42 +170,73 @@ cdef getQueryPolymerLens(BamFile inputBam, int tid, int[::1] queryArr, int[::1] 
                     if queryPos >= 0:
                         queryEnd = queryPos - 1
                 
-                # 6. Collect query homo-polymer length
-                polymerRegions[refStart].append(queryEnd - queryStart + 1)
+                # 6. Collect query homo-polymers
+                if refStart in queryPolymers:
+                    queryPolymers[refStart].append((iterator.offset, queryStart, queryEnd, queryEnd - queryStart + 1))
+                else:
+                    queryPolymers[refStart] = [(iterator.offset, queryStart, queryEnd, queryEnd - queryStart + 1)]
+                
                 refEnd = -2
 
 
-cdef object getPolymerRegions(str refSeq, int refLen, int minPolymerLen):
-    cdef int start = 0
-    cdef int end = 0
-    cdef int prevStart = -1
-    cdef object regions = OrderedDict()
-
-    # 1. Find all homo-polymer region
-    while end < refLen:
-        if refSeq[end] == refSeq[start]:
-            end += 1
+cdef int checkLeftSide(int[::1] queryArr, int[::1] refArr,  int i, int leftMost):
+    while i >= 0:
+        queryPos = queryArr[i]
+        refPos = refArr[i]
+        if (refPos > 0) and (refPos < leftMost):
+            return -1
+        if (queryPos < 0) or (refPos < 0):
+            i -= 1
             continue
-        if end - start >= minPolymerLen:
-            if (prevStart > 0) and ((start - regions[prevStart]) == 1):
-                # Merge adjacent homo-polymer
-                regions[prevStart] = [end-1]
-            else:
-                # Add new homo-polymer
-                regions[start] = [end-1]
-                prevStart = start
-        
-        start = end
-        end += 1
+        return queryPos
+
+    return -1
+
+
+cdef int checkRightSide(int[::1] queryArr, int[::1] refArr, int numPairs,  int i, int rightMost):
+    while i < numPairs:
+        queryPos = queryArr[i]
+        refPos = refArr[i]
+        if (refPos > 0) and (refPos > rightMost):
+            return -1
+        if (queryPos < 0) or (refPos < 0):
+            i += 1
+            continue
+        return queryPos
+
+    return -1
+
+
+cdef str getRecalibratedSeq(Iterator iterator, object queryPolymers, int refStart):
+    # 1. Get most common length
+    cdef int mostCommonLen = Counter([p[3] for p in queryPolymers[refStart]]).most_common(1)[0][0]
+    cdef list positionCounters = [defaultdict(int) for _ in range(mostCommonLen)]
+    cdef int64_t fileOffset
+    cdef int queryStart, queryEnd, queryLen
+    cdef int i, retValue, pos
+    cdef char base
     
-    # 2. Check final homo-polymer
-    if (refSeq[end-1] == refSeq[start]) and (end - start >= minPolymerLen):
-        if (prevStart > 0) and ((start - regions[prevStart]) == 1):
-            regions[prevStart] = [end-1]
-        else:
-            regions[start] = [end-1]
+    # 2. Count for each position
+    for fileOffset, queryStart, queryEnd, queryLen in queryPolymers[refStart]:
+        if queryLen != mostCommonLen:
+            continue
         
-    return regions
+        retValue = iterator.cnext3(fileOffset)
+        pos = 0
+
+        for i in range(queryStart, queryEnd+1):
+            base = seq_nt16_str[bam_seqi(bam_get_seq(iterator.bamRcord), i)]
+            positionCounters[pos][base] += 1
+            pos += 1
+    
+    # 3. Get most common base for each position
+    cdef list result = []
+    cdef object counter
+    for counter in positionCounters:
+        base = max(counter, key=counter.get)
+        result.append(chr(base))
+
+    return ''.join(result)
 
 
 cdef recalibration(str prefix, object cmdArgs):
@@ -235,7 +271,7 @@ cdef recalibration(str prefix, object cmdArgs):
         cRefName = faidx_iseq(inputFa, tid)
         refLen = faidx_seq_len(inputFa, cRefName)
         cRefSeq = faidx_fetch_seq(inputFa, cRefName, 0, refLen, &refLen)
-        refSeq = cRefSeq.decode("utf-8")
+        refSeq = cRefSeq.decode('utf-8')
         
         # 5. Define homopolymer regions
         polymerRegions = getPolymerRegions(refSeq, refLen, cmdArgs.minPolymerLen)
@@ -252,27 +288,29 @@ cdef recalibration(str prefix, object cmdArgs):
             outputFa.write(">" + refName + "\n" + refSeq + "\n")
             continue
         
-        # 8. Collect query homo-polymer length
-        getQueryPolymerLens(inputBam, tid, queryArr, refArr, polymerRegions)
+        # 8. Collect query homo-polymers
+        iterator = Iterator(inputBam, tid)
+        queryPolymers = getQueryPolymers(iterator, queryArr, refArr, polymerRegions)
 
         # 9. Output recalibrated sequence
         prevEnd = 0
         outputFa.write(">" + refName + "\n")
         for refStart in polymerRegions:
-            refEnd = polymerRegions[refStart][0]
+            refEnd = polymerRegions[refStart]
             outputFa.write(refSeq[prevEnd:refStart])
-            
-            if len(polymerRegions[refStart]) > 1:
-                poymerLen = Counter(polymerRegions[refStart][1:]).most_common(1)[0][0]
+
+            if refStart in queryPolymers:
+                outputFa.write(getRecalibratedSeq(iterator, queryPolymers, refStart))
             else:
-                poymerLen = refEnd - refStart + 1
+                outputFa.write(refSeq[refStart:(refEnd+1)])
             
-            outputFa.write(refSeq[refStart] * poymerLen)
             prevEnd = refEnd + 1
         
         if prevEnd < len(refSeq):
             outputFa.write(refSeq[prevEnd:])
+        
         outputFa.write("\n")
+        del iterator
 
     # 10. Close files
     fai_destroy(inputFa)
