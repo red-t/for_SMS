@@ -51,21 +51,20 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
         if os.path.getsize(f"{prefix}_assm.fa") == 0:
             continue
 
-        # 2. Polishing
-        cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam".format(prefix)
-        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-        if os.path.isfile(f"{prefix}_RawToAssm.bam") == False:
-            os.rename(f"{prefix}_assm.fa", f"{prefix}_assembled.fa")
-            continue
-
-        cmd = "samtools consensus --ff 3332 --homopoly-score 0.1 --low-MQ 10 --scale-MQ 1 --het-scale 0 --P-indel 2e-4 " \
-              "{0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
+        # 2. First round polishing
+        cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
+              "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
         subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
-        # 3. Recalibration
+        # 3. Second round polishing
+        cmd = "minimap2 -aY {0}_assembled.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
+              "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
+        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+
+        # 4. Recalibration
         recalibration(prefix, cmdArgs)
 
-        # 4. Remove N-bases
+        # 5. Remove N-bases
         cmd = (
             "sed 's/N//g' {0}_assembled.fa | "
             "awk '{{if($1~/^>/){{ctg=$1; a[ctg]=\"\"}} else{{a[ctg]=a[ctg]\"\"$1}}}} "
@@ -77,7 +76,7 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
 
 cdef object getPolymerRegions(str refSeq, int refLen, int minPolymerLen):
     cdef int start = 0
-    cdef int end = 0
+    cdef int end = 1
     cdef int prevStart = -1
     cdef object regions = OrderedDict()
 
