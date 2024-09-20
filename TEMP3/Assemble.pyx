@@ -130,12 +130,11 @@ cdef recalibration(str prefix, object cmdArgs):
         for refStart in polymerRegions:
             # Ignore long homopolymer, un-covered region
             refEnd = polymerRegions[refStart]
-            # if (refEnd - refStart + 1 >= 20) or (refStart not in queryPolymers):
-            #     outputFa.write(refSeq[refStart:refEnd+1])
-            #     continue
+            if (refEnd - refStart + 1 >= 20) or (refStart not in queryPolymers):
+                outputFa.write(refSeq[refStart:refEnd+1])
+                continue
 
-            # outputFa.write(getRecalibratedSeq(queryPolymers, refSeq, refStart, refEnd))
-            outputFa.write(refSeq[refStart:refEnd+1])
+            outputFa.write(getRecalibratedSeq(queryPolymers, refSeq, refStart, refEnd))
         
         outputFa.write("\n")
         del iterator
