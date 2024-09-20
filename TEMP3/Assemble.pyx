@@ -101,9 +101,10 @@ cdef recalibration(str prefix, object cmdArgs):
     cdef object queryArr = np.zeros(1, dtype=np.int32)
     cdef object refArr = np.zeros(1, dtype=np.int32)
     cdef int tid, refLen, newCapacity, numRef = faidx_nseq(inputFa)
-    cdef int refStart, refEnd
+    cdef int refStart, refEnd, skipNext
     cdef const char *cRefName
     cdef char *cRefSeq
+    cdef str refSeq, recalibratedSeq
 
     for tid in range(numRef):
         # 4. Load sequence
@@ -123,18 +124,27 @@ cdef recalibration(str prefix, object cmdArgs):
         
         # 8. Collect query homo-polymers
         iterator = Iterator(inputBam, tid)
-        queryPolymers = getQueryPolymers(iterator, queryArr, refArr, polymerRegions)
+        queryPolymers = getQueryPolymers(iterator, queryArr, refArr, polymerRegions, refLen)
         
         # 9. Output recalibrated sequence
         outputFa.write(">" + cRefName.decode('utf-8') + "\n")
+        skipNext = 0
         for refStart in polymerRegions:
-            # Ignore long homopolymer, un-covered region
             refEnd = polymerRegions[refStart]
-            if (refEnd - refStart + 1 >= 20) or (refStart not in queryPolymers):
+
+            # Ignore long homopolymer, un-covered region
+            if (refEnd - refStart + 1 > 20) or (refStart not in queryPolymers):
                 outputFa.write(refSeq[refStart:refEnd+1])
                 continue
-
-            outputFa.write(getRecalibratedSeq(queryPolymers, refSeq, refStart, refEnd))
+            
+            # Previous base/homo-polymer was recalibrated, skip this one
+            if skipNext:
+                outputFa.write(refSeq[refStart:refEnd+1])
+                skipNext = 0
+                continue
+            
+            recalibratedSeq, skipNext = getRecalibratedSeq(queryPolymers, refSeq, refStart, refEnd)
+            outputFa.write(recalibratedSeq)
         
         outputFa.write("\n")
         del iterator
@@ -164,10 +174,10 @@ cdef object getPolymerRegions(str refSeq, int refLen):
     return regions
 
 
-cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refArr, object polymerRegions):
+cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refArr, object polymerRegions, int refLen):
     cdef int refPos, refStart, refEnd
     cdef int queryPos, queryStart, queryEnd
-    cdef int i, retValue, readLen, numPairs
+    cdef int i, retValue, numPairs
     cdef object queryPolymers = OrderedDict()
     cdef str readSeq, querySeq
     
@@ -179,7 +189,6 @@ cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refA
 
         # 2. Get aligned-pairs
         readSeq = getReadSeq(iterator)
-        readLen = iterator.bamRcord.core.l_qseq
         numPairs = getAlignedPairs(iterator.bamRcord, &queryArr[0], &refArr[0])
         refEnd = -2
 
@@ -201,8 +210,15 @@ cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refA
                         queryEnd = -2
                         querySeq = ""
                     else:
-                        queryStart = checkLeftSide(queryArr, refArr, i-1, 0) + 1
-                        queryEnd = queryPos
+                        # Find real start
+                        queryPos = checkLeftSide(queryArr, refArr, i-1, 0)
+                        if queryPos >= 0:
+                            queryStart = queryPos + 1 
+                        # Find real end
+                        queryPos = checkRightSide(queryArr, refArr, numPairs, i+1, refLen)
+                        if queryPos >= 0:
+                            queryEnd = queryPos - 1
+
                         querySeq = readSeq[queryStart:queryEnd+1]
                     
                     if refStart in queryPolymers:
@@ -237,6 +253,10 @@ cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refA
                     else:
                         queryEnd = queryPos
                     continue
+                else:
+                    queryPos = checkRightSide(queryArr, refArr, numPairs, i+1, refLen)
+                    if queryPos >= 0:
+                        queryEnd = queryPos - 1
                 
                 # 6. Collect query homo-polymers
                 if refStart in queryPolymers:
@@ -262,11 +282,11 @@ cdef int checkLeftSide(int[::1] queryArr, int[::1] refArr,  int i, int leftMost)
     while i >= 0:
         queryPos = queryArr[i]
         refPos = refArr[i]
-        if (refPos > 0) and (refPos < leftMost):
-            return -1
         if (queryPos < 0) or (refPos < 0):
             i -= 1
             continue
+        if refPos < leftMost:
+            return -1
         return queryPos
 
     return -1
@@ -276,11 +296,11 @@ cdef int checkRightSide(int[::1] queryArr, int[::1] refArr, int numPairs,  int i
     while i < numPairs:
         queryPos = queryArr[i]
         refPos = refArr[i]
-        if (refPos > 0) and (refPos > rightMost):
-            return -1
         if (queryPos < 0) or (refPos < 0):
             i += 1
             continue
+        if refPos > rightMost:
+            return -1
         return queryPos
 
     return -1
@@ -302,11 +322,11 @@ cdef int getMostCommonLen(object queryPolymers, int refStart, int refEnd):
         return altLen
 
 
-cdef str getRecalibratedSeq(object queryPolymers, str refSeq, int refStart, int refEnd):
+cdef tuple getRecalibratedSeq(object queryPolymers, str refSeq, int refStart, int refEnd):
     # 1. Get most common length
     cdef int mostCommonLen = getMostCommonLen(queryPolymers, refStart, refEnd)
     if mostCommonLen == 0:
-        return ''
+        return '', 1
 
     # 2. Initialize counter for each position
     cdef list positionCounters = [defaultdict(int) for _ in range(mostCommonLen)]
@@ -329,10 +349,13 @@ cdef str getRecalibratedSeq(object queryPolymers, str refSeq, int refStart, int 
     cdef list result = []
     cdef object counter
     if len(positionCounters[0]) == 0:
-        return refSeq[refStart:refEnd+1]
+        return refSeq[refStart:refEnd+1], 0
     else:
         for counter in positionCounters:
             base = max(counter, key=counter.get)
             result.append(base)
 
-        return ''.join(result)
+        if (refEnd - refStart + 1) == mostCommonLen:
+            return ''.join(result), 0
+        else:
+            return ''.join(result), 1
