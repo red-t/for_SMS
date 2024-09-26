@@ -23,7 +23,7 @@ cdef int getMinEdge(int numSegRaw):
 cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object cmdArgs):
     cdef int numThread = cmdArgs.numThread
     cdef int nodeLen = cmdArgs.nodeLen
-    cdef int i, endIdx, minEdge
+    cdef int i, endIdx, minEdge, rounds
     cdef str cmd, prefix
 
     endIdx = startIdx + taskSize
@@ -40,14 +40,20 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
 
         # 1. Primary assembling
         prefix = "tmp_assm/{}_{}".format(cltView[i].tid, cltView[i].idx)
-        cmd = "wtdbg2 -p 5 -k 15 -l 256 -e {0} -S 1 -A --rescue-low-cov-edges --node-len {1} --ctg-min-length {1} " \
-            "--ctg-min-nodes 1 -q -t {2} -i {3}.fa -fo {3}".format(minEdge, nodeLen, numThread, prefix)
-        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-        if os.path.isfile(f"{prefix}.ctg.lay.gz") == False:
-            continue
+        rounds = 0
+        while rounds < 5:
+            rounds += 1
+            cmd = "wtdbg2 -p 5 -k 15 -l 256 -e {0} -S 1 -A --rescue-low-cov-edges --node-len {1} --ctg-min-length {1} " \
+                  "--ctg-min-nodes 1 -q -t {2} -i {3}.fa -fo {3}".format(minEdge, nodeLen, numThread, prefix)
+            subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+            if os.path.isfile(f"{prefix}.ctg.lay.gz") == False:
+                continue
+            
+            cmd = "wtpoa-cns -q -c 1 -t {0} -i {1}.ctg.lay.gz -fo {1}_assm.fa".format(numThread, prefix)
+            subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+            if os.path.isfile(f"{prefix}_assm.fa") and (os.path.getsize(f"{prefix}_assm.fa") != 0):
+                break
         
-        cmd = "wtpoa-cns -q -c 1 -t {0} -i {1}.ctg.lay.gz -fo {1}_assm.fa".format(numThread, prefix)
-        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
         if os.path.getsize(f"{prefix}_assm.fa") == 0:
             continue
 
@@ -235,7 +241,6 @@ cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refA
                         refEnd = -2
                     else:
                         queryStart = queryPos
-                    continue
                 else:
                     # Correction for boundary insertion
                     queryPos = checkLeftSide(queryArr, refArr, i-1, 0)
@@ -250,9 +255,9 @@ cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refA
                     queryPos = checkLeftSide(queryArr, refArr, i-1, refStart)
                     if queryPos < 0:
                         refEnd = -2
+                        continue
                     else:
                         queryEnd = queryPos
-                    continue
                 else:
                     queryPos = checkRightSide(queryArr, refArr, numPairs, i+1, refLen)
                     if queryPos >= 0:
@@ -316,7 +321,7 @@ cdef int getMostCommonLen(object queryPolymers, int refStart, int refEnd):
         if altLen != refLen:
             break
     
-    if altCount < 0.8 * refCount:
+    if altCount <= refCount:
         return refLen
     else:
         return altLen

@@ -162,7 +162,7 @@ cdef object annotateIns(Cluster[::1] cltView, int startIdx, int endIdx, object c
 
     for i in range(startIdx, endIdx):
         # 1. Check if cluster has assembled insSeq
-        assmFn = "tmp_assm/{}_{}.ctg.lay.gz".format(cltView[i].tid, cltView[i].idx)
+        assmFn = "tmp_assm/{}_{}_polished.fa".format(cltView[i].tid, cltView[i].idx)
         if os.path.isfile(assmFn) != 0:
                 cltView[i].flag |= CLT_ASSEMBLED
         
