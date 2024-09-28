@@ -40,32 +40,33 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
 
         # 1. Primary assembling
         prefix = "tmp_assm/{}_{}".format(cltView[i].tid, cltView[i].idx)
-        rounds = 0
-        while rounds < 5:
-            rounds += 1
-            cmd = "wtdbg2 -p 5 -k 15 -l 256 -e {0} -S 1 -A --rescue-low-cov-edges --node-len {1} --ctg-min-length {1} " \
-                  "--ctg-min-nodes 1 -q -t {2} -i {3}.fa -fo {3}".format(minEdge, nodeLen, numThread, prefix)
-            subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-            if os.path.isfile(f"{prefix}.ctg.lay.gz") == False:
-                continue
+        if not os.path.exists(f"{prefix}_polished.fa"):
+            rounds = 0
+            while rounds < 5:
+                rounds += 1
+                cmd = "wtdbg2 -p 5 -k 15 -l 256 -e {0} -S 1 -A --rescue-low-cov-edges --node-len {1} --ctg-min-length {1} " \
+                    "--ctg-min-nodes 1 -q -t {2} -i {3}.fa -fo {3}".format(minEdge, nodeLen, numThread, prefix)
+                subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+                if os.path.isfile(f"{prefix}.ctg.lay.gz") == False:
+                    continue
+                
+                cmd = "wtpoa-cns -q -c 1 -t {0} -i {1}.ctg.lay.gz -fo {1}_assm.fa".format(numThread, prefix)
+                subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+                if os.path.isfile(f"{prefix}_assm.fa") and (os.path.getsize(f"{prefix}_assm.fa") != 0):
+                    break
             
-            cmd = "wtpoa-cns -q -c 1 -t {0} -i {1}.ctg.lay.gz -fo {1}_assm.fa".format(numThread, prefix)
+            if os.path.getsize(f"{prefix}_assm.fa") == 0:
+                continue
+
+            # 2. First round polishing
+            cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
+                "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
             subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-            if os.path.isfile(f"{prefix}_assm.fa") and (os.path.getsize(f"{prefix}_assm.fa") != 0):
-                break
-        
-        if os.path.getsize(f"{prefix}_assm.fa") == 0:
-            continue
 
-        # 2. First round polishing
-        cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
-              "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
-        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-
-        # 3. Second round polishing
-        cmd = "minimap2 -aY {0}_assembled.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
-              "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
-        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+            # 3. Second round polishing
+            cmd = "minimap2 -aY {0}_assembled.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
+                "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
+            subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
         # 4. Recalibration
         recalibration(prefix, cmdArgs)
@@ -88,11 +89,12 @@ cdef recalibration(str prefix, object cmdArgs):
         return
 
     # 1. Map raw reads to polished seqs
-    os.rename(f"{prefix}_assembled.fa", f"{prefix}_polished.fa")
-    cmd = "minimap2 -aY {0}_polished.fa {0}.fa | " \
-          "samtools sort | samtools view -bhS -F 3332 -o {0}_RawToPolish.bam && " \
-          "samtools index {0}_RawToPolish.bam".format(prefix)
-    subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+    if not os.path.exists(f"{prefix}_polished.fa"):
+        os.rename(f"{prefix}_assembled.fa", f"{prefix}_polished.fa")
+        cmd = "minimap2 -aY {0}_polished.fa {0}.fa | " \
+            "samtools sort | samtools view -bhS -F 3332 -o {0}_RawToPolish.bam && " \
+            "samtools index {0}_RawToPolish.bam".format(prefix)
+        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
     if not os.path.exists(f"{prefix}_RawToPolish.bam.bai"):
         os.rename(f"{prefix}_polished.fa", f"{prefix}_assembled.fa")
         return
@@ -130,7 +132,8 @@ cdef recalibration(str prefix, object cmdArgs):
         
         # 8. Collect query homo-polymers
         iterator = Iterator(inputBam, tid)
-        queryPolymers = getQueryPolymers(iterator, queryArr, refArr, polymerRegions, refLen)
+        # queryPolymers = getQueryPolymers(iterator, queryArr, refArr, polymerRegions, refLen)
+        queryPolymers = getQueryPolymers(iterator, queryArr, refArr, polymerRegions, refSeq)
         
         # 9. Output recalibrated sequence
         outputFa.write(">" + cRefName.decode('utf-8') + "\n")
@@ -180,10 +183,12 @@ cdef object getPolymerRegions(str refSeq, int refLen):
     return regions
 
 
-cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refArr, object polymerRegions, int refLen):
+# cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refArr, object polymerRegions, int refLen):
+cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refArr, object polymerRegions, str refSeq):
     cdef int refPos, refStart, refEnd
     cdef int queryPos, queryStart, queryEnd
     cdef int i, retValue, numPairs
+    cdef int refLen = len(refSeq)
     cdef object queryPolymers = OrderedDict()
     cdef str readSeq, querySeq
     
@@ -227,11 +232,22 @@ cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refA
 
                         querySeq = readSeq[queryStart:queryEnd+1]
                     
-                    if refStart in queryPolymers:
-                        queryPolymers[refStart].append((querySeq, queryEnd - queryStart + 1))
+                    if queryStart == queryEnd:
+                        extraLen = getExtraLen(queryStart, readSeq, refSeq[refStart])
                     else:
-                        queryPolymers[refStart] = [(querySeq, queryEnd - queryStart + 1)]
+                        extraLen = 0
+                    
+                    if refStart in queryPolymers:
+                        queryPolymers[refStart].append((querySeq, queryEnd-queryStart+1, extraLen))
+                    else:
+                        queryPolymers[refStart] = [(querySeq, queryEnd-queryStart+1, extraLen)]
                     continue
+
+                    # if refStart in queryPolymers:
+                    #     queryPolymers[refStart].append((querySeq, queryEnd - queryStart + 1))
+                    # else:
+                    #     queryPolymers[refStart] = [(querySeq, queryEnd - queryStart + 1)]
+                    # continue
                 
                 # Homo-polymer region
                 if queryStart < 0:
@@ -263,11 +279,21 @@ cdef object getQueryPolymers(Iterator iterator, int[::1] queryArr, int[::1] refA
                     if queryPos >= 0:
                         queryEnd = queryPos - 1
                 
-                # 6. Collect query homo-polymers
-                if refStart in queryPolymers:
-                    queryPolymers[refStart].append((readSeq[queryStart:queryEnd+1], queryEnd - queryStart + 1))
+                if queryEnd - queryStart == refEnd - refStart:
+                    extraLen = getExtraLen(queryStart, readSeq, refSeq[refStart])
                 else:
-                    queryPolymers[refStart] = [(readSeq[queryStart:queryEnd+1], queryEnd - queryStart + 1)]
+                    extraLen = 0
+                
+                if refStart in queryPolymers:
+                    queryPolymers[refStart].append((readSeq[queryStart:queryEnd+1], queryEnd - queryStart + 1, extraLen))
+                else:
+                    queryPolymers[refStart] = [(readSeq[queryStart:queryEnd+1], queryEnd - queryStart + 1, extraLen)]
+
+                # # 6. Collect query homo-polymers
+                # if refStart in queryPolymers:
+                #     queryPolymers[refStart].append((readSeq[queryStart:queryEnd+1], queryEnd - queryStart + 1))
+                # else:
+                #     queryPolymers[refStart] = [(readSeq[queryStart:queryEnd+1], queryEnd - queryStart + 1)]
                 
                 refEnd = -2
 
@@ -311,8 +337,18 @@ cdef int checkRightSide(int[::1] queryArr, int[::1] refArr, int numPairs,  int i
     return -1
 
 
+cdef int getExtraLen(int queryStart, str readSeq, str polymerBase):
+    if queryStart == 0:
+        return 0    
+    if readSeq[queryStart-1] == polymerBase:
+        return 1
+    else:
+        return 0
+
+
 cdef int getMostCommonLen(object queryPolymers, int refStart, int refEnd):
-    cdef object counter = Counter([p[1] for p in queryPolymers[refStart]])
+    cdef object counter = Counter([p[1] + p[2] for p in queryPolymers[refStart]])
+    # cdef object counter = Counter([p[1] for p in queryPolymers[refStart]])
     cdef int refLen = refEnd - refStart + 1
     cdef int refCount = counter[refLen]
     cdef int altLen, altCount
