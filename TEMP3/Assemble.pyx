@@ -389,12 +389,18 @@ cdef tuple getRecalibratedSeq(object queryPolymers, str refSeq, int refStart, in
     # 4. Get most common base for each position
     cdef list result = []
     cdef object counter
+    cdef str refBase = refSeq[refStart]
+    cdef int refCount
     if len(positionCounters[0]) == 0:
         return refSeq[refStart:refEnd+1], 0
     else:
         for counter in positionCounters:
             base = max(counter, key=counter.get)
-            result.append(base)
+            refCount = counter[refBase] # 0 if refBase not exists
+            if refCount >= counter[base]:
+                result.append(refBase)
+            else:
+                result.append(base)
 
         if (refEnd - refStart + 1) == mostCommonLen:
             return ''.join(result), 0
