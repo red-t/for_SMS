@@ -158,6 +158,47 @@ cdef recalibration(str prefix, object cmdArgs):
         outputFa.write("\n")
         del iterator
 
+        if prefix != "tmp_assm/7_1833":
+            continue
+
+        recalibratedSeq, x = getRecalibratedSeq(queryPolymers, refSeq, 6569, 6570)
+        print("polymerRegions at 6569: ", polymerRegions[6569])
+        print("queryPolymers at 6569: ", queryPolymers[6569])
+        print("recalibratedSeq at 6569: ", f"{recalibratedSeq}\t{x}")
+        print("\n")
+
+        recalibratedSeq, x = getRecalibratedSeq(queryPolymers, refSeq, 6571, 6571)
+        print("polymerRegions at 6571: ", polymerRegions[6571])
+        print("queryPolymers at 6571: ", queryPolymers[6571])
+        print("recalibratedSeq at 6571: ", f"{recalibratedSeq}\t{x}")
+        print("\n")
+
+        # recalibratedSeq, x = getRecalibratedSeq(queryPolymers, refSeq, 5068, 5068)
+        # print("polymerRegions at 5068: ", polymerRegions[5068])
+        # print("queryPolymers at 5068: ", queryPolymers[5068])
+        # print("recalibratedSeq at 5068: ", f"{recalibratedSeq}\t{x}")
+        # print("\n")
+
+        # print("--------------------------------")
+
+        # recalibratedSeq, x = getRecalibratedSeq(queryPolymers, refSeq, 4012, 4014)
+        # print("polymerRegions at 4012: ", polymerRegions[4012])
+        # print("queryPolymers at 4012: ", queryPolymers[4012])
+        # print("recalibratedSeq at 4012: ", f"{recalibratedSeq}\t{x}")
+        # print("\n")
+
+        # recalibratedSeq, x = getRecalibratedSeq(queryPolymers, refSeq, 4015, 4015)
+        # print("polymerRegions at 4015: ", polymerRegions[4015])
+        # print("queryPolymers at 4015: ", queryPolymers[4015])
+        # print("recalibratedSeq at 4015: ", f"{recalibratedSeq}\t{x}")
+        # print("\n")
+
+        # recalibratedSeq, x = getRecalibratedSeq(queryPolymers, refSeq, 4016, 4018)
+        # print("polymerRegions at 4016: ", polymerRegions[4016])
+        # print("queryPolymers at 4016: ", queryPolymers[4016])
+        # print("recalibratedSeq at 4016: ", f"{recalibratedSeq}\t{x}")
+        # print("\n")
+
     # 10. Close files
     fai_destroy(inputFa)
     outputFa.close()
