@@ -137,6 +137,7 @@ cpdef object runInParallel(object cmdArgs):
         # 7. Output reference flank sequence for high-qual clusters
         subProcTup = set([executor.submit(outputRefFlank, \
                                           highQualArr, \
+                                          allCltData, \
                                           startIdx, \
                                           taskSize, \
                                           cmdArgs) for startIdx in startList])

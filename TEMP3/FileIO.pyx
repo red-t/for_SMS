@@ -1,5 +1,6 @@
 import os
 import subprocess
+from collections import Counter
 
 ########################
 ### Class Definition ###
@@ -265,10 +266,24 @@ cdef outputSingleSeq(Segment[::1] segView, BamFile outputFa, Iterator iterator, 
 #########################
 ### Flank Sequence IO ###
 #########################
-cpdef outputRefFlank(Cluster[::1] cltView, int startIdx, int taskSize, object cmdArgs):
+cpdef outputRefFlank(Cluster[::1] cltView, object allCltData, int startIdx, int taskSize, object cmdArgs):
     cdef int endIdx = startIdx + taskSize
     if endIdx > cltView.shape[0]:
         endIdx = cltView.shape[0]
+    
+    # Reset breakpoint to most common site
+    cdef object counter = Counter()
+    cdef Segment[::1] segView
+    for i in range(startIdx, endIdx):
+        segView = allCltData[cltView[i].tid][1]
+        for j in range(cltView[i].startIdx, cltView[i].endIdx):
+            if overhangIsShort(&segView[j], cmdArgs.minOverhang):
+                continue
+            counter[segView[j].refPosition] += 1
+        
+        cltView[i].refStart = counter.most_common(1)[0][0]
+        cltView[i].refEnd = cltView[i].refStart + 1
+        counter.clear()
     
     cdef bytes refFn = cmdArgs.refFn.encode('utf-8')
     extractRefFlanks(refFn, &cltView[0], startIdx, endIdx)

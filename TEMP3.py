@@ -111,9 +111,8 @@ if __name__ == '__main__':
             os.makedirs("tmp_build")
 
         if os.path.exists("tmp_assm"):
-            # shutil.rmtree("tmp_assm")
-            # os.makedirs("tmp_assm")
-            pass
+            shutil.rmtree("tmp_assm")
+            os.makedirs("tmp_assm")
         else:
             os.makedirs("tmp_assm")
 

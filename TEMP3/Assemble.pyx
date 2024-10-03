@@ -40,33 +40,32 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
 
         # 1. Primary assembling
         prefix = "tmp_assm/{}_{}".format(cltView[i].tid, cltView[i].idx)
-        if not os.path.exists(f"{prefix}_polished.fa"):
-            rounds = 0
-            while rounds < 5:
-                rounds += 1
-                cmd = "wtdbg2 -p 5 -k 15 -l 256 -e {0} -S 1 -A --rescue-low-cov-edges --node-len {1} --ctg-min-length {1} " \
-                    "--ctg-min-nodes 1 -q -t {2} -i {3}.fa -fo {3}".format(minEdge, nodeLen, numThread, prefix)
-                subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-                if os.path.isfile(f"{prefix}.ctg.lay.gz") == False:
-                    continue
-                
-                cmd = "wtpoa-cns -q -c 1 -t {0} -i {1}.ctg.lay.gz -fo {1}_assm.fa".format(numThread, prefix)
-                subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
-                if os.path.isfile(f"{prefix}_assm.fa") and (os.path.getsize(f"{prefix}_assm.fa") != 0):
-                    break
-            
-            if os.path.getsize(f"{prefix}_assm.fa") == 0:
+        rounds = 0
+        while rounds < 5:
+            rounds += 1
+            cmd = "wtdbg2 -p 5 -k 15 -l 256 -e {0} -S 1 -A --rescue-low-cov-edges --node-len {1} --ctg-min-length {1} " \
+                "--ctg-min-nodes 1 -q -t {2} -i {3}.fa -fo {3}".format(minEdge, nodeLen, numThread, prefix)
+            subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+            if os.path.isfile(f"{prefix}.ctg.lay.gz") == False:
                 continue
-
-            # 2. First round polishing
-            cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
-                "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
+            
+            cmd = "wtpoa-cns -q -c 1 -t {0} -i {1}.ctg.lay.gz -fo {1}_assm.fa".format(numThread, prefix)
             subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+            if os.path.isfile(f"{prefix}_assm.fa") and (os.path.getsize(f"{prefix}_assm.fa") != 0):
+                break
+        
+        if os.path.getsize(f"{prefix}_assm.fa") == 0:
+            continue
 
-            # 3. Second round polishing
-            cmd = "minimap2 -aY {0}_assembled.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
-                "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
-            subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+        # 2. First round polishing
+        cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
+            "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
+        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+
+        # 3. Second round polishing
+        cmd = "minimap2 -aY {0}_assembled.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \
+            "samtools consensus --ff 3332 -m simple -c 0 -d 1 -H 0.9 {0}_RawToAssm.bam -o {0}_assembled.fa".format(prefix)
+        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
         # 4. Recalibration
         recalibration(prefix, cmdArgs)
@@ -86,12 +85,11 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
 #####################
 cdef recalibration(str prefix, object cmdArgs):
     # 1. Map raw reads to polished seqs
-    if not os.path.exists(f"{prefix}_polished.fa"):
-        os.rename(f"{prefix}_assembled.fa", f"{prefix}_polished.fa")
-        cmd = "minimap2 -aY {0}_polished.fa {0}.fa | " \
-            "samtools sort | samtools view -bhS -F 3332 -o {0}_RawToPolish.bam && " \
-            "samtools index {0}_RawToPolish.bam".format(prefix)
-        subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+    os.rename(f"{prefix}_assembled.fa", f"{prefix}_polished.fa")
+    cmd = "minimap2 -aY {0}_polished.fa {0}.fa | " \
+        "samtools sort | samtools view -bhS -F 3332 -o {0}_RawToPolish.bam && " \
+        "samtools index {0}_RawToPolish.bam".format(prefix)
+    subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
     if not os.path.exists(f"{prefix}_RawToPolish.bam.bai"):
         os.rename(f"{prefix}_polished.fa", f"{prefix}_assembled.fa")
         return
