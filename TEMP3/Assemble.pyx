@@ -100,36 +100,37 @@ cdef recalibration(str prefix, object cmdArgs):
     cdef BamFile inputBam = BamFile(f"{prefix}_RawToPolish.bam", "rb")
     cdef object outputFa = open(f"{prefix}_assembled.fa", "w")
 
-    # 3. Recalibrate
-    cdef object queryArr = np.zeros(1, dtype=np.int32)
-    cdef object refArr = np.zeros(1, dtype=np.int32)
-    cdef int tid, refLen, newCapacity, numRef = faidx_nseq(inputFa)
+    # 3. Initilize
+    cdef int tid, numRef = faidx_nseq(inputFa)
+    cdef int refLen, maxLen = 0
+    for tid in range(numRef):
+        refLen = faidx_seq_len(inputFa, faidx_iseq(inputFa, tid))
+        if refLen > maxLen:
+            maxLen = refLen
+
+    # 4. Recalibrate
+    cdef object queryArr = np.zeros(5*maxLen, dtype=np.int32)
+    cdef object refArr = np.zeros(5*maxLen, dtype=np.int32)
     cdef int refStart, refEnd, skipNext
     cdef const char *cRefName
     cdef char *cRefSeq
     cdef str refSeq, recalibratedSeq
 
     for tid in range(numRef):
-        # 4. Load sequence
+        # 5. Load sequence
         cRefName = faidx_iseq(inputFa, tid)
         refLen = faidx_seq_len(inputFa, cRefName)
         cRefSeq = faidx_fetch_seq(inputFa, cRefName, 0, refLen, &refLen)
         refSeq = cRefSeq.decode('utf-8')
         
-        # 5. Define homopolymer regions
+        # 6. Define homopolymer regions
         polymerRegions = getPolymerRegions(refSeq, refLen)
-
-        # 6. Expand array capacity
-        newCapacity = int(2 * refLen)
-        if queryArr.shape[0] < newCapacity:
-            queryArr.resize((newCapacity,), refcheck=False)
-            refArr.resize((newCapacity,), refcheck=False)
         
-        # 8. Collect query homo-polymers
+        # 7. Collect query homo-polymers
         iterator = Iterator(inputBam, tid)
         queryPolymers = getQueryPolymers(iterator, queryArr, refArr, polymerRegions, refSeq)
         
-        # 9. Output recalibrated sequence
+        # 8. Output recalibrated sequence
         outputFa.write(">" + cRefName.decode('utf-8') + "\n")
         skipNext = 0
         for refStart in polymerRegions:
@@ -152,7 +153,7 @@ cdef recalibration(str prefix, object cmdArgs):
         outputFa.write("\n")
         del iterator
 
-    # 10. Close files
+    # 9. Close files
     fai_destroy(inputFa)
     outputFa.close()
     inputBam.close()
