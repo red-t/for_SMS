@@ -254,6 +254,29 @@ cpdef outputSomaCltSeqs(Cluster[::1] cltView, Segment[::1] segView, object cmdAr
     genomeBam.close(); del genomeBam
 
 
+cpdef int outputReadAsAssm(Cluster[::1] cltView, dict allCltData, object cmdArgs, int i):
+    if cltView[i].numSegRaw < 3:
+        return 0
+
+    cdef Segment[::1] segView = allCltData[cltView[i].tid][1]
+    cdef BamFile genomeBam = BamFile(cmdArgs.genomeBamFn, "rb", cmdArgs.numThread)
+    cdef Iterator iterator = Iterator(genomeBam, cltView[i].tid)
+    cdef bam1_t *destRecord = bam_init1()
+    cdef str outputFn = "tmp_assm/{}_{}_assm.fa".format(cltView[i].tid, cltView[i].idx)
+    cdef BamFile outputFa = BamFile(outputFn, "wF", cmdArgs.numThread, genomeBam)
+    cdef Args args
+
+    args.minOverhang = cmdArgs.minOverhang
+    j = getOuputSegIdx(&cltView[i], &segView[0], args)
+    outputSingleSeq(segView, outputFa, iterator, destRecord, j)
+    
+    outputFa.close()
+    bam_destroy1(destRecord); del iterator
+    genomeBam.close(); del genomeBam
+
+    return 1
+
+
 cdef outputSingleSeq(Segment[::1] segView, BamFile outputFa, Iterator iterator, bam1_t *destRecord, int j, int flankSize=3000):
     cdef int start, end, retValue
 
@@ -266,7 +289,7 @@ cdef outputSingleSeq(Segment[::1] segView, BamFile outputFa, Iterator iterator, 
 #########################
 ### Flank Sequence IO ###
 #########################
-cpdef outputRefFlank(Cluster[::1] cltView, object allCltData, int startIdx, int taskSize, object cmdArgs):
+cpdef outputRefFlank(Cluster[::1] cltView, dict allCltData, int startIdx, int taskSize, object cmdArgs):
     cdef int endIdx = startIdx + taskSize
     if endIdx > cltView.shape[0]:
         endIdx = cltView.shape[0]

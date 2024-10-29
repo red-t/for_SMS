@@ -20,7 +20,7 @@ cdef int getMinEdge(int numSegRaw):
         return 5
 
 
-cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object cmdArgs):
+cpdef assembleCluster(Cluster[::1] cltView, dict allCltData, int startIdx, int taskSize, object cmdArgs):
     cdef int numThread = cmdArgs.numThread
     cdef int nodeLen = cmdArgs.nodeLen
     cdef int i, endIdx, minEdge, rounds
@@ -54,8 +54,9 @@ cpdef assembleCluster(Cluster[::1] cltView, int startIdx, int taskSize, object c
             if os.path.isfile(f"{prefix}_assm.fa") and (os.path.getsize(f"{prefix}_assm.fa") != 0):
                 break
         
-        if os.path.getsize(f"{prefix}_assm.fa") == 0:
-            continue
+        if (not os.path.isfile(f"{prefix}_assm.fa")) or (os.path.getsize(f"{prefix}_assm.fa") == 0):
+            if not outputReadAsAssm(cltView, allCltData, cmdArgs, i):
+                continue
 
         # 2. First round polishing
         cmd = "minimap2 -aY {0}_assm.fa {0}.fa | samtools sort | samtools view -bhS -F 3332 -o {0}_RawToAssm.bam && " \

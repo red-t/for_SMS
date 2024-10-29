@@ -120,6 +120,7 @@ cpdef object runInParallel(object cmdArgs):
         taskSize, startList = divideTask(highQualArr.shape[0], cmdArgs.numProcess)
         subProcTup = set([executor.submit(assembleCluster, \
                                           highQualArr, \
+                                          allCltData, \
                                           startIdx, \
                                           taskSize, \
                                           cmdArgs) for startIdx in startList])
