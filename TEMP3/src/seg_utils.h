@@ -172,6 +172,7 @@ void updateSegByTeAlignment(Segment *segment, TeAlignment *teAlignment, int teId
  *******************************/
 #define alingnedBits 0x3c03f
 #define bamIsInvalid(bam) (((bam)->core.flag & BAM_FSECONDARY) != 0 || ((bam)->core.flag & BAM_FUNMAP) != 0)
+#define bamIsUnmap(bam) (((bam)->core.flag & BAM_FUNMAP) != 0)
 #define isCigarAligned(cigar) ((alingnedBits >> (bam_cigar_op((cigar))<<1) & 3) & 1)
 
 /// @brief Parsing and record a Seg-To-TE alignment

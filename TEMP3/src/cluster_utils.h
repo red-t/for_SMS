@@ -41,6 +41,7 @@
 #define CLT_POLYA_ONLY          33554432
 
 #define isTEMapped(flag) (((flag) & CLT_TE_MAP) != 0)
+#define mapToSameContig(flag) (((flag) & 32) != 0)
 #define isFlankMapped(flag) (((flag) & 60) != 0)
 #define isBothFlankMapped(flag) (((flag) & 48) != 0)
 #define isLeftFlankMapped(flag) (((flag) & CLT_LEFT_FLANK_MAP) != 0)

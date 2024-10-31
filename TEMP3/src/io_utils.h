@@ -41,8 +41,10 @@ void setFlankRegion(Cluster *clt, FlankRegion *region);
 /// @brief output flank-seq for single cluster
 void outputFlank(Cluster *clt, faidx_t *refFa, FlankRegion region);
 
-/// @brief output +-500bp local-seq around cluster position for tsd annotation
-void outputLocal(Cluster *clt, faidx_t *refFa, FlankRegion region);
+// /// @brief output +-500bp local-seq around cluster position for tsd annotation
+// void outputLocal(Cluster *clt, faidx_t *refFa, FlankRegion region);
+/// @brief Output local region around refrence breakpoint with length of 2*length
+void outputLocal(Cluster *clt, faidx_t *refFa, int length, const char *suffix);
 
 
 /*****************************
@@ -65,14 +67,29 @@ typedef struct InsRegion
     uint32_t flag;
 } InsRegion;
 
-/// @brief output insertion-seq and tsd-containing-seq from contig
-void extractIns(Cluster *clt);
+// /// @brief output insertion-seq and tsd-containing-seq from contig
+// void extractIns(Cluster *clt);
+
+/// @brief Primary defining of insertion region
+void defineInsRegion(char *refFn, Cluster *clt);
 
 /// @brief define insertion-seq region by Flank-To-Assm alignments
 void setInsRegion(Cluster *clt, InsRegion *region);
 
-/// @brief adjust region->flag
-void adjustInsRegion(InsRegion *region);
+/// @brief Adjust insertion region and clt->flag
+void adjustInsRegion(Cluster *clt, InsRegion *region);
+
+/// @brief Secondary defining of insertion region
+void refineInsRegion(Cluster *clt);
+
+/// @brief Reset insertion region
+void reSetInsRegion1(Cluster *clt, faidx_t *assmFa);
+
+/// @brief Get tid in the assmFa, based on qname of the bam record
+int getTid(bam1_t *bam, faidx_t *assmFa);
+
+/// @brief Re-adjust insertion region and clt->flag
+void reAdjustInsRegion(Cluster *clt, int tid1, int refPos1, int leftMost, int tid2, int refPos2, int rightMost);
 
 /// @brief output insertion-seq in FASTA format
 void outputInsSeq(faidx_t *assmFa, Cluster *clt);
@@ -80,14 +97,14 @@ void outputInsSeq(faidx_t *assmFa, Cluster *clt);
 /// @brief get insertion-seq
 char *getInsSeq(faidx_t *assmFa, Cluster *clt);
 
-/// @brief output flank-seqs of insertion-seq from assembled-contig for re-deining insertion region
-void outputAssmFlank(faidx_t *assmFa, Cluster *clt);
+// /// @brief output flank-seqs of insertion-seq from assembled-contig for re-deining insertion region
+// void outputAssmFlank(faidx_t *assmFa, Cluster *clt);
 
-/// @brief refine and ouput insertion-seq for single-flank-mapped cases
-void reExtractIns(Cluster *clt);
+// /// @brief refine and ouput insertion-seq for single-flank-mapped cases
+// void reExtractIns(Cluster *clt);
 
-/// @brief re-set insertion-seq region
-void reSetInsRegion(Cluster *clt, faidx_t *assmFa);
+// /// @brief re-set insertion-seq region
+// void reSetInsRegion(Cluster *clt, faidx_t *assmFa);
 
 /*******************
  *** Cluster I/O ***

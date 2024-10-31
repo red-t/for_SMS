@@ -23,13 +23,22 @@ AnnoDt = np.dtype([
 ### Annotate Assembly ###
 #########################
 cdef annotateAssm(Cluster[::1] cltView, int startIdx, int endIdx, object cmdArgs):
-    cdef int i
+    cdef bytes refFn = cmdArgs.refFn.encode('utf-8')
+
     for i in range(startIdx, endIdx):
         mapFlankToAssm(cltView[i].tid, cltView[i].idx)
-        extractIns(&cltView[i])
-        mapAssmFlankToLocal(cltView[i].tid, cltView[i].idx)
-        if os.path.isfile("tmp_anno/{}_{}_AssmFlankToLocal.bam".format(cltView[i].tid, cltView[i].idx)) == True:
-            reExtractIns(&cltView[i])
+        # extractIns(&cltView[i])
+        if os.path.isfile("tmp_anno/{}_{}_FlankToAssm.bam".format(cltView[i].tid, cltView[i].idx)) == True:
+            defineInsRegion(refFn, &cltView[i])
+
+        # mapAssmFlankToLocal(cltView[i].tid, cltView[i].idx)
+        # if os.path.isfile("tmp_anno/{}_{}_AssmFlankToLocal.bam".format(cltView[i].tid, cltView[i].idx)) == True:
+        #     reExtractIns(&cltView[i])
+        
+        mapAssmToRef(cltView[i].tid, cltView[i].idx)
+        if os.path.isfile("tmp_anno/{}_{}_AssmToRef.bam".format(cltView[i].tid, cltView[i].idx)) == True:
+            refineInsRegion(&cltView[i])
+        
         mapInsToTE(cltView[i].tid, cltView[i].idx, cmdArgs)
         
 
@@ -42,15 +51,23 @@ cdef mapFlankToAssm(int tid, int idx):
     subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
 
-cdef mapAssmFlankToLocal(int tid, int idx):
-    cdef str targetFn = "tmp_anno/{}_{}_local.fa".format(tid, idx)
-    cdef str queryFn = "tmp_anno/{}_{}_assmFlank.fa".format(tid, idx)
-    cdef str outFn = "tmp_anno/{}_{}_AssmFlankToLocal.bam".format(tid, idx)
+# cdef mapAssmFlankToLocal(int tid, int idx):
+#     cdef str targetFn = "tmp_anno/{}_{}_local.fa".format(tid, idx)
+#     cdef str queryFn = "tmp_anno/{}_{}_assmFlank.fa".format(tid, idx)
+#     cdef str outFn = "tmp_anno/{}_{}_AssmFlankToLocal.bam".format(tid, idx)
+#     cdef str cmd = "minimap2 -x sr --secondary=no -t 1 -aY {} {} | " \
+#                    "samtools view -bhS -o {} -".format(targetFn, queryFn, outFn)
+#     if os.path.isfile(queryFn) == False:
+#         return
+    
+#     subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
+
+cdef mapAssmToRef(int tid, int idx):
+    cdef str targetFn = "tmp_anno/{}_{}_ref.fa".format(tid, idx)
+    cdef str queryFn = "tmp_assm/{}_{}_assembled.fa".format(tid, idx)
+    cdef str outFn = "tmp_anno/{}_{}_AssmToRef.bam".format(tid, idx)
     cdef str cmd = "minimap2 -x sr --secondary=no -t 1 -aY {} {} | " \
                    "samtools view -bhS -o {} -".format(targetFn, queryFn, outFn)
-    if os.path.isfile(queryFn) == False:
-        return
-    
     subprocess.run(cmd, stderr=subprocess.DEVNULL, shell=True, executable='/bin/bash')
 
 

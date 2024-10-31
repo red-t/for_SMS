@@ -1,6 +1,14 @@
 from .FileIO cimport *
 
 cdef extern from "src/io_utils.h":
+    #############################
+    ### Insertion Sequence IO ###
+    #############################
+    # void extractIns(Cluster *clt)
+    # void reExtractIns(Cluster *clt)
+    void defineInsRegion(char *refFn, Cluster *clt)
+    void refineInsRegion(Cluster *clt)
+    
     ###################
     ### Cluster I/O ###
     ###################

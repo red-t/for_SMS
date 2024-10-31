@@ -196,12 +196,6 @@ cdef extern from "src/io_utils.h" nogil:
     #########################
     void extractRefFlanks(char *refFn, Cluster *cltArr, int startIdx, int endIdx)
 
-    #############################
-    ### Insertion Sequence IO ###
-    #############################
-    void extractIns(Cluster *clt)
-    void reExtractIns(Cluster *clt)
-
 
 cdef Args newArgs(int tid, float bgDiv, float bgDepth, float bgReadLen, object cmdArgs)
 cdef AiList* newAiList(str bedFn, const char *chrom)

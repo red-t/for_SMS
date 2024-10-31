@@ -79,7 +79,12 @@ void extractRefFlanks(char *refFn, Cluster *cltArr, int startIdx, int endIdx)
         Cluster *clt = &cltArr[i];
         setFlankRegion(clt, &region);
         outputFlank(clt, refFa, region);
-        outputLocal(clt, refFa, region);
+        // outputLocal(clt, refFa, region);
+        outputLocal(clt, refFa, 200, "local");
+
+        // Output local region for secodary defining
+        outputLocal(clt, refFa, 2000, "ref");
+        
     }
 
     if (refFa != NULL) {fai_destroy(refFa); refFa=NULL;}
@@ -114,16 +119,34 @@ void outputFlank(Cluster *clt, faidx_t *refFa, FlankRegion region)
     if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
 }
 
-/// @brief output +-500bp local-seq around cluster position for tsd annotation
-void outputLocal(Cluster *clt, faidx_t *refFa, FlankRegion region)
+// /// @brief output +-500bp local-seq around cluster position for tsd annotation
+// void outputLocal(Cluster *clt, faidx_t *refFa, FlankRegion region)
+// {
+//     hts_pos_t seqLen;
+//     int start = (region.start1 < 0) ? 0 : region.start1;
+//     const char *chrom = faidx_iseq(refFa, clt->tid);
+//     char *localSeq = faidx_fetch_seq64(refFa, chrom, start, region.end2, &seqLen);
+
+//     char outFn[100] = {'\0'};
+//     sprintf(outFn, "tmp_anno/%d_%d_local.fa", clt->tid, clt->idx);
+//     FILE *fp = fopen(outFn, "w");
+//     fprintf(fp, ">%d\n%s\n", start, localSeq);
+//     fclose(fp);
+
+//     if (localSeq != NULL) {free(localSeq); localSeq=NULL;}
+// }
+
+/// @brief Output local region around refrence breakpoint with length of 2*length
+void outputLocal(Cluster *clt, faidx_t *refFa, int length, const char *suffix)
 {
     hts_pos_t seqLen;
-    int start = (region.start1 < 0) ? 0 : region.start1;
+    int start = (clt->refStart - length < 0) ? 0 : clt->refStart - length;
+    int end = clt->refStart + length - 1;
     const char *chrom = faidx_iseq(refFa, clt->tid);
-    char *localSeq = faidx_fetch_seq64(refFa, chrom, start, region.end2, &seqLen);
+    char *localSeq = faidx_fetch_seq64(refFa, chrom, start, end, &seqLen);
 
     char outFn[100] = {'\0'};
-    sprintf(outFn, "tmp_anno/%d_%d_local.fa", clt->tid, clt->idx);
+    sprintf(outFn, "tmp_anno/%d_%d_%s.fa", clt->tid, clt->idx, suffix);
     FILE *fp = fopen(outFn, "w");
     fprintf(fp, ">%d\n%s\n", start, localSeq);
     fclose(fp);
@@ -150,25 +173,33 @@ InsRegion initInsRegion()
     return region;
 }
 
-/// @brief output insertion-seq from contig
-void extractIns(Cluster *clt)
+// /// @brief output insertion-seq from contig
+// void extractIns(Cluster *clt)
+// {
+//     InsRegion region = initInsRegion();
+//     setInsRegion(clt, &region);
+//     if (!isFlankMapped(clt->flag))
+//         return;
+
+//     char assmFn[100] = {'\0'};
+//     sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
+//     faidx_t *assmFa = fai_load((const char *)assmFn);
+
+//     if (isBothFlankMapped(clt->flag))
+//         outputInsSeq(assmFa, clt);
+//     else
+//         outputAssmFlank(assmFa, clt);
+
+//     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
+//     return;
+// }
+
+/// @brief Primary defining of insertion region
+void defineInsRegion(char *refFn, Cluster *clt)
 {
+    // Primary defining
     InsRegion region = initInsRegion();
     setInsRegion(clt, &region);
-    if (!isFlankMapped(clt->flag))
-        return;
-
-    char assmFn[100] = {'\0'};
-    sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
-    faidx_t *assmFa = fai_load((const char *)assmFn);
-
-    if (isBothFlankMapped(clt->flag))
-        outputInsSeq(assmFa, clt);
-    else
-        outputAssmFlank(assmFa, clt);
-
-    if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
-    return;
 }
 
 /// @brief define insertion-seq region by Flank-To-Assm alignments
@@ -218,52 +249,224 @@ void setInsRegion(Cluster *clt, InsRegion *region)
     if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
     if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
 
-    adjustInsRegion(region);
+    adjustInsRegion(clt, region);
+}
+
+/// @brief Adjust insertion region and clt->flag
+void adjustInsRegion(Cluster *clt, InsRegion *region)
+{
     clt->tid1 = region->tid1;
     clt->leftMost = region->leftMost;
     clt->tid2 = region->tid2;
     clt->rightMost = region->rightMost;
-    clt->flag |= region->flag;
+
+    // Only left end can be defined
+    if ((region->tid2 < 0 || isClipInFlank(region->cigar2, 400)) && (region->tid1 >= 0 && !isClipInFlank(region->cigar1, 400))) {
+        clt->flag |= CLT_LEFT_FLANK_MAP;
+        return;
+    }
+
+    // Only right end can be defined
+    if ((region->tid1 < 0 || isClipInFlank(region->cigar1, 400)) && (region->tid2 >= 0 && !isClipInFlank(region->cigar2, 400))) {
+        clt->flag |= CLT_RIGHT_FLANK_MAP;
+        return;
+    }
+
+    // Both ends can be defined
+    if ((region->tid1 >= 0 && region->tid2 >= 0) && (!isClipInFlank(region->cigar1, 400) && !isClipInFlank(region->cigar2, 400))) {
+        if (region->leftMost > region->rightMost - 100)
+            return;
+        clt->flag |= (region->tid1 == region->tid2) ? CLT_SAME_FLANK_MAP : CLT_DIFF_FLANK_MAP;
+        return;
+    }
 }
 
-/// @brief adjust region->flag
-void adjustInsRegion(InsRegion *region)
+/// @brief Secondary defining of insertion region
+void refineInsRegion(Cluster *clt)
 {
-    if (region->tid1 < 0 && region->tid2 < 0) // No flank mapped
-        return;
+    char assmFn[100] = {'\0'};
+    sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
+    faidx_t *assmFa = fai_load((const char *)assmFn);
+    
+    reSetInsRegion1(clt, assmFa);
+    if (isFlankMapped(clt->flag))
+        outputInsSeq(assmFa, clt);
 
-    // Large clip in both flank
-    if (isClipInFlank(region->cigar1, 400) && isClipInFlank(region->cigar2, 400))
-        return;
+    if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
+}
 
-    if (region->tid2 < 0) { // Only left lank mapped
-        region->flag |= CLT_LEFT_FLANK_MAP;
-        return;
+/// @brief Reset insertion region
+void reSetInsRegion1(Cluster *clt, faidx_t *assmFa)
+{
+    char inputFn[100] = {'\0'};
+    sprintf(inputFn, "tmp_anno/%d_%d_AssmToRef.bam", clt->tid, clt->idx);
+    htsFile *inputBam = sam_open(inputFn, "rb");
+    sam_hdr_t *header = sam_hdr_read(inputBam);
+    bam1_t *bam = bam_init1();
+
+    // Traverse CIGAR to detect insertion site for each aligment
+    int localStart = atoi(sam_hdr_tid2name(header, 0));
+    int refLen = header->target_len[0];
+    if (refLen == 4000) {
+        clt->refStart = localStart + 2000;
+        clt->refEnd = clt->refStart + 1;
     }
 
-    if (region->tid1 < 0) { // Only right lank mapped
-        region->flag |= CLT_RIGHT_FLANK_MAP;
-        return;
+    int tid1 = -1, refPos1 = 0, leftMost = 0;
+    int tid2 = -1, refPos2 = 0, rightMost = 0;
+
+    while (1)
+    {
+        int retValue = bam_read1(inputBam->fp.bgzf, bam);
+        if (retValue < 0)
+            break;
+        if (bamIsUnmap(bam) || bam_is_rev(bam))
+            continue;
+
+        int queryPosition = 0;                        // position on assembly
+        int refPosition = localStart + bam->core.pos; // position on local reference
+        int numCigar = bam->core.n_cigar;
+        int lastCigarIdx = numCigar - 1;
+        uint32_t *cigarArr = bam_get_cigar(bam);
+        for (int i = 0; i < numCigar; i++)
+        {
+            int cigarLen = bam_cigar_oplen(cigarArr[i]);
+            switch (bam_cigar_op(cigarArr[i]))
+            {
+            case BAM_CMATCH:
+            case BAM_CEQUAL:
+            case BAM_CDIFF:
+                queryPosition += cigarLen;
+                refPosition += cigarLen;
+                break;
+
+            case BAM_CSOFT_CLIP:
+            case BAM_CINS:
+                if (cigarLen < 100)
+                    goto SKIP;
+
+                int deltaDistToBp1 = abs(refPosition - clt->refStart) - abs(refPos1 - clt->refStart);
+                int deltaDistToBp2 = abs(refPosition - clt->refStart) - abs(refPos2 - clt->refStart);
+
+                if (i == 0) {
+                    // left-clip, update rightMost
+                    if (deltaDistToBp2 > 0)
+                        goto SKIP;
+
+                    rightMost = cigarLen;
+                    refPos2 = refPosition;
+                    tid2 = getTid(bam, assmFa);
+                } else if (i == lastCigarIdx) {
+                    // right-clip, update leftMost
+                    if (deltaDistToBp1 > 0)
+                        goto SKIP;
+
+                    leftMost = queryPosition;
+                    refPos1 = refPosition;
+                    tid1 = getTid(bam, assmFa);
+                } else {
+                    // insertion, update leftMost && rightMost
+                    if (deltaDistToBp1 > 0 || deltaDistToBp2 > 0)
+                        goto SKIP;
+                    
+                    leftMost = queryPosition;
+                    refPos1 = refPosition;
+                    tid1 = getTid(bam, assmFa);
+
+                    rightMost = queryPosition + cigarLen;
+                    refPos2 = refPosition;
+                    tid2 = getTid(bam, assmFa);
+                }
+
+                SKIP:
+                    queryPosition += cigarLen;
+                    break;
+
+            case BAM_CDEL:
+            case BAM_CREF_SKIP:
+                refPosition += cigarLen;
+                break;
+                
+            default:
+                break;
+            }
+        }
+    }
+    
+    reAdjustInsRegion(clt, tid1, refPos1, leftMost, tid2, refPos2, rightMost);
+
+    if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
+    if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
+    if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
+}
+
+/// @brief Get tid in the assmFa, based on qname of the bam record
+int getTid(bam1_t *bam, faidx_t *assmFa)
+{
+    int nseq = faidx_nseq(assmFa);
+    const char *seqName = bam_get_qname(bam);
+    int tid = -1;
+
+    for (int i = 0; i < nseq; i++)
+    {
+        const char *currentName = faidx_iseq(assmFa, i);
+        if (strcmp(currentName, seqName) == 0) {
+            tid = i;
+            break;
+        }
     }
 
-    if (isClipInFlank(region->cigar2, 400)) { // Large flank in right flank
-        region->flag |= CLT_LEFT_FLANK_MAP;
-        return;
+    return tid;
+}
+
+/// @brief Re-adjust insertion region and clt->flag
+void reAdjustInsRegion(Cluster *clt, int tid1, int refPos1, int leftMost, int tid2, int refPos2, int rightMost)
+{
+    int distToBp1 = abs(refPos1 - clt->refStart);
+    int distToBp2 = abs(refPos2 - clt->refStart);
+
+    // Only left end can be refined
+    if ((tid2 < 0 || distToBp2 > 50) && (tid1 >= 0 && distToBp1 <= 50)) {
+        if (mapToSameContig(clt->flag))
+            return;
+        fprintf(stderr, "\n[ Insertion region of %d_%d was refined to ===> CLT_LEFT_FLANK_MAP ]\tPrimary definition(flag tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\t%d ===> Secondary definition(tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\n", clt->tid, clt->idx, clt->flag, clt->tid1, clt->leftMost, clt->tid2, clt->rightMost, tid1, leftMost, tid2, rightMost);
+        clt->flag &= 0xffffffc3;
+        clt->flag |= CLT_LEFT_FLANK_MAP;
+        goto END;
     }
 
-    if (isClipInFlank(region->cigar1, 400)) { // Large flank in left flank
-        region->flag |= CLT_RIGHT_FLANK_MAP;
-        return;
+    // Only right end can be refined
+    if ((tid1 < 0 || distToBp1 > 50) && (tid2 >= 0 && distToBp2 <= 50)) {
+        if (mapToSameContig(clt->flag))
+            return;
+        fprintf(stderr, "\n[ Insertion region of %d_%d was refined to ===> CLT_RIGHT_FLANK_MAP ]\tPrimary definition(flag tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\t%d ===> Secondary definition(tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\n", clt->tid, clt->idx, clt->flag, clt->tid1, clt->leftMost, clt->tid2, clt->rightMost, tid1, leftMost, tid2, rightMost);
+        clt->flag &= 0xffffffc3;
+        clt->flag |= CLT_RIGHT_FLANK_MAP;
+        goto END;
     }
 
-    // Two flanks map to same contig
-    if (region->tid1 == region->tid2 && region->leftMost <= (region->rightMost-100)) {
-        region->flag |= CLT_SAME_FLANK_MAP;
-        return;
+    // Both ends can be refiend
+    if ((tid1 >= 0 && tid2 >= 0) && (distToBp1 <= 50 && distToBp2 <= 50)) {
+        if (leftMost > rightMost - 100)
+            return;
+        fprintf(stderr, "\n[ Insertion region of %d_%d was refined to ===> CLT_SAME_FLANK_MAP ]\tPrimary definition(flag tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\t%d ===> Secondary definition(tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\n", clt->tid, clt->idx, clt->flag, clt->tid1, clt->leftMost, clt->tid2, clt->rightMost, tid1, leftMost, tid2, rightMost);
+        clt->flag &= 0xffffffc3;
+        clt->flag |= (tid1 == tid2) ? CLT_SAME_FLANK_MAP : CLT_DIFF_FLANK_MAP;
+        goto END;
     }
 
-    if (region->tid1 != region->tid2) // Two flanks map to different contig
-        region->flag |= CLT_DIFF_FLANK_MAP;
+    if (isFlankMapped(clt->flag)) {
+        fprintf(stderr, "\n[ Failed to refine insertion region of %d_%d, but primary definition succeeded ]\tPrimary definition(flag tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\t%d <=== Secondary definition(tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\n", clt->tid, clt->idx, clt->flag, clt->tid1, clt->leftMost, clt->tid2, clt->rightMost, tid1, leftMost, tid2, rightMost);
+        return;
+    } else {
+        fprintf(stderr, "\n[ Failed to define insertion region of %d_%d, check tmp_anno/%d_%d_FlankToAssm.bam to verify primary definition, check tmp_anno/%d_%d_AssmToRef.bam to verify secondary definition ]\tPrimary definition(flag tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\t%d ==== Secondary definition(tid1 leftMost tid2 rightMost): %d\t%d\t%d\t%d\n", clt->tid, clt->idx, clt->tid, clt->idx, clt->tid, clt->idx, clt->flag, clt->tid1, clt->leftMost, clt->tid2, clt->rightMost, tid1, leftMost, tid2, rightMost);
+    }
+
+    END:
+        clt->tid1 = tid1;
+        clt->leftMost = leftMost;
+        clt->tid2 = tid2;
+        clt->rightMost = rightMost;
 }
 
 /// @brief output insertion-seq for annotation
@@ -314,122 +517,122 @@ char *getInsSeq(faidx_t *assmFa, Cluster *clt)
     return NULL;
 }
 
-/// @brief output flank-seqs of insertion-seq from assembled-contig for re-defining insertion region
-void outputAssmFlank(faidx_t *assmFa, Cluster *clt)
-{
-    int insLen = isLeftFlankMapped(clt->flag) ? (faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1)) - clt->leftMost) : clt->rightMost;
-    if (insLen < 250) {
-        outputInsSeq(assmFa, clt);
-        return;
-    }
+// /// @brief output flank-seqs of insertion-seq from assembled-contig for re-defining insertion region
+// void outputAssmFlank(faidx_t *assmFa, Cluster *clt)
+// {
+//     int insLen = isLeftFlankMapped(clt->flag) ? (faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1)) - clt->leftMost) : clt->rightMost;
+//     if (insLen < 250) {
+//         outputInsSeq(assmFa, clt);
+//         return;
+//     }
 
-    char *leftSeq = NULL, *rightSeq = NULL;
-    hts_pos_t seqLen;
+//     char *leftSeq = NULL, *rightSeq = NULL;
+//     hts_pos_t seqLen;
 
-    if (isLeftFlankMapped(clt->flag)) {
-        int assmLen = faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1));
-        leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), clt->leftMost-200, clt->leftMost-1, &seqLen);
-        rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), assmLen-200, assmLen-1, &seqLen);
-    }
+//     if (isLeftFlankMapped(clt->flag)) {
+//         int assmLen = faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1));
+//         leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), clt->leftMost-200, clt->leftMost-1, &seqLen);
+//         rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid1), assmLen-200, assmLen-1, &seqLen);
+//     }
 
-    if (isRightFlankMapped(clt->flag)) {
-        leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), 0, 199, &seqLen);
-        rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), clt->rightMost, clt->rightMost+199, &seqLen);
-    }
+//     if (isRightFlankMapped(clt->flag)) {
+//         leftSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), 0, 199, &seqLen);
+//         rightSeq = faidx_fetch_seq64(assmFa, faidx_iseq(assmFa, clt->tid2), clt->rightMost, clt->rightMost+199, &seqLen);
+//     }
 
-    char outFn[100] = {'\0'};
-    sprintf(outFn, "tmp_anno/%d_%d_assmFlank.fa", clt->tid, clt->idx);
-    FILE *fp = fopen(outFn, "w");
-    fprintf(fp, ">0\n%s\n", leftSeq);
-    fprintf(fp, ">1\n%s\n", rightSeq);
-    fclose(fp);
+//     char outFn[100] = {'\0'};
+//     sprintf(outFn, "tmp_anno/%d_%d_assmFlank.fa", clt->tid, clt->idx);
+//     FILE *fp = fopen(outFn, "w");
+//     fprintf(fp, ">0\n%s\n", leftSeq);
+//     fprintf(fp, ">1\n%s\n", rightSeq);
+//     fclose(fp);
 
-    if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
-    if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
-}
+//     if (leftSeq != NULL) {free(leftSeq); leftSeq=NULL;}
+//     if (rightSeq != NULL) {free(rightSeq); rightSeq=NULL;}
+// }
 
-/// @brief refine and ouput insertion-seq for single-flank-mapped cases
-void reExtractIns(Cluster *clt)
-{
-    char assmFn[100] = {'\0'};
-    sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
-    faidx_t *assmFa = fai_load((const char *)assmFn);
-    reSetInsRegion(clt, assmFa);
-    outputInsSeq(assmFa, clt);
+// /// @brief refine and ouput insertion-seq for single-flank-mapped cases
+// void reExtractIns(Cluster *clt)
+// {
+//     char assmFn[100] = {'\0'};
+//     sprintf(assmFn, "tmp_assm/%d_%d_assembled.fa", clt->tid, clt->idx);
+//     faidx_t *assmFa = fai_load((const char *)assmFn);
+//     reSetInsRegion(clt, assmFa);
+//     outputInsSeq(assmFa, clt);
 
-    if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
-    return;
-}
+//     if (assmFa != NULL) {fai_destroy(assmFa); assmFa=NULL;}
+//     return;
+// }
 
-/// @brief re-set insertion-seq region
-void reSetInsRegion(Cluster *clt, faidx_t *assmFa)
-{
-    char inputFn[100] = {'\0'};
-    sprintf(inputFn, "tmp_anno/%d_%d_AssmFlankToLocal.bam", clt->tid, clt->idx);
-    htsFile *inputBam = sam_open(inputFn, "rb");
-    sam_hdr_t *header = sam_hdr_read(inputBam);
-    bam1_t *bam = bam_init1();
-    int leftEnd = 0, rightStart = 0, leftLen = 0, rightLen = 0;
-    int localStart = atoi(sam_hdr_tid2name(header, 0));
-    uint32_t leftCigar1 = 0, leftCigar2 = 0;
-    uint32_t rightCigar1 = 0, rightCigar2 = 0;
+// /// @brief re-set insertion-seq region
+// void reSetInsRegion(Cluster *clt, faidx_t *assmFa)
+// {
+//     char inputFn[100] = {'\0'};
+//     sprintf(inputFn, "tmp_anno/%d_%d_AssmFlankToLocal.bam", clt->tid, clt->idx);
+//     htsFile *inputBam = sam_open(inputFn, "rb");
+//     sam_hdr_t *header = sam_hdr_read(inputBam);
+//     bam1_t *bam = bam_init1();
+//     int leftEnd = 0, rightStart = 0, leftLen = 0, rightLen = 0;
+//     int localStart = atoi(sam_hdr_tid2name(header, 0));
+//     uint32_t leftCigar1 = 0, leftCigar2 = 0;
+//     uint32_t rightCigar1 = 0, rightCigar2 = 0;
 
-    while (1)
-    {
-        int retValue = bam_read1(inputBam->fp.bgzf, bam);
-        if (retValue < 0)
-            break;
-        if (bamIsInvalid(bam) || bamIsSup(bam) || bam_is_rev(bam))
-            continue;
+//     while (1)
+//     {
+//         int retValue = bam_read1(inputBam->fp.bgzf, bam);
+//         if (retValue < 0)
+//             break;
+//         if (bamIsInvalid(bam) || bamIsSup(bam) || bam_is_rev(bam))
+//             continue;
 
-        int numCigar = bam->core.n_cigar;
-        uint32_t *cigarArr = bam_get_cigar(bam);
+//         int numCigar = bam->core.n_cigar;
+//         uint32_t *cigarArr = bam_get_cigar(bam);
 
-        if (isLeftFlank(bam)) {
-            leftEnd = bam_endpos(bam);
-            leftLen = bam->core.l_qseq;
-            leftCigar1 = cigarArr[0];
-            leftCigar2 = cigarArr[numCigar - 1];
-        } else {
-            rightStart = bam->core.pos;
-            rightLen = bam->core.l_qseq;
-            rightCigar1 = cigarArr[0];
-            rightCigar2 = cigarArr[numCigar - 1];
-        }
-    }
+//         if (isLeftFlank(bam)) {
+//             leftEnd = bam_endpos(bam);
+//             leftLen = bam->core.l_qseq;
+//             leftCigar1 = cigarArr[0];
+//             leftCigar2 = cigarArr[numCigar - 1];
+//         } else {
+//             rightStart = bam->core.pos;
+//             rightLen = bam->core.l_qseq;
+//             rightCigar1 = cigarArr[0];
+//             rightCigar2 = cigarArr[numCigar - 1];
+//         }
+//     }
     
-    if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
-    if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
-    if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
+//     if (bam != NULL) {bam_destroy1(bam); bam=NULL;}
+//     if (inputBam != NULL) {sam_close(inputBam); inputBam=NULL;}
+//     if (header != NULL) {sam_hdr_destroy(header); header=NULL;}
 
-    if (leftEnd == 0 || rightStart == 0 )
-        return;
+//     if (leftEnd == 0 || rightStart == 0 )
+//         return;
 
-    if (isClipInFlank(leftCigar1, 50) || isClipInFlank(rightCigar2, 50))
-        return;
+//     if (isClipInFlank(leftCigar1, 50) || isClipInFlank(rightCigar2, 50))
+//         return;
 
-    int leftDelta = MIN(abs(leftEnd + localStart - clt->refStart), abs(leftEnd + localStart - clt->refEnd));
-    int rightDelta = MIN(abs(rightStart + localStart - clt->refStart), abs(rightStart + localStart - clt->refEnd));
-    if (leftDelta > 50 || rightDelta > 50)
-        return;
+//     int leftDelta = MIN(abs(leftEnd + localStart - clt->refStart), abs(leftEnd + localStart - clt->refEnd));
+//     int rightDelta = MIN(abs(rightStart + localStart - clt->refStart), abs(rightStart + localStart - clt->refEnd));
+//     if (leftDelta > 50 || rightDelta > 50)
+//         return;
 
-    if (abs(rightStart - leftEnd) > 50)
-        return;
+//     if (abs(rightStart - leftEnd) > 50)
+//         return;
 
-    if (isLeftFlankMapped(clt->flag)) {
-        clt->tid2 = clt->tid1;
-        clt->rightMost = faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1));
-        clt->rightMost -= (rightLen - bam_cigar_oplen(rightCigar1));
-    }
+//     if (isLeftFlankMapped(clt->flag)) {
+//         clt->tid2 = clt->tid1;
+//         clt->rightMost = faidx_seq_len64(assmFa, faidx_iseq(assmFa, clt->tid1));
+//         clt->rightMost -= (rightLen - bam_cigar_oplen(rightCigar1));
+//     }
 
-    if (isRightFlankMapped(clt->flag)) {
-        clt->tid1 = clt->tid2;
-        clt->leftMost = leftLen - bam_cigar_oplen(leftCigar2);
-    }
+//     if (isRightFlankMapped(clt->flag)) {
+//         clt->tid1 = clt->tid2;
+//         clt->leftMost = leftLen - bam_cigar_oplen(leftCigar2);
+//     }
 
-    clt->flag &= 0xfffffff3;
-    clt->flag |= CLT_SAME_FLANK_MAP;
-}
+//     clt->flag &= 0xfffffff3;
+//     clt->flag |= CLT_SAME_FLANK_MAP;
+// }
 
 /*******************
  *** Cluster I/O ***
